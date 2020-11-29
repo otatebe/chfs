@@ -1,0 +1,50 @@
+#!/bin/sh
+
+PROTO=sockets
+PORT=10000
+DBDIR=/tmp/$USER
+CHFSD=chfsd
+LOG_DIR=$HOME
+
+program=$0
+
+usage() {
+	[ "X$*" = X ] || echo $*
+	echo "usage: $program [-c db_dir] [-proto proto] [-p port] -h hostfile start | stop | status"
+	exit 1
+}
+
+while [ $# -gt 0 ]; do
+	case $1 in
+	    start|stop|status) mode=$1 ;;
+	    -h) shift; HOSTFILE=$1 ;;
+	    -proto) shift; PROTO=$1 ;;
+	    -p) shift; PORT=$1 ;;
+	    -c) shift; DBDIR=$1 ;;
+	    -*) echo "unknown option: $1"
+		usage ;;
+	    *) usage ;;
+	esac
+	shift
+done
+
+[ "X$mode" = X ] && usage
+[ "X$HOSTFILE" = X ] && usage Hostfile should be specified
+[ ! -f $HOSTFILE ] && usage $HOSTFILE: no such file
+
+SERVER=
+for host in `sed -e 's/#.*//' -e '/^[ 	]*$/d' $HOSTFILE | awk '{ print $1 }'`
+do
+	echo $host
+	case $mode in
+	start)
+	ssh $host LD_LIBRARY_PATH=$LD_LIBRARY_PATH $CHFSD -c $DBDIR -p $PROTO -h $host:$PORT -l $LOG_DIR/$host $SERVER
+	[ X"$SERVER" = X ] && SERVER=$PROTO://$host:$PORT
+	;;
+	stop)
+	ssh $host pkill $CHFSD
+	;;
+	esac
+done
+
+exit 0

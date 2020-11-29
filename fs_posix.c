@@ -1,0 +1,322 @@
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/xattr.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <dirent.h>
+#include <errno.h>
+#include <margo.h>
+#include "ring_types.h"
+#include "kv_types.h"
+#include "kv.h"
+#include "kv_err.h"
+#include "fs_types.h"
+#include "fs.h"
+#include "log.h"
+
+static int
+mkdir_p(char *path, mode_t mode);
+
+void
+fs_inode_init(char *dir)
+{
+	int r;
+
+	r = chdir(dir);
+	if (r == -1 && errno == ENOENT) {
+		r = mkdir_p(dir, 0755);
+		if (r == 0)
+			r = chdir(dir);
+	}
+	if (r == -1)
+		log_fatal("%s: %s", dir, strerror(errno));
+
+	log_info("fs_inode_init: path %s", dir);
+}
+
+/* key is modified */
+static char *
+key_to_path(char *key, size_t key_size)
+{
+	size_t klen = strlen(key);
+
+	log_debug("key_to_path: key %s", key);
+	if (klen + 1 < key_size)
+		key[klen] = ':';
+	while (*key && *key == '/')
+		++key;
+	if (*key == '\0')
+		key = ".";
+	log_debug("key_to_path: path %s", key);
+	return (key);
+}
+
+static char *
+fs_dirname(const char *path)
+{
+	size_t p = strlen(path) - 1;
+	char *r;
+
+	while (p > 0 && path[p] != '/')
+		--p;
+	if (p == 0)
+		return (NULL);
+
+	r = malloc(p + 1);
+	if (r == NULL)
+		return (NULL);
+	strncpy(r, path, p);
+	r[p] = '\0';
+	log_debug("fs_dirname: path %s dirname %s\n", path, r);
+	return (r);
+}
+
+#define DIR_LEVEL 20
+
+static int
+mkdir_p(char *path, mode_t mode)
+{
+	int r, p = strlen(path) - 1, pos[DIR_LEVEL], i;
+
+	log_debug("mkdir_p: %s", path);
+	r = mkdir(path, mode);
+	if (r == 0 || errno != ENOENT)
+		return (r);
+	for (i = 0; i < DIR_LEVEL; ++i) {
+		while (p > 0 && path[p] != '/')
+			--p;
+		if (p == 0)
+			return (-1);
+		pos[i] = p;
+		path[p] = '\0';
+
+		log_debug("mkdir_p: [%d] %s", i, path);
+		r = mkdir(path, mode);
+		if (r == -1) {
+			if (errno == ENOENT)
+				continue;
+			return (r);
+		}
+		for (; i >= 0; --i) {
+			path[pos[i]] = '/';
+			r = mkdir(path, mode);
+			if (r == -1)
+				return (r);
+		}
+		return (0);
+	}
+	return (-1);
+}
+
+#define FS_XATTR_CHUNK_SIZE "user.chunk_size"
+
+static int
+set_chunk_size(const char *path, size_t size)
+{
+	int r;
+
+	r = setxattr(path, FS_XATTR_CHUNK_SIZE, &size, sizeof(size), 0);
+	if (r == -1)
+		log_error("set_chunk_size: %s", strerror(errno));
+	return (r);
+}
+
+static int
+get_chunk_size(const char *path, size_t *size)
+{
+	int r;
+
+	r = getxattr(path, FS_XATTR_CHUNK_SIZE, size, sizeof(*size));
+	if (r == -1)
+		log_info("get_chunk_size: %s", strerror(errno));
+	return (r);
+}
+
+static int
+fs_open(const char *path, int flags, mode_t mode, size_t *chunk_size)
+{
+	int fd, r = 0;
+	char *d;
+
+	if ((flags & O_ACCMODE) == O_RDONLY) {
+		if (get_chunk_size(path, chunk_size) == -1)
+			return (-1);
+	}
+	fd = open(path, flags, mode);
+	if (fd == -1) {
+		if (flags & O_CREAT) {
+			d = fs_dirname(path);
+			if (d == NULL)
+				return (fd);
+			r = mkdir_p(d, 0755);
+			free(d);
+			if (r == -1)
+				return (r);
+		}
+		switch (flags & O_ACCMODE) {
+		case O_WRONLY:
+		case O_RDWR:
+			flags |= O_CREAT;
+		}
+		fd = open(path, flags, mode);
+	}
+	if (fd == -1)
+		return (fd);
+	if (flags & O_CREAT) {
+		r = set_chunk_size(path, *chunk_size);
+		if (r == -1)
+			close(fd);
+	}
+	return (r == -1 ? r : fd);
+}
+
+int
+fs_inode_create(char *key, size_t key_size, int32_t uid, int32_t gid,
+	mode_t mode, size_t chunk_size)
+{
+	char *p = key_to_path(key, key_size);
+	int r = 0;
+
+	log_debug("fs_inode_create: %s mode %o chunk_size %ld", p, mode,
+		chunk_size);
+	if (S_ISREG(mode)) {
+		r = fs_open(p, O_CREAT|O_WRONLY|O_TRUNC, mode, &chunk_size);
+		if (r == -1)
+			return (r);
+		close(r);
+		r = 0;
+	} else if (S_ISDIR(mode))
+		r = mkdir_p(p, mode);
+	return (r);
+}
+
+int
+fs_inode_stat(char *key, size_t key_size, struct fs_stat *st)
+{
+	char *p = key_to_path(key, key_size);
+	struct stat sb;
+	int r;
+
+	log_debug("fs_inode_stat: %s", p);
+	r = stat(p, &sb);
+	if (r == -1)
+		goto err;
+
+	if (S_ISREG(sb.st_mode)) {
+		r = get_chunk_size(p, &st->chunk_size);
+		if (r == -1)
+			goto err;
+	} else
+		st->chunk_size = 0;
+
+	st->mode = sb.st_mode;
+	st->uid = sb.st_uid;
+	st->gid = sb.st_gid;
+	st->size = sb.st_size;
+	r = 0;
+err:
+	log_debug("fs_inode_stat: %d", r);
+	return (r);
+}
+
+int
+fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
+	off_t offset, mode_t mode, size_t chunk_size)
+{
+	char *p = key_to_path(key, key_size);
+	size_t ss;
+	int fd, r = 0;
+
+	log_debug("fs_inode_write: %s size %ld offset %ld", p, *size, offset);
+	ss = *size;
+	if (ss + offset > chunk_size)
+		ss = chunk_size - offset;
+	if (ss <= 0) {
+		*size = 0;
+		goto err;
+	}
+	fd = r = fs_open(p, O_WRONLY, mode, &chunk_size);
+	if (fd != -1) {
+		r = pwrite(fd, buf, ss, offset);
+		close(fd);
+	}
+	if (r == -1)
+		goto err;
+	*size = r;
+	r = 0;
+err:
+	log_debug("fs_inode_write: ret %d", r);
+	return (r);
+}
+
+int
+fs_inode_read(char *key, size_t key_size, void *buf, size_t *size,
+	off_t offset)
+{
+	char *p = key_to_path(key, key_size);
+	size_t ss, chunk_size;
+	int fd, r;
+
+	log_debug("fs_inode_read: %s size %ld offset %ld", p, *size, offset);
+	fd = r = fs_open(p, O_RDONLY, 0644, &chunk_size);
+	if (r == -1)
+		goto err;
+	log_debug("fs_inode_read: chunk_size %ld", chunk_size);
+
+	ss = *size;
+	if (ss + offset > chunk_size)
+		ss = chunk_size - offset;
+	if (ss <= 0)
+		r = 0;
+	else
+		r = pread(fd, buf, ss, offset);
+	close(fd);
+	if (r == -1)
+		goto err;
+	*size = r;
+	r = 0;
+err:
+	log_debug("fs_inode_read: ret %d", r);
+	return (r);
+}
+
+int
+fs_inode_remove(char *key, size_t key_size)
+{
+	char *p = key_to_path(key, key_size);
+	struct stat sb;
+
+	log_debug("fs_inode_remove: %s", p);
+	if (stat(p, &sb) == -1)
+		return (-1);
+	if (S_ISREG(sb.st_mode))
+		return (unlink(p));
+	if (S_ISDIR(sb.st_mode))
+		return (rmdir(p));
+	return (-1);
+}
+
+int
+fs_inode_readdir(char *path, void (*cb)(struct dirent *, void *),
+	void *arg)
+{
+	char *p = key_to_path(path, strlen(path) + 1);
+	struct dirent *dent;
+	DIR *dp;
+	int r;
+
+	log_debug("fs_inode_readdir: %s", p);
+	dp = opendir(p);
+	if (dp != NULL) {
+		r = 0;
+		while ((dent = readdir(dp)) != NULL) {
+			if (strchr(dent->d_name, ':'))
+				continue;
+			cb(dent, arg);
+		}
+		closedir(dp);
+	} else
+		r = -1;
+
+	return (r);
+}
