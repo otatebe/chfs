@@ -74,7 +74,7 @@ chfs_init(const char *server)
 	margo_instance_id mid;
 	size_t client_size = sizeof(chfs_client);
 	hg_addr_t client_addr;
-	char *chunk_size_str, *prot;
+	char *chunk_size, *rdma_thresh, *prot;
 	hg_return_t ret;
 
 	if (server == NULL)
@@ -83,9 +83,13 @@ chfs_init(const char *server)
 		log_fatal("chfs_init: no server");
 	log_info("chfs_init: server %s", server);
 
-	chunk_size_str = getenv("CHFS_CHUNK_SIZE");
-	if (chunk_size_str != NULL)
-		chfs_set_chunk_size(atoi(chunk_size_str));
+	chunk_size = getenv("CHFS_CHUNK_SIZE");
+	if (chunk_size != NULL)
+		chfs_set_chunk_size(atoi(chunk_size));
+
+	rdma_thresh = getenv("CHFS_RDMA_THRESH");
+	if (rdma_thresh != NULL)
+		chfs_set_get_rdma_thresh(atoi(rdma_thresh));
 
 	prot = margo_protocol(server);
 	if (prot == NULL)
