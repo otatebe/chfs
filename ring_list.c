@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <margo.h>
 #include <openssl/md5.h>
+#include "config.h"
 #include "ring_types.h"
 #include "ring_list.h"
 
@@ -17,6 +18,24 @@ typedef struct ring_list {
 static ABT_mutex ring_list_mutex;
 static ring_list_t ring_list;
 
+static int
+hostname_len(const char *name)
+{
+	int len = strlen(name);
+#ifndef USE_HOST_PORT
+	int s;
+
+	/* eliminate port number */
+	s = len - 1;
+	while (s >= 0 && name[s] && name[s] != ':')
+		--s;
+	if (s >= 0 && name[s] == ':')
+		return (s);
+	else
+#endif
+		return (len);
+}
+
 void
 ring_list_init(char *self)
 {
@@ -30,7 +49,7 @@ ring_list_init(char *self)
 		assert(ring_list.nodes);
 		ring_list.nodes[0].name = strdup(self);
 		assert(ring_list.nodes[0].name);
-		MD5((unsigned char *)self, strlen(self),
+		MD5((unsigned char *)self, hostname_len(self),
 			ring_list.nodes[0].md5);
 	}
 }
@@ -113,7 +132,7 @@ ring_list_update(string_list_t *src)
 	ring_list.nodes = malloc(sizeof(ring_list.nodes[0]) * src->n);
 	for (i = 0; i < src->n; ++i) {
 		ring_list.nodes[i].name = strdup(src->s[i]);
-		MD5((unsigned char *)src->s[i], strlen(src->s[i]),
+		MD5((unsigned char *)src->s[i], hostname_len(src->s[i]),
 			ring_list.nodes[i].md5);
 	}
 	qsort(ring_list.nodes, ring_list.n, sizeof(ring_list.nodes[0]),

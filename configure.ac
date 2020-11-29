@@ -13,6 +13,16 @@ AC_PROG_CC
 AM_PROG_AR
 LT_INIT
 
+AC_MSG_CHECKING([whether port number is included to hash])
+AC_ARG_ENABLE([host-port],
+  [AS_HELP_STRING([--enable-host-port],
+    [include port number to hash @<:@default=no@:>@])],
+  [], [enableval=no])
+AC_MSG_RESULT([$enableval])
+if test x$enableval != xno; then
+  AC_DEFINE([USE_HOST_PORT], [1], [Include port numner to hash])
+fi
+
 # Checks for libraries.
 PKG_CHECK_MODULES([MARGO], [margo])
 PKG_CHECK_MODULES([OPENSSL], [openssl])
@@ -26,7 +36,6 @@ AC_ARG_WITH([pmemkv],
 AC_MSG_RESULT([$with_pmemkv])
 AM_CONDITIONAL([USE_PMEMKV], [test x$with_pmemkv != xno])
 if test x$with_pmemkv != xno; then
-  AC_DEFINE([USE_PMEMKV], [1], [Use pmemkv])
   PKG_CHECK_MODULES([LIBPMEMKV], [libpmemkv])
 fi
 
