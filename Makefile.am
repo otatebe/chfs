@@ -1,5 +1,5 @@
 bin_PROGRAMS = chlist chfuse
-dist_bin_SCRIPTS = chfsctl
+nodist_bin_SCRIPTS = chfsctl
 sbin_PROGRAMS = chfsd
 lib_LTLIBRARIES = libchfs.la
 include_HEADERS = chfs.h
