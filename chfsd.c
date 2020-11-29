@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <syslog.h>
 #include <libgen.h>
+#include <errno.h>
 #include <margo.h>
 #include "ring.h"
 #include "ring_types.h"
@@ -93,7 +94,7 @@ void
 usage(char *prog_name)
 {
 	fprintf(stderr, "Usage: %s [-d] [-c db_dir] [-p protocol] [-h host] "
-		"[-l log_file] [server]\n", prog_name);
+		"[-l log_file] [-S server_info_file] [server]\n", prog_name);
 	exit(EXIT_FAILURE);
 }
 
@@ -108,12 +109,13 @@ main(int argc, char *argv[])
 	margo_instance_id mid;
 	char *db_dir = "/tmp", *hostname = NULL, *log_file = NULL;
 	char *protocol = "sockets", info_string[PATH_MAX];
+	char *server_info_file = NULL;
 	int opt, debug = 0;
 	char *prog_name;
 
 	prog_name = basename(argv[0]);
 
-	while ((opt = getopt(argc, argv, "c:dh:l:p:")) != -1) {
+	while ((opt = getopt(argc, argv, "c:dh:l:p:S:")) != -1) {
 		switch (opt) {
 		case 'c':
 			db_dir = optarg;
@@ -130,6 +132,9 @@ main(int argc, char *argv[])
 			break;
 		case 'p':
 			protocol = optarg;
+			break;
+		case 'S':
+			server_info_file = optarg;
 			break;
 		default:
 			usage(argv[0]);
@@ -175,6 +180,15 @@ main(int argc, char *argv[])
 	margo_addr_to_string(mid, addr_str, &addr_str_size, my_address);
 	margo_addr_free(mid, my_address);
 	log_info("Server running at address %s", addr_str);
+	if (server_info_file) {
+		FILE *fp = fopen(server_info_file, "w");
+
+		if (fp) {
+			fprintf(fp, "%s\n", addr_str);
+			fclose(fp);
+		} else
+			log_error("%s: %s", server_info_file, strerror(errno));
+	}
 
 	ring_rpc_init(mid);
 	ring_init(addr_str);

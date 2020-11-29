@@ -6,16 +6,20 @@ PATH=@sbindir@:$PATH
 export PATH
 
 PROTO=sockets
-PORT=10000
 DBDIR=/tmp/$USER
 CHFSD=chfsd
 LOG_DIR=$HOME
 
 program=$0
 
+err() {
+	[ "X$*" = X ] || echo >&2 $*
+	exit 1
+}
+
 usage() {
-	[ "X$*" = X ] || echo $*
-	echo "usage: $program [-c db_dir] [-proto proto] [-p port] -h hostfile start | stop | status"
+	[ "X$*" = X ] || echo >&2 $*
+	echo >&2 "usage: $program [-c db_dir] [-p proto] [-L log_dir] -h hostfile start | stop | status"
 	exit 1
 }
 
@@ -23,9 +27,9 @@ while [ $# -gt 0 ]; do
 	case $1 in
 	    start|stop|status) mode=$1 ;;
 	    -h) shift; HOSTFILE=$1 ;;
-	    -proto) shift; PROTO=$1 ;;
-	    -p) shift; PORT=$1 ;;
 	    -c) shift; DBDIR=$1 ;;
+	    -p) shift; PROTO=$1 ;;
+	    -L) shift; LOG_DIR=$1 ;;
 	    -*) echo "unknown option: $1"
 		usage ;;
 	    *) usage ;;
@@ -37,14 +41,28 @@ done
 [ "X$HOSTFILE" = X ] && usage Hostfile should be specified
 [ ! -f $HOSTFILE ] && usage $HOSTFILE: no such file
 
-SERVER=
+case $mode in
+start)
+SERVER_INFO_FILE=/tmp/server-info-file-$$
+MYHOSTNAMES="$(hostname) $(hostname -A) $(hostname -I)"
+$CHFSD -c $DBDIR -p $PROTO -l $LOG_DIR/`hostname` -S $SERVER_INFO_FILE
+timeout=10
+while [ ! -s $SERVER_INFO_FILE -a $timeout -gt 0 ]; do sleep 1; timeout=$((timeout - 1)); done
+[ $timeout -eq 0 ] && err $CHFSD: timeout
+
+SERVER=`cat $SERVER_INFO_FILE`
+rm $SERVER_INFO_FILE
+[ X"$SERVER" = X ] && err $CHFSD: no server info
+echo "CHFS_SERVER=\"$SERVER\"; export CHFS_SERVER"
+;;
+esac
+
 for host in `sed -e 's/#.*//' -e '/^[ 	]*$/d' $HOSTFILE | awk '{ print $1 }'`
 do
-	echo $host
 	case $mode in
 	start)
-	ssh $host LD_LIBRARY_PATH=$LD_LIBRARY_PATH $CHFSD -c $DBDIR -p $PROTO -h $host:$PORT -l $LOG_DIR/$host $SERVER
-	[ X"$SERVER" = X ] && SERVER=$PROTO://$host:$PORT
+	echo $MYHOSTNAMES | grep $host > /dev/null && continue
+	ssh $host LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH\" PATH=\"$PATH\" $CHFSD -c $DBDIR -p $PROTO -l $LOG_DIR/$host \"$SERVER\"
 	;;
 	stop)
 	ssh $host pkill $CHFSD
