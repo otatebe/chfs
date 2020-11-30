@@ -22,7 +22,7 @@ static int
 hostname_len(const char *name)
 {
 	int len = strlen(name);
-#ifndef USE_HOST_PORT
+#ifndef ENABLE_HASH_PORT
 	int s;
 
 	/* eliminate port number */
