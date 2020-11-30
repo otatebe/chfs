@@ -45,7 +45,7 @@ SERVER_INFO_FILE=/tmp/server-info-file-$USER
 case $mode in
 start)
 MYHOSTNAMES="$(hostname) $(hostname -A) $(hostname -I)"
-$CHFSD -c $DBDIR -p $PROTO -l $LOG_DIR/`hostname` -S $SERVER_INFO_FILE
+$CHFSD -c $DBDIR -p $PROTO -l $LOG_DIR/$(hostname -f) -S $SERVER_INFO_FILE
 timeout=10
 while [ ! -s $SERVER_INFO_FILE -a $timeout -gt 0 ]; do sleep 1; timeout=$((timeout - 1)); done
 [ $timeout -eq 0 ] && err $CHFSD: timeout
