@@ -17,7 +17,7 @@ libchfs_la_SOURCES = chfs.c ring_list.c ring_list_rpc.c log.c kv_err.c fs_client
 
 chfsd_SOURCES = chfsd.c ring.c ring_rpc.c fs_server.c host.c
 if USE_PMEMKV
-chfsd_SOURCES += fs_server_kv.c fs.c pmemkv.c
+chfsd_SOURCES += fs_server_kv.c fs_kv.c pmemkv.c
 else
 chfsd_SOURCES += fs_server_posix.c fs_posix.c
 endif
