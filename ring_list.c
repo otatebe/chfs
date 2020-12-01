@@ -148,15 +148,15 @@ ring_list_remove(char *host)
 	if (host == NULL)
 		return;
 	ABT_mutex_lock(ring_list_mutex);
-	assert(ring_list.n > 1);
 	for (i = 0; i < ring_list.n; ++i)
 		if (strcmp(host, ring_list.nodes[i].name) == 0)
 			break;
-	assert(i < ring_list.n);
-	free(ring_list.nodes[i].name);
-	--ring_list.n;
-	for (; i < ring_list.n; ++i)
-		ring_list.nodes[i] = ring_list.nodes[i + 1];
+	if (i < ring_list.n) {
+		free(ring_list.nodes[i].name);
+		--ring_list.n;
+		for (; i < ring_list.n; ++i)
+			ring_list.nodes[i] = ring_list.nodes[i + 1];
+	}
 	ABT_mutex_unlock(ring_list_mutex);
 }
 
