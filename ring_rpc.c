@@ -279,7 +279,7 @@ ring_fix_next(int election)
 }
 
 static time_t heartbeat_time;
-#define TIMEOUT	5
+#define HEARTBEAT_TIMEOUT	10
 
 void
 ring_heartbeat()
@@ -303,7 +303,7 @@ ring_heartbeat()
 int
 ring_heartbeat_is_timeout()
 {
-	return (time(NULL) - heartbeat_time > TIMEOUT);
+	return (time(NULL) - heartbeat_time > HEARTBEAT_TIMEOUT);
 }
 
 void
