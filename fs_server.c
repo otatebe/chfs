@@ -27,7 +27,7 @@ static void inode_remove(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(inode_remove)
 
 void
-fs_server_init(margo_instance_id mid, char *db_dir)
+fs_server_init(margo_instance_id mid, char *db_dir, int timeout)
 {
 	hg_id_t create_rpc, stat_rpc;
 	hg_id_t write_rpc, read_rpc, remove_rpc;
@@ -43,8 +43,8 @@ fs_server_init(margo_instance_id mid, char *db_dir)
 	remove_rpc = MARGO_REGISTER(mid, "inode_remove", kv_byte_t, int32_t,
 		inode_remove);
 
-	fs_client_init_internal(mid, create_rpc, stat_rpc, write_rpc, read_rpc,
-		remove_rpc);
+	fs_client_init_internal(mid, timeout, create_rpc, stat_rpc, write_rpc,
+		read_rpc, remove_rpc);
 	fs_server_init_more(mid, db_dir);
 }
 

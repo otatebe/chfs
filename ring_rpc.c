@@ -5,7 +5,7 @@
 #include "ring_list.h"
 #include "log.h"
 
-#define TIMEOUT_MSEC	(0)
+static int ring_rpc_timeout_msec;
 
 static struct env {
 	margo_instance_id mid;
@@ -57,7 +57,7 @@ ring_rpc_join(const char *server, char *self, char **prev)
 	if (ret != HG_SUCCESS)
 		return (ret);
 
-	ret = margo_forward_timed(h, &self, TIMEOUT_MSEC);
+	ret = margo_forward_timed(h, &self, ring_rpc_timeout_msec);
 	if (ret != HG_SUCCESS)
 		goto err;
 
@@ -86,7 +86,7 @@ ring_rpc_set_next(const char *server, char *host)
 	if (ret != HG_SUCCESS)
 		return (ret);
 
-	ret = margo_forward_timed(h, &host, TIMEOUT_MSEC);
+	ret = margo_forward_timed(h, &host, ring_rpc_timeout_msec);
 
 	ret2 = margo_destroy(h);
 	if (ret == HG_SUCCESS)
@@ -104,7 +104,7 @@ ring_rpc_set_prev(const char *server, char *host)
 	if (ret != HG_SUCCESS)
 		return (ret);
 
-	ret = margo_forward_timed(h, &host, TIMEOUT_MSEC);
+	ret = margo_forward_timed(h, &host, ring_rpc_timeout_msec);
 
 	ret2 = margo_destroy(h);
 	if (ret == HG_SUCCESS)
@@ -130,7 +130,7 @@ ring_rpc_list(const char *server, string_list_t *list, char *self)
 		list->s[list->n] = self;
 		++list->n;
 	}
-	ret = margo_forward_timed(h, list, TIMEOUT_MSEC);
+	ret = margo_forward_timed(h, list, ring_rpc_timeout_msec);
 	/* decrement required not to free 'self' above in margo_input_free */
 	--list->n;
 
@@ -157,7 +157,7 @@ ring_rpc_election(const char *server, string_list_t *list, char *self)
 		list->s[list->n] = self;
 		++list->n;
 	}
-	ret = margo_forward_timed(h, list, TIMEOUT_MSEC);
+	ret = margo_forward_timed(h, list, ring_rpc_timeout_msec);
 	--list->n;
 
 	ret2 = margo_destroy(h);
@@ -176,7 +176,7 @@ ring_rpc_coordinator(const char *server, coordinator_t *list)
 	if (ret != HG_SUCCESS)
 		return (ret);
 
-	ret = margo_forward_timed(h, list, TIMEOUT_MSEC);
+	ret = margo_forward_timed(h, list, ring_rpc_timeout_msec);
 
 	ret2 = margo_destroy(h);
 	if (ret == HG_SUCCESS)
@@ -187,9 +187,10 @@ ring_rpc_coordinator(const char *server, coordinator_t *list)
 static ABT_mutex join_mutex;
 
 void
-ring_rpc_init(margo_instance_id mid)
+ring_rpc_init(margo_instance_id mid, int timeout)
 {
 	env.mid = mid;
+	ring_rpc_timeout_msec = timeout;
 	env.join_rpc = MARGO_REGISTER(mid, "join", hg_string_t, hg_string_t,
 		join);
 	env.set_next_rpc = MARGO_REGISTER(mid, "set_next", hg_string_t, void,

@@ -16,6 +16,7 @@ static char chfs_client[PATH_MAX];
 static uint32_t chfs_uid, chfs_gid;
 static int chfs_chunk_size = 4096;
 static int chfs_get_rdma_thresh = 2048;
+static int chfs_rpc_timeout_msec = 10000;	/* 10 seconds */
 
 static int chfs_fd_table_size;
 struct chfs_fd_table {
@@ -36,6 +37,13 @@ chfs_set_get_rdma_thresh(int thresh)
 {
 	log_info("chfs_set_get_rdma_thresh: %d", thresh);
 	chfs_get_rdma_thresh = thresh;
+}
+
+void
+chfs_set_rpc_timeout_msec(int timeout)
+{
+	log_info("chfs_set_rpc_timeout_msec: %d", timeout);
+	chfs_rpc_timeout_msec = timeout;
 }
 
 static void
@@ -74,7 +82,7 @@ chfs_init(const char *server)
 	margo_instance_id mid;
 	size_t client_size = sizeof(chfs_client);
 	hg_addr_t client_addr;
-	char *chunk_size, *rdma_thresh, *prot;
+	char *chunk_size, *rdma_thresh, *rpc_timeout, *proto;
 	hg_return_t ret;
 
 	if (server == NULL)
@@ -91,14 +99,18 @@ chfs_init(const char *server)
 	if (rdma_thresh != NULL)
 		chfs_set_get_rdma_thresh(atoi(rdma_thresh));
 
-	prot = margo_protocol(server);
-	if (prot == NULL)
+	rpc_timeout = getenv("CHFS_RPC_TIMEOUT_MSEC");
+	if (rpc_timeout != NULL)
+		chfs_set_rpc_timeout_msec(atoi(rpc_timeout));
+
+	proto = margo_protocol(server);
+	if (proto == NULL)
 		log_fatal("chfs_init: no protocol");
-	mid = margo_init(prot, MARGO_CLIENT_MODE, 1, 0);
-	free(prot);
+	mid = margo_init(proto, MARGO_CLIENT_MODE, 1, 0);
+	free(proto);
 	ring_list_init(NULL);
-	ring_list_rpc_init(mid);
-	fs_client_init(mid);
+	ring_list_rpc_init(mid, chfs_rpc_timeout_msec);
+	fs_client_init(mid, chfs_rpc_timeout_msec);
 
 	margo_addr_self(mid, &client_addr);
 	margo_addr_to_string(mid, chfs_client, &client_size, client_addr);

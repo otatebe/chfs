@@ -94,7 +94,8 @@ void
 usage(char *prog_name)
 {
 	fprintf(stderr, "Usage: %s [-d] [-c db_dir] [-p protocol] [-h host] "
-		"[-l log_file] [-S server_info_file] [server]\n", prog_name);
+		"[-l log_file]\n\t[-S server_info_file] [-t rpc_timeout_msec] "
+		"[server]\n", prog_name);
 	exit(EXIT_FAILURE);
 }
 
@@ -110,12 +111,12 @@ main(int argc, char *argv[])
 	char *db_dir = "/tmp", *hostname = NULL, *log_file = NULL;
 	char *protocol = "sockets", info_string[PATH_MAX];
 	char *server_info_file = NULL;
-	int opt, debug = 0;
+	int opt, debug = 0, rpc_timeout_msec = 10000;
 	char *prog_name;
 
 	prog_name = basename(argv[0]);
 
-	while ((opt = getopt(argc, argv, "c:dh:l:p:S:")) != -1) {
+	while ((opt = getopt(argc, argv, "c:dh:l:p:S:t:")) != -1) {
 		switch (opt) {
 		case 'c':
 			db_dir = optarg;
@@ -136,8 +137,11 @@ main(int argc, char *argv[])
 		case 'S':
 			server_info_file = optarg;
 			break;
+		case 't':
+			rpc_timeout_msec = atoi(optarg);
+			break;
 		default:
-			usage(argv[0]);
+			usage(prog_name);
 		}
 	}
 	argc -= optind;
@@ -190,11 +194,11 @@ main(int argc, char *argv[])
 			log_error("%s: %s", server_info_file, strerror(errno));
 	}
 
-	ring_rpc_init(mid);
 	ring_init(addr_str);
 	ring_list_init(addr_str);
-	ring_list_rpc_init(mid);
-	fs_server_init(mid, db_dir);
+	ring_rpc_init(mid, rpc_timeout_msec);
+	ring_list_rpc_init(mid, rpc_timeout_msec);
+	fs_server_init(mid, db_dir, rpc_timeout_msec);
 
 	if (argc > 0)
 		join_ring(mid, argv[0]);

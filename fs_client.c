@@ -5,7 +5,7 @@
 #include "fs_types.h"
 #include "fs_rpc.h"
 
-#define TIMEOUT_MSEC	(0)
+static int fs_rpc_timeout_msec;
 
 static struct env {
 	margo_instance_id mid;
@@ -47,7 +47,7 @@ fs_rpc_inode_create(const char *server, void *key, size_t key_size, int32_t uid,
 	in.st.mode = mode;
 	in.st.chunk_size = chunk_size;
 	in.st.size = 0;
-	ret = margo_forward_timed(h, &in, TIMEOUT_MSEC);
+	ret = margo_forward_timed(h, &in, fs_rpc_timeout_msec);
 	if (ret != HG_SUCCESS)
 		goto err;
 
@@ -77,7 +77,7 @@ fs_rpc_inode_stat(const char *server, void *key, size_t key_size,
 
 	in.v = key;
 	in.s = key_size;
-	ret = margo_forward_timed(h, &in, TIMEOUT_MSEC);
+	ret = margo_forward_timed(h, &in, fs_rpc_timeout_msec);
 	if (ret != HG_SUCCESS)
 		goto err;
 
@@ -121,7 +121,7 @@ fs_rpc_inode_write(const char *server, void *key, size_t key_size,
 	in.offset = offset;
 	in.mode = mode;
 	in.chunk_size = chunk_size;
-	ret = margo_forward_timed(h, &in, TIMEOUT_MSEC);
+	ret = margo_forward_timed(h, &in, fs_rpc_timeout_msec);
 	if (ret != HG_SUCCESS)
 		goto err;
 
@@ -156,7 +156,7 @@ fs_rpc_inode_read(const char *server, void *key, size_t key_size, void *buf,
 	in.key.s = key_size;
 	in.size = *size;
 	in.offset = offset;
-	ret = margo_forward_timed(h, &in, TIMEOUT_MSEC);
+	ret = margo_forward_timed(h, &in, fs_rpc_timeout_msec);
 	if (ret != HG_SUCCESS)
 		goto err;
 
@@ -197,7 +197,7 @@ fs_rpc_inode_read_rdma_bulk(const char *server, void *key, size_t key_size,
 	in.offset = offset;
 	in.value = buf;
 	in.value_size = *size;
-	ret = margo_forward_timed(h, &in, TIMEOUT_MSEC);
+	ret = margo_forward_timed(h, &in, fs_rpc_timeout_msec);
 	if (ret != HG_SUCCESS)
 		goto err;
 
@@ -250,7 +250,7 @@ fs_rpc_inode_remove(const char *server, void *key, size_t key_size, int *errp)
 
 	in.v = key;
 	in.s = key_size;
-	ret = margo_forward_timed(h, &in, TIMEOUT_MSEC);
+	ret = margo_forward_timed(h, &in, fs_rpc_timeout_msec);
 	if (ret != HG_SUCCESS)
 		goto err;
 
@@ -281,7 +281,7 @@ fs_rpc_readdir(const char *server, const char *path, void *buf,
 	if (ret != HG_SUCCESS)
 		return (ret);
 
-	ret = margo_forward_timed(h, &path, TIMEOUT_MSEC);
+	ret = margo_forward_timed(h, &path, fs_rpc_timeout_msec);
 	if (ret != HG_SUCCESS)
 		goto err;
 
@@ -308,11 +308,12 @@ err:
 }
 
 void
-fs_client_init_internal(margo_instance_id mid, hg_id_t create_rpc,
-	hg_id_t stat_rpc, hg_id_t write_rpc, hg_id_t read_rpc,
-	hg_id_t remove_rpc)
+fs_client_init_internal(margo_instance_id mid, int timeout,
+	hg_id_t create_rpc, hg_id_t stat_rpc, hg_id_t write_rpc,
+	hg_id_t read_rpc, hg_id_t remove_rpc)
 {
 	env.mid = mid;
+	fs_rpc_timeout_msec = timeout;
 	env.create_rpc = create_rpc;
 	env.stat_rpc = stat_rpc;
 	env.write_rpc = write_rpc;
@@ -328,9 +329,10 @@ fs_client_init_more_internal(hg_id_t read_rdma_rpc, hg_id_t readdir_rpc)
 }
 
 void
-fs_client_init(margo_instance_id mid)
+fs_client_init(margo_instance_id mid, int timeout)
 {
 	env.mid = mid;
+	fs_rpc_timeout_msec = timeout;
 	env.create_rpc = MARGO_REGISTER(mid, "inode_create", fs_create_in_t,
 		int32_t, NULL);
 	env.stat_rpc = MARGO_REGISTER(mid, "inode_stat", kv_byte_t,

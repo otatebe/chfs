@@ -4,7 +4,7 @@
 #include "ring_list_rpc.h"
 #include "log.h"
 
-#define TIMEOUT_MSEC	(0)
+static int ring_list_rpc_timeout_msec;
 
 static struct env {
 	margo_instance_id mid;
@@ -40,7 +40,7 @@ ring_list_rpc_node_list(const char *server)
 	if (ret != HG_SUCCESS)
 		return (ret);
 
-	ret = margo_forward_timed(h, &in, TIMEOUT_MSEC);
+	ret = margo_forward_timed(h, &in, ring_list_rpc_timeout_msec);
 	if (ret != HG_SUCCESS)
 		goto err;
 
@@ -57,9 +57,10 @@ err:
 }
 
 void
-ring_list_rpc_init(margo_instance_id mid)
+ring_list_rpc_init(margo_instance_id mid, int timeout)
 {
 	env.mid = mid;
+	ring_list_rpc_timeout_msec = timeout;
 	env.node_list_rpc = MARGO_REGISTER(mid, "node_list", int32_t,
 		string_list_t, node_list);
 }

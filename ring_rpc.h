@@ -16,7 +16,7 @@ ring_rpc_election(const char *server, string_list_t *list, char *self);
 hg_return_t
 ring_rpc_coordinator(const char *server, coordinator_t *list);
 
-void ring_rpc_init(margo_instance_id mid);
+void ring_rpc_init(margo_instance_id mid, int timeout);
 
 void ring_heartbeat();
 int ring_heartbeat_is_timeout();

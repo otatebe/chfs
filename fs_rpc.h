@@ -37,15 +37,15 @@ fs_rpc_readdir(const char *server, const char *path, void *buf,
 	int *errp);
 
 void
-fs_client_init_internal(margo_instance_id mid, hg_id_t create_rpc,
-	hg_id_t stat_rpc, hg_id_t write_rpc, hg_id_t read_rpc,
-	hg_id_t remove_rpc);
+fs_client_init_internal(margo_instance_id mid, int timeout,
+	hg_id_t create_rpc, hg_id_t stat_rpc, hg_id_t write_rpc,
+	hg_id_t read_rpc, hg_id_t remove_rpc);
 
 void
 fs_client_init_more_internal(hg_id_t read_rdma_rpc, hg_id_t readdir_rpc);
 
-void fs_client_init(margo_instance_id mid);
-void fs_server_init(margo_instance_id mid, char *db_dir);
+void fs_client_init(margo_instance_id mid, int timeout);
+void fs_server_init(margo_instance_id mid, char *db_dir, int timeout);
 void fs_server_init_more(margo_instance_id mid, char *db_dir);
 void fs_server_term(void);
 void fs_server_term_more(void);
