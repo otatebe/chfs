@@ -6,7 +6,7 @@
 #include "log.h"
 
 static FILE *log_file = NULL;
-static int priority_max_level = LOG_INFO;
+static int priority_max_level = LOG_NOTICE;
 
 static struct {
 	char *name;
