@@ -196,6 +196,13 @@ main(int argc, char *argv[])
 	margo_addr_to_string(mid, addr_str, &addr_str_size, my_address);
 	margo_addr_free(mid, my_address);
 	log_info("Server running at address %s", addr_str);
+
+	ring_init(addr_str);
+	ring_list_init(addr_str);
+	ring_rpc_init(mid, rpc_timeout_msec);
+	ring_list_rpc_init(mid, rpc_timeout_msec);
+	fs_server_init(mid, db_dir, rpc_timeout_msec);
+
 	if (server_info_file) {
 		FILE *fp = fopen(server_info_file, "w");
 
@@ -205,12 +212,6 @@ main(int argc, char *argv[])
 		} else
 			log_error("%s: %s", server_info_file, strerror(errno));
 	}
-
-	ring_init(addr_str);
-	ring_list_init(addr_str);
-	ring_rpc_init(mid, rpc_timeout_msec);
-	ring_list_rpc_init(mid, rpc_timeout_msec);
-	fs_server_init(mid, db_dir, rpc_timeout_msec);
 
 	if (argc > 0)
 		join_ring(mid, argv[0]);
