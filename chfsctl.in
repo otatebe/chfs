@@ -48,6 +48,7 @@ PKILL_FLAG=
 SERVER_INFO_FILE=/tmp/server-info-file-$USER
 case $mode in
 start)
+rm -f $SERVER_INFO_FILE
 MYHOSTNAMES="$(hostname) $(hostname -A) $(hostname -I)"
 $CHFSD -c $DBDIR -p $PROTO -l $LOG_DIR/$(hostname -f) -S $SERVER_INFO_FILE
 timeout=10
@@ -63,7 +64,11 @@ pkill $PKILL_FLAG $CHFSD
 rm -f $SERVER_INFO_FILE
 ;;
 status)
-[ -s $SERVER_INFO_FILE ] && chlist `cat $SERVER_INFO_FILE` || echo >&2 no server info file
+if [ -s $SERVER_INFO_FILE ]; then
+	chlist `cat $SERVER_INFO_FILE`
+else
+	echo >&2 no server info file
+fi
 ;;
 esac
 
