@@ -94,8 +94,8 @@ void
 usage(char *prog_name)
 {
 	fprintf(stderr, "Usage: %s [-d] [-c db_dir] [-p protocol] [-h host] "
-		"[-l log_file]\n\t[-S server_info_file] [-t rpc_timeout_msec] "
-		"[server]\n", prog_name);
+		"[-l log_file]\n\t[-S server_info_file] [-t rpc_timeout_msec]\n"
+		"\t[-H heartbeat_interval] [server]\n", prog_name);
 	exit(EXIT_FAILURE);
 }
 
@@ -112,11 +112,12 @@ main(int argc, char *argv[])
 	char *protocol = "sockets", info_string[PATH_MAX];
 	char *server_info_file = NULL;
 	int opt, debug = 0, rpc_timeout_msec = 10000;
+	int heartbeat_interval = 10;
 	char *prog_name;
 
 	prog_name = basename(argv[0]);
 
-	while ((opt = getopt(argc, argv, "c:dh:l:p:S:t:")) != -1) {
+	while ((opt = getopt(argc, argv, "c:dh:H:l:p:S:t:")) != -1) {
 		switch (opt) {
 		case 'c':
 			db_dir = optarg;
@@ -127,6 +128,9 @@ main(int argc, char *argv[])
 			break;
 		case 'h':
 			hostname = optarg;
+			break;
+		case 'H':
+			heartbeat_interval = atoi(optarg);
 			break;
 		case 'l':
 			log_file = optarg;
@@ -202,16 +206,18 @@ main(int argc, char *argv[])
 
 	if (argc > 0)
 		join_ring(mid, argv[0]);
-#if 0
-	while (1) {
+
+	ring_set_heartbeat_timeout(heartbeat_interval * 10);
+	log_debug("heartbeat interval: %d (timeout %d)",
+		heartbeat_interval, heartbeat_interval * 10);
+	while (heartbeat_interval > 0) {
 		if (ring_list_is_coordinator(addr_str)) {
-			puts("coordinator");
+			log_debug("coordinator");
 			ring_heartbeat();
 		} else if (ring_heartbeat_is_timeout())
 			ring_start_election();
-		sleep(1);
+		sleep(heartbeat_interval);
 	}
-#endif
 	margo_wait_for_finalize(mid);
 
 	return (0);
