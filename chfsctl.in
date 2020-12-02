@@ -10,7 +10,7 @@ DBDIR=/tmp/$USER
 CHFSD=chfsd
 LOG_DIR=$HOME
 
-program=$0
+program=$(basename $0)
 
 err() {
 	[ "X$*" = X ] || echo >&2 $*
