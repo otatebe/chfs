@@ -1,11 +1,42 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <string.h>
 #include <syslog.h>
 #include "log.h"
 
 static FILE *log_file = NULL;
 static int priority_max_level = LOG_INFO;
+
+static struct {
+	char *name;
+	int val;
+} priority_names[] = {
+	{ "emerg", LOG_EMERG },	/* system in unusable */
+	{ "alert", LOG_ALERT },	/* action must be taken immediately */
+	{ "crit", LOG_CRIT },	/* critical conditions */
+	{ "err", LOG_ERR },	/* error conditions */
+	{ "warning", LOG_WARNING }, /* warning conditions */
+	{ "notice", LOG_NOTICE },   /* normal but significant condition */
+	{ "info", LOG_INFO },       /* informational */
+	{ "debug", LOG_DEBUG },     /* debug-level messages */
+	{ NULL, -1 }
+};
+
+int
+log_priority_from_name(char *name)
+{
+	int i = 0;
+
+	if (name == NULL)
+		return (-1);
+	while (priority_names[i].name) {
+		if (strcmp(priority_names[i].name, name) == 0)
+			break;
+		++i;
+	}
+	return (priority_names[i].val);
+}
 
 void
 log_set_priority_max_level(int priority)

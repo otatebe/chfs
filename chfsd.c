@@ -112,19 +112,20 @@ main(int argc, char *argv[])
 	char *protocol = "sockets", info_string[PATH_MAX];
 	char *server_info_file = NULL;
 	int opt, debug = 0, rpc_timeout_msec = 10000;
-	int heartbeat_interval = 10;
+	int heartbeat_interval = 10, log_priority = -1;
 	char *prog_name;
 
 	prog_name = basename(argv[0]);
 
-	while ((opt = getopt(argc, argv, "c:dh:H:l:p:S:t:")) != -1) {
+	while ((opt = getopt(argc, argv, "c:dh:H:l:L:p:S:t:")) != -1) {
 		switch (opt) {
 		case 'c':
 			db_dir = optarg;
 			break;
 		case 'd':
 			debug = 1;
-			log_set_priority_max_level(LOG_DEBUG);
+			if (log_priority == -1)
+				log_priority = LOG_DEBUG;
 			break;
 		case 'h':
 			hostname = optarg;
@@ -134,6 +135,11 @@ main(int argc, char *argv[])
 			break;
 		case 'l':
 			log_file = optarg;
+			break;
+		case 'L':
+			log_priority = log_priority_from_name(optarg);
+			if (log_priority == -1)
+				log_error("%s: invalid log priority", optarg);
 			break;
 		case 'p':
 			protocol = optarg;
@@ -148,6 +154,8 @@ main(int argc, char *argv[])
 			usage(prog_name);
 		}
 	}
+	if (log_priority != -1)
+		log_set_priority_max_level(log_priority);
 	argc -= optind;
 	argv += optind;
 

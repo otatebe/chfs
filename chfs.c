@@ -83,6 +83,8 @@ chfs_init(const char *server)
 	size_t client_size = sizeof(chfs_client);
 	hg_addr_t client_addr;
 	char *chunk_size, *rdma_thresh, *rpc_timeout, *proto;
+	char *log_priority;
+	int max_log_level;
 	hg_return_t ret;
 
 	if (server == NULL)
@@ -103,11 +105,22 @@ chfs_init(const char *server)
 	if (rpc_timeout != NULL)
 		chfs_set_rpc_timeout_msec(atoi(rpc_timeout));
 
+	log_priority = getenv("CHFS_LOG_PRIORITY");
+	if (log_priority != NULL) {
+		max_log_level = log_priority_from_name(log_priority);
+		if (max_log_level == -1)
+			log_error("%s: invalid log priority", log_priority);
+		else
+			log_set_priority_max_level(max_log_level);
+	}
+
 	proto = margo_protocol(server);
 	if (proto == NULL)
-		log_fatal("chfs_init: no protocol");
+		log_fatal("%s: no protocol", server);
 	mid = margo_init(proto, MARGO_CLIENT_MODE, 1, 0);
 	free(proto);
+	if (mid == MARGO_INSTANCE_NULL)
+		log_fatal("margo_init failed, abort");
 	ring_list_init(NULL);
 	ring_list_rpc_init(mid, chfs_rpc_timeout_msec);
 	fs_client_init(mid, chfs_rpc_timeout_msec);
