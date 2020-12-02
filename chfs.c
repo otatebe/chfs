@@ -87,6 +87,14 @@ chfs_init(const char *server)
 	int max_log_level;
 	hg_return_t ret;
 
+	log_priority = getenv("CHFS_LOG_PRIORITY");
+	if (log_priority != NULL) {
+		max_log_level = log_priority_from_name(log_priority);
+		if (max_log_level == -1)
+			log_error("%s: invalid log priority", log_priority);
+		else
+			log_set_priority_max_level(max_log_level);
+	}
 	if (server == NULL)
 		server = getenv("CHFS_SERVER");
 	if (server == NULL)
@@ -104,15 +112,6 @@ chfs_init(const char *server)
 	rpc_timeout = getenv("CHFS_RPC_TIMEOUT_MSEC");
 	if (rpc_timeout != NULL)
 		chfs_set_rpc_timeout_msec(atoi(rpc_timeout));
-
-	log_priority = getenv("CHFS_LOG_PRIORITY");
-	if (log_priority != NULL) {
-		max_log_level = log_priority_from_name(log_priority);
-		if (max_log_level == -1)
-			log_error("%s: invalid log priority", log_priority);
-		else
-			log_set_priority_max_level(max_log_level);
-	}
 
 	proto = margo_protocol(server);
 	if (proto == NULL)
