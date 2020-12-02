@@ -19,13 +19,14 @@ err() {
 
 usage() {
 	[ "X$*" = X ] || echo >&2 $*
-	echo >&2 "usage: $program [-c db_dir] [-p proto] [-L log_dir] -h hostfile start | stop | status"
+	echo >&2 "usage: $program [-c db_dir] [-p proto] [-L log_dir]"
+	echo >&2 "\t\t-h hostfile start | stop | status | kill"
 	exit 1
 }
 
 while [ $# -gt 0 ]; do
 	case $1 in
-	    start|stop|status) mode=$1 ;;
+	    start|stop|status|kill) mode=$1 ;;
 	    -h) shift; HOSTFILE=$1 ;;
 	    -c) shift; DBDIR=$1 ;;
 	    -p) shift; PROTO=$1 ;;
@@ -41,6 +42,9 @@ done
 [ "X$HOSTFILE" = X ] && usage Hostfile should be specified
 [ ! -f $HOSTFILE ] && usage $HOSTFILE: no such file
 
+PKILL_FLAG=
+[ "$mode" = kill ] && PKILL_FLAG=-9
+
 SERVER_INFO_FILE=/tmp/server-info-file-$USER
 case $mode in
 start)
@@ -54,8 +58,8 @@ SERVER=`cat $SERVER_INFO_FILE`
 [ X"$SERVER" = X ] && err $CHFSD: no server info
 echo "CHFS_SERVER=\"$SERVER\"; export CHFS_SERVER"
 ;;
-stop)
-pkill $CHFSD
+stop|kill)
+pkill $PKILL_FLAG $CHFSD
 rm -f $SERVER_INFO_FILE
 ;;
 status)
@@ -66,13 +70,13 @@ esac
 
 for host in `sed -e 's/#.*//' -e '/^[ 	]*$/d' $HOSTFILE | awk '{ print $1 }'`
 do
+	echo $MYHOSTNAMES | grep $host > /dev/null && continue
 	case $mode in
 	start)
-	echo $MYHOSTNAMES | grep $host > /dev/null && continue
 	ssh $host LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH\" PATH=\"$PATH\" $CHFSD -c $DBDIR -p $PROTO -l $LOG_DIR/$host \"$SERVER\"
 	;;
-	stop)
-	ssh $host pkill $CHFSD
+	stop|kill)
+	ssh $host pkill $PKILL_FLAG $CHFSD
 	;;
 	esac
 done
