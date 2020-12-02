@@ -16,7 +16,7 @@ static char chfs_client[PATH_MAX];
 static uint32_t chfs_uid, chfs_gid;
 static int chfs_chunk_size = 4096;
 static int chfs_get_rdma_thresh = 2048;
-static int chfs_rpc_timeout_msec = 10000;	/* 10 seconds */
+static int chfs_rpc_timeout_msec = 0;	/* no timeout */
 
 static int chfs_fd_table_size;
 struct chfs_fd_table {

@@ -111,7 +111,7 @@ main(int argc, char *argv[])
 	char *db_dir = "/tmp", *hostname = NULL, *log_file = NULL;
 	char *protocol = "sockets", info_string[PATH_MAX];
 	char *server_info_file = NULL;
-	int opt, debug = 0, rpc_timeout_msec = 10000;
+	int opt, debug = 0, rpc_timeout_msec = 0;
 	int heartbeat_interval = 10, log_priority = -1;
 	char *prog_name;
 
