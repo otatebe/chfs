@@ -281,6 +281,45 @@ err:
 }
 
 int
+rmdir_r(const char *dir)
+{
+	DIR *d;
+	struct dirent *dent;
+	int r, r2, save_errno;
+
+	r = rmdir(dir);
+	if (r == 0 || (errno != ENOTEMPTY && errno != EEXIST))
+		return (r);
+
+	d = opendir(dir);
+	if (d == NULL)
+		return (-1);
+	r = chdir(dir);
+	if (r == -1) {
+		save_errno = errno;
+		goto err;
+	}
+	while ((dent = readdir(d)) != NULL) {
+		if (dent->d_name[0] == '.' && (dent->d_name[1] == '\0' ||
+		    (dent->d_name[1] == '.' && dent->d_name[2] == '\0')))
+			continue;
+
+		r = rmdir_r(dent->d_name);
+		if (r == -1)
+			break;
+	}
+	save_errno = errno;
+	r2 = chdir("..");
+	assert(r2 == 0);
+err:
+	closedir(d);
+	errno = save_errno;
+	if (r == 0)
+		r = rmdir(dir);
+	return (r);
+}
+
+int
 fs_inode_remove(char *key, size_t key_size)
 {
 	char *p = key_to_path(key, key_size);
@@ -292,7 +331,7 @@ fs_inode_remove(char *key, size_t key_size)
 	if (S_ISREG(sb.st_mode))
 		return (unlink(p));
 	if (S_ISDIR(sb.st_mode))
-		return (rmdir(p));
+		return (rmdir_r(p));
 	return (-1);
 }
 
