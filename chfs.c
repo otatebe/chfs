@@ -531,14 +531,23 @@ chfs_stat(const char *path, struct stat *st)
 	struct fs_stat sb;
 	size_t psize;
 	void *pi;
+	char *p;
 	hg_return_t ret;
-	int err, i;
+	int err, i, p_len;
 
 	if (path[0] == '\0' || strcmp(path, "/") == 0) {
 		root_stat(st);
 		return (0);
 	}
-	ret = chfs_rpc_inode_stat((void *)path, strlen(path) + 1, &sb, &err);
+	p_len = strlen(path);
+	if (p_len > 0 && path[p_len - 1] == '/') {
+		p = strdup(path);
+		assert(p);
+		p[p_len - 1] = '\0';
+		ret = chfs_rpc_inode_stat(p, p_len, &sb, &err);
+		free(p);
+	} else
+		ret = chfs_rpc_inode_stat((void *)path, p_len + 1, &sb, &err);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS)
 		return (-1);
 	st->st_mode = sb.mode;
