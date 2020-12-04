@@ -97,12 +97,13 @@ mkdir_p(char *path, mode_t mode)
 		if (r == -1) {
 			if (errno == ENOENT)
 				continue;
-			return (r);
+			if (errno != EEXIST)
+				return (r);
 		}
 		for (; i >= 0; --i) {
 			path[pos[i]] = '/';
 			r = mkdir(path, mode);
-			if (r == -1)
+			if (r == -1 && errno != EEXIST)
 				return (r);
 		}
 		return (0);
