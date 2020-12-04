@@ -280,12 +280,38 @@ err:
 	return (r);
 }
 
+static char *
+make_path(const char *dir, const char *entry)
+{
+	int dir_len, entry_len, slash = 1;
+	char *p;
+
+	if (dir == NULL || entry == NULL)
+		return (NULL);
+
+	dir_len = strlen(dir);
+	entry_len = strlen(entry);
+
+	if (dir_len > 0 && dir[dir_len - 1] == '/')
+		slash = 0;
+	p = malloc(dir_len + slash + entry_len + 1);
+	if (p == NULL)
+		return (NULL);
+	strcpy(p, dir);
+	if (slash)
+		strcat(p, "/");
+	strcat(p, entry);
+
+	return (p);
+}
+
 int
 rmdir_r(const char *dir)
 {
 	DIR *d;
 	struct dirent *dent;
-	int r, r2, save_errno;
+	char *p;
+	int r, save_errno;
 
 	r = rmdir(dir);
 	if (r == 0 || (errno != ENOTEMPTY && errno != EEXIST))
@@ -294,24 +320,24 @@ rmdir_r(const char *dir)
 	d = opendir(dir);
 	if (d == NULL)
 		return (-1);
-	r = chdir(dir);
-	if (r == -1) {
-		save_errno = errno;
-		goto err;
-	}
+
 	while ((dent = readdir(d)) != NULL) {
 		if (dent->d_name[0] == '.' && (dent->d_name[1] == '\0' ||
 		    (dent->d_name[1] == '.' && dent->d_name[2] == '\0')))
 			continue;
 
-		r = rmdir_r(dent->d_name);
+		p = make_path(dir, dent->d_name);
+		if (p == NULL) {
+			r = -1;
+			errno = ENOMEM;
+			break;
+		}
+		r = rmdir_r(p);
+		free(p);
 		if (r == -1)
 			break;
 	}
 	save_errno = errno;
-	r2 = chdir("..");
-	assert(r2 == 0);
-err:
 	closedir(d);
 	errno = save_errno;
 	if (r == 0)
