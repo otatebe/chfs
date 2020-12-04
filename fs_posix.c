@@ -82,6 +82,8 @@ mkdir_p(char *path, mode_t mode)
 	r = mkdir(path, mode);
 	if (r == 0 || errno != ENOENT)
 		return (r);
+	while (p > 0 && path[p] == '/')
+		--p;
 	for (i = 0; i < DIR_LEVEL; ++i) {
 		while (p > 0 && path[p] != '/')
 			--p;
@@ -148,10 +150,9 @@ fs_open(const char *path, int flags, mode_t mode, size_t *chunk_size)
 			d = fs_dirname(path);
 			if (d == NULL)
 				return (fd);
-			r = mkdir_p(d, 0755);
+			/* mkdir_p() may fail due to race condition */
+			mkdir_p(d, 0755);
 			free(d);
-			if (r == -1)
-				return (r);
 		}
 		switch (flags & O_ACCMODE) {
 		case O_WRONLY:
