@@ -12,6 +12,7 @@ struct inode {
 	uint32_t msize;
 	uint64_t size;
 	uint64_t chunk_size;
+	fs_time_t mtime, ctime;
 };
 
 static int32_t fs_msize = sizeof(struct inode);
@@ -26,6 +27,7 @@ static struct inode *
 create_inode(uint32_t uid, uint32_t gid, uint32_t mode, size_t chunk_size)
 {
 	struct inode *inode;
+	struct timespec ts;
 
 	inode = calloc(fs_msize + chunk_size, 1);
 	if (inode == NULL)
@@ -37,6 +39,9 @@ create_inode(uint32_t uid, uint32_t gid, uint32_t mode, size_t chunk_size)
 	inode->msize = fs_msize;
 	inode->size = 0;
 	inode->chunk_size = chunk_size;
+	clock_gettime(CLOCK_REALTIME_COARSE, &ts);
+	inode->mtime.sec = inode->ctime.sec = ts.tv_sec;
+	inode->mtime.nsec = inode->ctime.nsec = ts.tv_nsec;
 
 	return (inode);
 }
@@ -72,6 +77,10 @@ fs_inode_stat(char *key, size_t key_size, struct fs_stat *stat)
 	stat->gid = inode.gid;
 	stat->size = inode.size;
 	stat->chunk_size = inode.chunk_size;
+	stat->mtime.sec = inode.mtime.sec;
+	stat->mtime.nsec = inode.mtime.nsec;
+	stat->ctime.sec = inode.ctime.sec;
+	stat->ctime.nsec = inode.ctime.nsec;
 	return (KV_SUCCESS);
 }
 

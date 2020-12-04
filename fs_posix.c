@@ -215,6 +215,10 @@ fs_inode_stat(char *key, size_t key_size, struct fs_stat *st)
 	st->uid = sb.st_uid;
 	st->gid = sb.st_gid;
 	st->size = sb.st_size;
+	st->mtime.sec = sb.st_mtim.tv_sec;
+	st->mtime.nsec = sb.st_mtim.tv_nsec;
+	st->ctime.sec = sb.st_ctim.tv_sec;
+	st->ctime.nsec = sb.st_ctim.tv_nsec;
 	r = 0;
 err:
 	log_debug("fs_inode_stat: %d", r);

@@ -521,10 +521,8 @@ chfs_rmdir(const char *path)
 static void
 root_stat(struct stat *st)
 {
+	memset(st, 0, sizeof(*st));
 	st->st_mode = S_IFDIR | 0755;
-	st->st_uid = 0;
-	st->st_gid = 0;
-	st->st_size = 0;
 }
 
 int
@@ -547,6 +545,10 @@ chfs_stat(const char *path, struct stat *st)
 	st->st_uid = sb.uid;
 	st->st_gid = sb.gid;
 	st->st_size = sb.size;
+	st->st_mtim.tv_sec = sb.mtime.sec;
+	st->st_mtim.tv_nsec = sb.mtime.nsec;
+	st->st_ctim.tv_sec = sb.ctime.sec;
+	st->st_ctim.tv_nsec = sb.ctime.nsec;
 	st->st_nlink = 1;
 	if (S_ISDIR(sb.mode) || sb.size < sb.chunk_size)
 		return (0);

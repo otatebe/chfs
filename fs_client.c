@@ -42,11 +42,10 @@ fs_rpc_inode_create(const char *server, void *key, size_t key_size, int32_t uid,
 
 	in.key.v = key;
 	in.key.s = key_size;
-	in.st.uid = uid;
-	in.st.gid = gid;
-	in.st.mode = mode;
-	in.st.chunk_size = chunk_size;
-	in.st.size = 0;
+	in.uid = uid;
+	in.gid = gid;
+	in.mode = mode;
+	in.chunk_size = chunk_size;
 	ret = margo_forward_timed(h, &in, fs_rpc_timeout_msec);
 	if (ret != HG_SUCCESS)
 		goto err;
@@ -91,6 +90,8 @@ fs_rpc_inode_stat(const char *server, void *key, size_t key_size,
 		st->gid = out.st.gid;
 		st->size = out.st.size;
 		st->chunk_size = out.st.chunk_size;
+		st->mtime = out.st.mtime;
+		st->ctime = out.st.ctime;
 	}
 	ret = margo_free_output(h, &out);
 err:
@@ -295,6 +296,10 @@ fs_rpc_readdir(const char *server, const char *path, void *buf,
 			sb.st_uid = out.fi[i].sb.uid;
 			sb.st_gid = out.fi[i].sb.gid;
 			sb.st_mode = out.fi[i].sb.mode;
+			sb.st_mtim.tv_sec = out.fi[i].sb.mtime.sec;
+			sb.st_mtim.tv_nsec = out.fi[i].sb.mtime.nsec;
+			sb.st_ctim.tv_sec = out.fi[i].sb.ctime.sec;
+			sb.st_ctim.tv_nsec = out.fi[i].sb.ctime.nsec;
 			if (filler(buf, out.fi[i].name, &sb, 0))
 				break;
 		}

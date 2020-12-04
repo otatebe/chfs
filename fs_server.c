@@ -69,13 +69,13 @@ inode_create(hg_handle_t h)
 	self = ring_get_self();
 	target = ring_list_lookup(in.key.v, in.key.s);
 	if (strcmp(self, target) != 0) {
-		ret = fs_rpc_inode_create(target, in.key.v, in.key.s, in.st.uid,
-			in.st.gid, in.st.mode, in.st.chunk_size, &err);
+		ret = fs_rpc_inode_create(target, in.key.v, in.key.s, in.uid,
+			in.gid, in.mode, in.chunk_size, &err);
 		if (ret != HG_SUCCESS)
 			err = KV_ERR_SERVER_DOWN;
 	} else
-		err = fs_inode_create(in.key.v, in.key.s, in.st.uid, in.st.gid,
-			in.st.mode, in.st.chunk_size);
+		err = fs_inode_create(in.key.v, in.key.s, in.uid, in.gid,
+			in.mode, in.chunk_size);
 	free(target);
 	ring_release_self();
 
@@ -126,6 +126,8 @@ inode_stat(hg_handle_t h)
 		out.st.gid = sb.gid;
 		out.st.size = sb.size;
 		out.st.chunk_size = sb.chunk_size;
+		out.st.mtime = sb.ctime;
+		out.st.ctime = sb.ctime;
 	}
 	ret = margo_respond(h, &out);
 	assert(ret == HG_SUCCESS);
