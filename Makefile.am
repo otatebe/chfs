@@ -6,10 +6,7 @@ include_HEADERS = chfs.h
 noinst_HEADERS = ring_list.h ring_list_rpc.h ring_types.h ring_rpc.h ring.h \
 	kv_types.h kv.h kv_err.h fs_rpc.h fs_types.h fs.h host.h log.h
 
-chlist_SOURCES = chlist.c
 chlist_LDADD = libchfs.la @MARGO_LIBS@ @OPENSSL_LIBS@
-
-chfuse_SOURCES = chfuse.c
 chfuse_LDADD = libchfs.la @FUSE_LIBS@ @MARGO_LIBS@ @OPENSSL_LIBS@
 chfuse_CFLAGS = @FUSE_CFLAGS@
 
