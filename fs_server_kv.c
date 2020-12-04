@@ -201,7 +201,7 @@ inode_readdir(hg_handle_t h)
 	assert(a.fi);
 	a.pathlen = strlen(path);
 	strcpy(a.path, path);
-	if (path[a.pathlen - 1] != '/') {
+	if (a.pathlen > 0 && path[a.pathlen - 1] != '/') {
 		strcat(a.path, "/");
 		a.pathlen += 1;
 	}
