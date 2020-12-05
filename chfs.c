@@ -18,11 +18,13 @@ static int chfs_chunk_size = 4096;
 static int chfs_get_rdma_thresh = 2048;
 static int chfs_rpc_timeout_msec = 0;	/* no timeout */
 
+static ABT_mutex chfs_fd_mutex;
 static int chfs_fd_table_size;
 struct chfs_fd_table {
 	char *path;
 	mode_t mode;
 	int chunk_size, pos;
+	int ref, closed;
 } *chfs_fd_table;
 
 void
@@ -57,6 +59,7 @@ init_fd_table()
 
 	for (i = 0; i < chfs_fd_table_size; ++i)
 		chfs_fd_table[i].path = NULL;
+	ABT_mutex_create(&chfs_fd_mutex);
 }
 
 static char *
@@ -146,7 +149,7 @@ chfs_term()
 }
 
 static int
-create_fd(const char *path, mode_t mode, int chunk_size)
+create_fd_unlocked(const char *path, mode_t mode, int chunk_size)
 {
 	struct chfs_fd_table *tmp;
 	int fd, i;
@@ -169,29 +172,99 @@ create_fd(const char *path, mode_t mode, int chunk_size)
 	chfs_fd_table[fd].mode = mode;
 	chfs_fd_table[fd].chunk_size = chunk_size;
 	chfs_fd_table[fd].pos = 0;
+	chfs_fd_table[fd].ref = 0;
+	chfs_fd_table[fd].closed = 0;
 	return (fd);
+}
+
+static int
+create_fd(const char *path, mode_t mode, int chunk_size)
+{
+	int fd;
+
+	ABT_mutex_lock(chfs_fd_mutex);
+	fd = create_fd_unlocked(path, mode, chunk_size);
+	ABT_mutex_unlock(chfs_fd_mutex);
+	return (fd);
+}
+
+static void
+clear_fd_table_unlocked(struct chfs_fd_table *tab)
+{
+	free(tab->path);
+	tab->path = NULL;
+}
+
+static int
+check_fd_unlocked(int fd)
+{
+	if (fd < 0 || fd >= chfs_fd_table_size)
+		return (-1);
+	if (chfs_fd_table[fd].path == NULL)
+		return (-1);
+	return (0);
+}
+
+static int
+clear_fd_unlocked(int fd)
+{
+	if (check_fd_unlocked(fd))
+		return (-1);
+	if (chfs_fd_table[fd].ref > 0)
+		chfs_fd_table[fd].closed = 1;
+	else
+		clear_fd_table_unlocked(&chfs_fd_table[fd]);
+	return (0);
 }
 
 static int
 clear_fd(int fd)
 {
-	if (fd < 0 || fd >= chfs_fd_table_size)
-		return (-1);
-	if (chfs_fd_table[fd].path == NULL)
-		return (-1);
-	free(chfs_fd_table[fd].path);
-	chfs_fd_table[fd].path = NULL;
-	return (0);
+	int r;
+
+	ABT_mutex_lock(chfs_fd_mutex);
+	r = clear_fd_unlocked(fd);
+	ABT_mutex_unlock(chfs_fd_mutex);
+	return (r);
+}
+
+static struct chfs_fd_table *
+get_fd_table_unlocked(int fd)
+{
+	if (check_fd_unlocked(fd))
+		return (NULL);
+	if (chfs_fd_table[fd].closed)
+		return (NULL);
+	++chfs_fd_table[fd].ref;
+	return (&chfs_fd_table[fd]);
 }
 
 static struct chfs_fd_table *
 get_fd_table(int fd)
 {
-	if (fd < 0 || fd >= chfs_fd_table_size)
-		return (NULL);
-	if (chfs_fd_table[fd].path == NULL)
-		return (NULL);
-	return (&chfs_fd_table[fd]);
+	struct chfs_fd_table *tab;
+
+	ABT_mutex_lock(chfs_fd_mutex);
+	tab = get_fd_table_unlocked(fd);
+	ABT_mutex_unlock(chfs_fd_mutex);
+	return (tab);
+}
+
+static void
+release_fd_table_unlocked(struct chfs_fd_table *tab)
+{
+	--tab->ref;
+	if (tab->closed == 0 || tab->ref > 0)
+		return;
+	clear_fd_table_unlocked(tab);
+}
+
+static void
+release_fd_table(struct chfs_fd_table *tab)
+{
+	ABT_mutex_lock(chfs_fd_mutex);
+	release_fd_table_unlocked(tab);
+	ABT_mutex_unlock(chfs_fd_mutex);
 }
 
 static hg_return_t
@@ -379,25 +452,29 @@ chfs_pwrite(int fd, const void *buf, size_t size, off_t offset)
 {
 	struct chfs_fd_table *tab = get_fd_table(fd);
 	void *path;
-	int index, local_pos, err;
+	int index, local_pos, chunk_size, err;
+	mode_t mode;
 	size_t s = size, ss = 0, psize;
 	hg_return_t ret;
 
 	if (tab == NULL)
 		return (-1);
 
-	index = offset / tab->chunk_size;
-	local_pos = offset % tab->chunk_size;
+	chunk_size = tab->chunk_size;
+	mode = tab->mode;
+	index = offset / chunk_size;
+	local_pos = offset % chunk_size;
 
-	if (local_pos + s > tab->chunk_size)
-		s = tab->chunk_size - local_pos;
+	if (local_pos + s > chunk_size)
+		s = chunk_size - local_pos;
 	assert(s > 0);
 
 	path = path_index(tab->path, index, &psize);
+	release_fd_table(tab);
 	if (path == NULL)
 		return (-1);
 	ret = chfs_rpc_inode_write(path, psize, (void *)buf, &s, local_pos,
-		tab->mode, tab->chunk_size, &err);
+		mode, chunk_size, &err);
 	free(path);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS)
 		return (-1);
@@ -419,6 +496,7 @@ chfs_write(int fd, const void *buf, size_t size)
 	s = chfs_pwrite(fd, buf, size, tab->pos);
 	if (s > 0)
 		tab->pos += s;
+	release_fd_table(tab);
 	return (s);
 }
 
@@ -427,16 +505,18 @@ chfs_pread(int fd, void *buf, size_t size, off_t offset)
 {
 	struct chfs_fd_table *tab = get_fd_table(fd);
 	void *path;
-	int index, local_pos, ret, err;
+	int index, local_pos, chunk_size, ret, err;
 	size_t s = size, ss = 0, psize;
 
 	if (tab == NULL)
 		return (-1);
 
-	index = offset / tab->chunk_size;
-	local_pos = offset % tab->chunk_size;
+	chunk_size = tab->chunk_size;
+	index = offset / chunk_size;
+	local_pos = offset % chunk_size;
 
 	path = path_index(tab->path, index, &psize);
+	release_fd_table(tab);
 	if (path == NULL)
 		return (-1);
 	ret = chfs_rpc_inode_read(path, psize, buf, &s, local_pos, &err);
@@ -446,7 +526,7 @@ chfs_pread(int fd, void *buf, size_t size, off_t offset)
 	if (s <= 0)
 		return (0);
 
-	if (local_pos + s < tab->chunk_size)
+	if (local_pos + s < chunk_size)
 		return (s);
 	if (size - s > 0) {
 		ss = chfs_pread(fd, buf + s, size - s, offset + s);
@@ -465,6 +545,7 @@ chfs_read(int fd, void *buf, size_t size)
 	s = chfs_pread(fd, buf, size, tab->pos);
 	if (s > 0)
 		tab->pos += s;
+	release_fd_table(tab);
 	return (s);
 }
 
