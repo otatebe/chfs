@@ -367,20 +367,29 @@ chfs_rpc_inode_stat(void *key, size_t key_size, struct fs_stat *st, int *errp)
 	return (ret);
 }
 
+static const char *
+skip_slash(const char *p)
+{
+	while (*p && *p == '/')
+		++p;
+	return (p);
+}
+
 int
 chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,
 	int chunk_size)
 {
+	const char *p = skip_slash(path);
 	hg_return_t ret;
 	int fd, err;
 
 	mode |= S_IFREG;
-	fd = create_fd(path, mode, chunk_size);
+	fd = create_fd(p, mode, chunk_size);
 	if (fd < 0)
 		return (-1);
 
-	ret = chfs_rpc_inode_create((void *)path, strlen(path) + 1,
-		mode, chunk_size, &err);
+	ret = chfs_rpc_inode_create((void *)p, strlen(p) + 1, mode, chunk_size,
+		&err);
 	if (ret == HG_SUCCESS && err == KV_SUCCESS)
 		return (fd);
 
@@ -397,15 +406,16 @@ chfs_create(const char *path, int32_t flags, mode_t mode)
 int
 chfs_open(const char *path, int32_t flags)
 {
+	const char *p = skip_slash(path);
 	struct fs_stat st;
 	hg_return_t ret;
 	int fd, err;
 
-	ret = chfs_rpc_inode_stat((void *)path, strlen(path) + 1, &st, &err);
+	ret = chfs_rpc_inode_stat((void *)p, strlen(p) + 1, &st, &err);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS)
 		return (-1);
 
-	fd = create_fd(path, st.mode, st.chunk_size);
+	fd = create_fd(p, st.mode, st.chunk_size);
 	if (fd >= 0)
 		return (fd);
 	return (-1);
@@ -552,16 +562,17 @@ chfs_read(int fd, void *buf, size_t size)
 int
 chfs_unlink(const char *path)
 {
+	const char *p = skip_slash(path);
 	int ret, err, i;
 	size_t psize;
 	void *pi;
 
-	ret = chfs_rpc_remove((void *)path, strlen(path) + 1, &err);
+	ret = chfs_rpc_remove((void *)p, strlen(p) + 1, &err);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS)
 		return (-1);
 
 	for (i = 1; ; ++i) {
-		pi = path_index(path, i, &psize);
+		pi = path_index(p, i, &psize);
 		if (pi == NULL)
 			break;
 		ret = chfs_rpc_remove(pi, psize, &err);
@@ -575,11 +586,12 @@ chfs_unlink(const char *path)
 int
 chfs_mkdir(const char *path, mode_t mode)
 {
+	const char *p = skip_slash(path);
 	hg_return_t ret;
 	int err;
 
 	mode |= S_IFDIR;
-	ret = chfs_rpc_inode_create((void *)path, strlen(path) + 1,
+	ret = chfs_rpc_inode_create((void *)p, strlen(p) + 1,
 		mode, 0, &err);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS)
 		return (-1);
@@ -589,11 +601,12 @@ chfs_mkdir(const char *path, mode_t mode)
 int
 chfs_rmdir(const char *path)
 {
+	const char *p = skip_slash(path);
 	hg_return_t ret;
 	int err;
 
 	/* XXX check child entries */
-	ret = chfs_rpc_remove((void *)path, strlen(path) + 1, &err);
+	ret = chfs_rpc_remove((void *)p, strlen(p) + 1, &err);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS)
 		return (-1);
 	return (0);
@@ -609,26 +622,27 @@ root_stat(struct stat *st)
 int
 chfs_stat(const char *path, struct stat *st)
 {
+	const char *p = skip_slash(path);
 	struct fs_stat sb;
 	size_t psize;
 	void *pi;
-	char *p;
+	char *pp;
 	hg_return_t ret;
 	int err, i, p_len;
 
-	if (path[0] == '\0' || strcmp(path, "/") == 0) {
+	if (p[0] == '\0') {
 		root_stat(st);
 		return (0);
 	}
-	p_len = strlen(path);
-	if (p_len > 0 && path[p_len - 1] == '/') {
-		p = strdup(path);
-		assert(p);
-		p[p_len - 1] = '\0';
-		ret = chfs_rpc_inode_stat(p, p_len, &sb, &err);
-		free(p);
+	p_len = strlen(p);
+	if (p_len > 0 && p[p_len - 1] == '/') {
+		pp = strdup(p);
+		assert(pp);
+		pp[p_len - 1] = '\0';
+		ret = chfs_rpc_inode_stat(pp, p_len, &sb, &err);
+		free(pp);
 	} else
-		ret = chfs_rpc_inode_stat((void *)path, p_len + 1, &sb, &err);
+		ret = chfs_rpc_inode_stat((void *)p, p_len + 1, &sb, &err);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS)
 		return (-1);
 	st->st_mode = sb.mode;
@@ -644,7 +658,7 @@ chfs_stat(const char *path, struct stat *st)
 		return (0);
 
 	for (i = 1; ; ++i) {
-		pi = path_index(path, i, &psize);
+		pi = path_index(p, i, &psize);
 		if (pi == NULL)
 			break;
 		ret = chfs_rpc_inode_stat(pi, psize, &sb, &err);
@@ -662,13 +676,14 @@ int
 chfs_readdir(const char *path, void *buf,
 	int (*filler)(void *, const char *, const struct stat *, off_t))
 {
+	const char *p = skip_slash(path);
 	string_list_t node_list;
 	hg_return_t ret;
 	int err, i;
 
 	ring_list_copy(&node_list);
 	for (i = 0; i < node_list.n; ++i) {
-		ret = fs_rpc_readdir(node_list.s[i], path, buf, filler, &err);
+		ret = fs_rpc_readdir(node_list.s[i], p, buf, filler, &err);
 		if (ret != HG_SUCCESS || err != KV_SUCCESS)
 			continue;
 	}

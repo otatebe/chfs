@@ -22,22 +22,13 @@ chfuse_init(struct fuse_conn_info *conn)
 	return (NULL);
 }
 
-static const char *
-skip_slash(const char *p)
-{
-	while (*p && *p == '/')
-		++p;
-	return (p);
-}
-
 static int
 chfuse_getattr(const char *path, struct stat *st)
 {
-	const char *p = skip_slash(path);
 	int ret;
 
 	printf("getattr: %s\n", path);
-	ret = chfs_stat(p, st);
+	ret = chfs_stat(path, st);
 	if (ret == -1)
 		return (-ENOENT);
 	return (0);
@@ -46,11 +37,10 @@ chfuse_getattr(const char *path, struct stat *st)
 static int
 chfuse_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
-	const char *p = skip_slash(path);
 	int fd, ret = 0;
 
 	printf("create: %s\n", path);
-	fd = chfs_create(p, fi->flags, mode);
+	fd = chfs_create(path, fi->flags, mode);
 	if (fd >= 0)
 		fi->fh = fd;
 	else
@@ -62,11 +52,10 @@ chfuse_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 static int
 chfuse_open(const char *path, struct fuse_file_info *fi)
 {
-	const char *p = skip_slash(path);
 	int fd, ret = 0;
 
 	printf("open: %s\n", path);
-	fd = chfs_open(p, fi->flags);
+	fd = chfs_open(path, fi->flags);
 	if (fd >= 0)
 		fi->fh = fd;
 	else
@@ -128,11 +117,10 @@ chfuse_fsync(const char *path, int isdatasync, struct fuse_file_info *fi)
 static int
 chfuse_unlink(const char *path)
 {
-	const char *p = skip_slash(path);
 	int ret;
 
 	printf("unlink: %s\n", path);
-	ret = chfs_unlink(p);
+	ret = chfs_unlink(path);
 	if (ret == -1)
 		return (-EIO);
 	return (ret);
@@ -141,11 +129,10 @@ chfuse_unlink(const char *path)
 static int
 chfuse_mkdir(const char *path, mode_t mode)
 {
-	const char *p = skip_slash(path);
 	int ret;
 
 	printf("mkdir: %s\n", path);
-	ret = chfs_mkdir(p, mode);
+	ret = chfs_mkdir(path, mode);
 	if (ret == -1)
 		return (-EIO);
 	return (ret);
@@ -154,11 +141,10 @@ chfuse_mkdir(const char *path, mode_t mode)
 static int
 chfuse_rmdir(const char *path)
 {
-	const char *p = skip_slash(path);
 	int ret;
 
 	printf("rmdir: %s\n", path);
-	ret = chfs_rmdir(p);
+	ret = chfs_rmdir(path);
 	if (ret == -1)
 		return (-EIO);
 	return (ret);
@@ -168,11 +154,10 @@ static int
 chfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	off_t offset, struct fuse_file_info *fi)
 {
-	const char *p = skip_slash(path);
 	int ret;
 
 	printf("readdir: %s\n", path);
-	ret = chfs_readdir(p, buf, filler);
+	ret = chfs_readdir(path, buf, filler);
 	if (ret == -1)
 		return (-EIO);
 	return (ret);
