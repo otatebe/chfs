@@ -571,7 +571,7 @@ chfs_unlink(const char *path)
 	if (ret != HG_SUCCESS || err != KV_SUCCESS)
 		return (-1);
 
-	for (i = 1; ; ++i) {
+	for (i = 1;; ++i) {
 		pi = path_index(p, i, &psize);
 		if (pi == NULL)
 			break;
@@ -657,7 +657,7 @@ chfs_stat(const char *path, struct stat *st)
 	if (S_ISDIR(sb.mode) || sb.size < sb.chunk_size)
 		return (0);
 
-	for (i = 1; ; ++i) {
+	for (i = 1;; ++i) {
 		pi = path_index(p, i, &psize);
 		if (pi == NULL)
 			break;
