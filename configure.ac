@@ -13,6 +13,16 @@ AC_PROG_CC
 AM_PROG_AR
 LT_INIT
 
+AC_MSG_CHECKING([whether xattr is used for metadata])
+AC_ARG_ENABLE([xattr],
+  [AS_HELP_STRING([--enable-xattr],
+    [use xattr for metadata @<:@default=no@:>@])],
+  [], [enableval=no])
+AC_MSG_RESULT([$enableval])
+if test x$enableval != xno; then
+  AC_DEFINE([USE_XATTR], [1], [Use xattr for metadata])
+fi
+
 AC_MSG_CHECKING([whether port number is included to hash])
 AC_ARG_ENABLE([hash-port],
   [AS_HELP_STRING([--enable-hash-port],

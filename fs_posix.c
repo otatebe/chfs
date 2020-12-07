@@ -6,6 +6,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <margo.h>
+#include "config.h"
 #include "ring_types.h"
 #include "kv_types.h"
 #include "kv.h"
@@ -16,6 +17,14 @@
 
 static int
 mkdir_p(char *path, mode_t mode);
+
+#ifndef USE_XATTR
+struct metadata {
+	size_t chunk_size;
+};
+
+static int msize = sizeof(struct metadata);
+#endif
 
 void
 fs_inode_init(char *dir)
@@ -117,10 +126,33 @@ static int
 set_chunk_size(const char *path, size_t size)
 {
 	int r;
+	static const char diag[] = "set_chunk_size";
+#ifndef USE_XATTR
+	int fd;
+	struct metadata mdata;
+#endif
 
+#ifdef USE_XATTR
 	r = setxattr(path, FS_XATTR_CHUNK_SIZE, &size, sizeof(size), 0);
 	if (r == -1)
-		log_error("set_chunk_size: %s", strerror(errno));
+		log_error("%s: %s", diag, strerror(errno));
+#else
+	fd = r = open(path, O_WRONLY);
+	if (fd == -1)
+		log_error("%s: %s", diag, strerror(errno));
+	else {
+		mdata.chunk_size = size;
+		r = write(fd, &mdata, msize);
+		if (r == -1)
+			log_error("%s (write): %s", diag, strerror(errno));
+		else if (r != msize) {
+			log_error("%s (write): %d of %d bytes written", diag,
+				r, msize);
+			r = -1;
+		}
+		close(fd);
+	}
+#endif
 	return (r);
 }
 
@@ -128,10 +160,33 @@ static int
 get_chunk_size(const char *path, size_t *size)
 {
 	int r;
+	static const char diag[] = "get_chunk_size";
+#ifndef USE_XATTR
+	int fd;
+	struct metadata mdata;
+#endif
 
+#ifdef USE_XATTR
 	r = getxattr(path, FS_XATTR_CHUNK_SIZE, size, sizeof(*size));
 	if (r == -1)
-		log_info("get_chunk_size: %s", strerror(errno));
+		log_info("%s: %s", diag, strerror(errno));
+#else
+	fd = r = open(path, O_RDONLY);
+	if (fd == -1)
+		log_info("%s: %s", diag, strerror(errno));
+	else {
+		r = read(fd, &mdata, msize);
+		if (r == -1)
+			log_error("%s (read): %s", diag, strerror(errno));
+		else if (r != msize) {
+			log_error("%s (read): %d of %d bytes read", diag, r,
+				msize);
+			r = -1;
+		} else
+			*size = mdata.chunk_size;
+		close(fd);
+	}
+#endif
 	return (r);
 }
 
@@ -215,6 +270,9 @@ fs_inode_stat(char *key, size_t key_size, struct fs_stat *st)
 	st->uid = sb.st_uid;
 	st->gid = sb.st_gid;
 	st->size = sb.st_size;
+#ifndef USE_XATTR
+	st->size -= msize;
+#endif
 	st->mtime.sec = sb.st_mtim.tv_sec;
 	st->mtime.nsec = sb.st_mtim.tv_nsec;
 	st->ctime.sec = sb.st_ctim.tv_sec;
@@ -243,6 +301,9 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 	}
 	fd = r = fs_open(p, O_WRONLY, mode, &chunk_size);
 	if (fd != -1) {
+#ifndef USE_XATTR
+		offset += msize;
+#endif
 		r = pwrite(fd, buf, ss, offset);
 		close(fd);
 	}
@@ -272,6 +333,9 @@ fs_inode_read(char *key, size_t key_size, void *buf, size_t *size,
 	ss = *size;
 	if (ss + offset > chunk_size)
 		ss = chunk_size - offset;
+#ifndef USE_XATTR
+	offset += msize;
+#endif
 	if (ss <= 0)
 		r = 0;
 	else
