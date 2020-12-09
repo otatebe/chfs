@@ -296,10 +296,8 @@ fs_rpc_readdir(const char *server, const char *path, void *buf,
 			sb.st_uid = out.fi[i].sb.uid;
 			sb.st_gid = out.fi[i].sb.gid;
 			sb.st_mode = out.fi[i].sb.mode;
-			sb.st_mtim.tv_sec = out.fi[i].sb.mtime.sec;
-			sb.st_mtim.tv_nsec = out.fi[i].sb.mtime.nsec;
-			sb.st_ctim.tv_sec = out.fi[i].sb.ctime.sec;
-			sb.st_ctim.tv_nsec = out.fi[i].sb.ctime.nsec;
+			sb.st_mtim = out.fi[i].sb.mtime;
+			sb.st_ctim = out.fi[i].sb.ctime;
 			if (filler(buf, out.fi[i].name, &sb, 0))
 				break;
 		}

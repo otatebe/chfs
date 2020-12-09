@@ -649,10 +649,8 @@ chfs_stat(const char *path, struct stat *st)
 	st->st_uid = sb.uid;
 	st->st_gid = sb.gid;
 	st->st_size = sb.size;
-	st->st_mtim.tv_sec = sb.mtime.sec;
-	st->st_mtim.tv_nsec = sb.mtime.nsec;
-	st->st_ctim.tv_sec = sb.ctime.sec;
-	st->st_ctim.tv_nsec = sb.ctime.nsec;
+	st->st_mtim = sb.mtime;
+	st->st_ctim = sb.ctime;
 	st->st_nlink = 1;
 	if (S_ISDIR(sb.mode) || sb.size < sb.chunk_size)
 		return (0);

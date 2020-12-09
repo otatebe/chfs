@@ -1,19 +1,21 @@
-MERCURY_GEN_PROC(fs_time_t,
-	((int64_t)(sec))((int64_t)(nsec)))
+typedef struct timespec fs_timespec_t;
+
+MERCURY_GEN_STRUCT_PROC(fs_timespec_t,
+	((int64_t)(tv_sec))((int64_t)(tv_nsec)))
 
 typedef struct fs_stat {
 	uint32_t mode;
 	uint32_t uid, gid;
 	uint64_t size;
 	uint64_t chunk_size;
-	fs_time_t mtime, ctime;
+	struct timespec mtime, ctime;
 } fs_stat_t;
 
 MERCURY_GEN_STRUCT_PROC(fs_stat_t,
 	((uint32_t)(mode))\
 	((uint32_t)(uid))((uint32_t)(gid))\
 	((uint64_t)(size))((uint64_t)(chunk_size))\
-	((fs_time_t)(mtime))((fs_time_t)(ctime)))
+	((fs_timespec_t)(mtime))((fs_timespec_t)(ctime)))
 
 MERCURY_GEN_PROC(fs_create_in_t,
 	((kv_byte_t)(key))\

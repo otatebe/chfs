@@ -12,7 +12,7 @@ struct inode {
 	uint32_t msize;
 	uint64_t size;
 	uint64_t chunk_size;
-	fs_time_t mtime, ctime;
+	struct timespec mtime, ctime;
 };
 
 static int32_t fs_msize = sizeof(struct inode);
@@ -40,8 +40,7 @@ create_inode(uint32_t uid, uint32_t gid, uint32_t mode, size_t chunk_size)
 	inode->size = 0;
 	inode->chunk_size = chunk_size;
 	clock_gettime(CLOCK_REALTIME_COARSE, &ts);
-	inode->mtime.sec = inode->ctime.sec = ts.tv_sec;
-	inode->mtime.nsec = inode->ctime.nsec = ts.tv_nsec;
+	inode->mtime = inode->ctime = ts;
 
 	return (inode);
 }

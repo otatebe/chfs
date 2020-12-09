@@ -273,10 +273,8 @@ fs_inode_stat(char *key, size_t key_size, struct fs_stat *st)
 #ifndef USE_XATTR
 	st->size -= msize;
 #endif
-	st->mtime.sec = sb.st_mtim.tv_sec;
-	st->mtime.nsec = sb.st_mtim.tv_nsec;
-	st->ctime.sec = sb.st_ctim.tv_sec;
-	st->ctime.nsec = sb.st_ctim.tv_nsec;
+	st->mtime = sb.st_mtim;
+	st->ctime = sb.st_ctim;
 	r = 0;
 err:
 	log_debug("fs_inode_stat: %d", r);
