@@ -36,14 +36,15 @@ join_ring(margo_instance_id mid, const char *server)
 	size_t addr_str_size = sizeof(addr_str);
 	char *prev, *self;
 
-	margo_addr_lookup(mid, server, &addr);
+	ret = margo_addr_lookup(mid, server, &addr);
+	ring_fatal(ret, "join:lookup");
 	margo_addr_to_string(mid, addr_str, &addr_str_size, addr);
 	margo_addr_free(mid, addr);
 	ring_set_next(addr_str);
 	self = ring_get_self();
 	ret = ring_rpc_join(addr_str, self, &prev);
 	ring_release_self();
-	ring_fatal(ret, "join");
+	ring_fatal(ret, "join:rpc_join");
 	assert(prev != NULL);
 	ring_set_prev(prev);
 	free(prev);
