@@ -95,7 +95,8 @@ usage(char *prog_name)
 {
 	fprintf(stderr, "Usage: %s [-d] [-c db_dir] [-p protocol] [-h host] "
 		"[-l log_file]\n\t[-S server_info_file] [-t rpc_timeout_msec]\n"
-		"\t[-H heartbeat_interval] [server]\n", prog_name);
+		"\t[-H heartbeat_interval] [-L log_priority] [server]\n",
+		prog_name);
 	exit(EXIT_FAILURE);
 }
 
