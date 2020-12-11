@@ -52,6 +52,7 @@ inode_read_rdma(hg_handle_t h)
 	assert(ret == HG_SUCCESS);
 	log_debug("inode_read_rdma: key=%s", (char *)in.key.v);
 
+	memset(&out, 0, sizeof(out));
 	ret = margo_addr_lookup(mid, in.client, &client_addr);
 	if (ret != HG_SUCCESS) {
 		out.err = KV_ERR_LOOKUP;
@@ -154,6 +155,7 @@ inode_readdir(hg_handle_t h)
 	a.fi = malloc(sizeof(a.fi[0]) * a.size);
 	assert(a.fi);
 
+	memset(&out, 0, sizeof(out));
 	out.err = fs_inode_readdir(path, fs_add_entry, &a);
 	ret = margo_free_input(h, &path);
 	if (out.err == KV_SUCCESS) {

@@ -88,6 +88,7 @@ inode_read_rdma(hg_handle_t h)
 	assert(ret == HG_SUCCESS);
 	log_debug("inode_read_rdma: key=%s", (char *)in.key.v);
 
+	memset(&out, 0, sizeof(out));
 	ret = margo_addr_lookup(mid, in.client, &client_addr);
 	if (ret != HG_SUCCESS) {
 		out.err = KV_ERR_LOOKUP;
@@ -207,6 +208,7 @@ inode_readdir(hg_handle_t h)
 	}
 	assert(a.pathlen < PATH_MAX);
 
+	memset(&out, 0, sizeof(out));
 	out.err = kv_get_all_cb(fs_readdir_cb, &a);
 	ret = margo_free_input(h, &path);
 	if (out.err == KV_SUCCESS) {

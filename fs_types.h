@@ -23,22 +23,8 @@ MERCURY_GEN_PROC(fs_create_in_t,
 	((uint32_t)(uid))((uint32_t)(gid))\
 	((uint64_t)(chunk_size)))
 
-typedef struct {
-	fs_stat_t st;
-	int32_t err;
-} fs_stat_out_t;
-
-static inline hg_return_t
-hg_proc_fs_stat_out_t(hg_proc_t proc, void *data)
-{
-	fs_stat_out_t *k = data;
-	hg_return_t ret;
-
-	ret = hg_proc_int32_t(proc, &k->err);
-	if (ret != HG_SUCCESS || k->err != 0)
-		return (ret);
-	return (hg_proc_fs_stat_t(proc, &k->st));
-}
+MERCURY_GEN_PROC(fs_stat_out_t,
+	 ((int32_t)(err))((fs_stat_t)(st)))
 
 MERCURY_GEN_PROC(fs_write_in_t,
 	((kv_byte_t)(key))\
@@ -65,7 +51,7 @@ hg_proc_fs_readdir_out_t(hg_proc_t proc, void *data)
 	int i;
 
 	ret = hg_proc_int32_t(proc, &k->err);
-	if (ret != HG_SUCCESS || k->err != 0)
+	if (ret != HG_SUCCESS)
 		return (ret);
 	ret = hg_proc_int32_t(proc, &k->n);
 	if (ret != HG_SUCCESS)
