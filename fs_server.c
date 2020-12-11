@@ -152,7 +152,6 @@ inode_write(hg_handle_t h)
 	assert(ret == HG_SUCCESS);
 	log_debug("inode_write: key=%s", (char *)in.key.v);
 
-	memset(&out, 0, sizeof(out));
 	self = ring_get_self();
 	target = ring_list_lookup(in.key.v, in.key.s);
 	out.value_size = in.value.s;
