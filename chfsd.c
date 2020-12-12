@@ -53,11 +53,14 @@ join_ring(margo_instance_id mid, const char *server)
 static void
 leave()
 {
-	char *next, *prev;
+	char *next, *prev, *self;
 	int prev_prev = 0;
 	hg_return_t ret;
 
+	self = ring_get_self();
 	next = ring_get_next();
+	if (strcmp(self, next) == 0)
+		goto leave;
 	prev = ring_get_prev();
 	ret = ring_rpc_set_next(prev, next);
 	if (ret != HG_SUCCESS) {
@@ -75,7 +78,9 @@ leave()
 	ring_release_prev();
 	if (prev_prev == 1)
 		ring_release_prev_prev();
+leave:
 	ring_release_next();
+	ring_release_self();
 	fs_server_term();
 	log_term();
 }
