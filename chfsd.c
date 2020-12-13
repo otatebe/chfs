@@ -57,6 +57,7 @@ leave()
 	int prev_prev = 0;
 	hg_return_t ret;
 
+	log_debug("leave");
 	self = ring_get_self();
 	next = ring_get_next();
 	if (strcmp(self, next) == 0)
@@ -219,13 +220,14 @@ main(int argc, char *argv[])
 		} else
 			log_error("%s: %s", server_info_file, strerror(errno));
 	}
-
-	if (argc > 0)
-		join_ring(mid, argv[0]);
-
 	ring_set_heartbeat_timeout(heartbeat_interval * 10);
 	log_debug("heartbeat interval: %d (timeout %d)",
 		heartbeat_interval, heartbeat_interval * 10);
+
+	if (argc > 0) {
+		join_ring(mid, argv[0]);
+		ring_wait_coordinator_rpc();
+	}
 	while (heartbeat_interval > 0) {
 		if (ring_list_is_coordinator(addr_str)) {
 			log_debug("coordinator");

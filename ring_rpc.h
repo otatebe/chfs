@@ -22,3 +22,4 @@ void ring_set_heartbeat_timeout(int timeout);
 void ring_heartbeat();
 int ring_heartbeat_is_timeout();
 void ring_start_election();
+void ring_wait_coordinator_rpc();

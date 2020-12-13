@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include <margo.h>
 #include "ring.h"
 #include "ring_types.h"
@@ -126,12 +127,12 @@ ring_rpc_list(const char *server, string_list_t *list, char *self)
 	if (list == NULL)
 		list = &new_list;
 	else {
-		/* space already allocated in hg_proc_node_list_t() */
+		/* space already allocated in hg_proc_string_list_t() */
 		list->s[list->n] = self;
 		++list->n;
 	}
 	ret = margo_forward_timed(h, list, ring_rpc_timeout_msec);
-	/* decrement required not to free 'self' above in margo_input_free */
+	/* decrement required not to free 'self' above in margo_free_input */
 	--list->n;
 
 	ret2 = margo_destroy(h);
@@ -241,7 +242,8 @@ join(hg_handle_t h)
 	assert(ret == HG_SUCCESS);
 
 	ret = margo_respond(h, &prev);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("join: %s", HG_Error_to_string(ret));
 	if (prev_prev == 0)
 		ring_release_prev();
 	else
@@ -252,31 +254,45 @@ join(hg_handle_t h)
 }
 DEFINE_MARGO_RPC_HANDLER(join)
 
-static void
-ring_fix_next(int election)
+/* this assumes ring_get_next() is called */
+static int
+ring_fix_next(char *next, int election)
 {
-	char *self, *next, *next_next;
+	char *self, *next_next;
+	static const char diag[] = "ring_fix_next";
 	hg_return_t ret;
+	int r = 0;
 
-	log_debug("ring_fix_next");
-	next = ring_get_next();
+	log_debug("%s: remove %s (%d)", diag, next, election);
 	next_next = ring_get_next_next();
-	assert(next_next);
-	assert(strcmp(next, next_next));
-	ring_release_next();
+	if (next_next == NULL || strcmp(next, next_next) == 0) {
+		log_error("%s: no more server", diag);
+		r = -1;
+		goto release_next_next;
+	}
 	ring_set_next(next_next);
 
 	self = ring_get_self();
 	ret = ring_rpc_set_prev(next_next, self);
-	assert(ret == HG_SUCCESS);
-
+	if (ret != HG_SUCCESS) {
+		log_error("%s (set_prev): %s", diag, HG_Error_to_string(ret));
+		r = -1;
+		goto release_self;
+	}
 	if (election) {
 		/* election starts */
 		ret = ring_rpc_election(next_next, NULL, self);
-		assert(ret == HG_SUCCESS);
+		if (ret != HG_SUCCESS) {
+			log_error("%s (election): %s", diag,
+				HG_Error_to_string(ret));
+			r = -1;
+		}
 	}
+release_self:
 	ring_release_self();
+release_next_next:
 	ring_release_next_next();
+	return (r);
 }
 
 static time_t heartbeat_time;
@@ -299,11 +315,14 @@ ring_heartbeat()
 	while (1) {
 		next = ring_get_next();
 		ret = ring_rpc_list(next, NULL, self);
-		ring_release_next();
 		if (ret == HG_SUCCESS)
 			break;
-		ring_fix_next(1);
+		log_notice("heartbeat: %s", HG_Error_to_string(ret));
+		if (ring_fix_next(next, 1) == -1)
+			break;
+		ring_release_next();
 	}
+	ring_release_next();
 	ring_release_self();
 }
 
@@ -325,11 +344,14 @@ ring_start_election()
 	while (1) {
 		next = ring_get_next();
 		ret = ring_rpc_election(next, NULL, self);
-		ring_release_next();
 		if (ret == HG_SUCCESS)
 			break;
-		ring_fix_next(0);
+		log_notice("start_election: %s", HG_Error_to_string(ret));
+		if (ring_fix_next(next, 0) == -1)
+			break;
+		ring_release_next();
 	}
+	ring_release_next();
 	ring_release_self();
 }
 
@@ -398,11 +420,14 @@ list(hg_handle_t h)
 		while (1) {
 			next = ring_get_next();
 			ret = ring_rpc_list(next, &in, self);
-			ring_release_next();
 			if (ret == HG_SUCCESS)
 				break;
-			ring_fix_next(1);
+			log_notice("list: %s", HG_Error_to_string(ret));
+			if (ring_fix_next(next, 1) == -1)
+				break;
+			ring_release_next();
 		}
+		ring_release_next();
 	}
 	ring_release_self();
 
@@ -419,14 +444,17 @@ remove_host(coordinator_t *c, char *host)
 {
 	int i;
 
+	log_debug("remove_host: %s", host);
 	for (i = 0; i < c->list.n; ++i)
 		if (strcmp(c->list.s[i], host) == 0)
 			break;
-	c->list.n = c->list.n - 1;
-	free(c->list.s[i]);
-	for (; i < c->list.n; ++i)
-		c->list.s[i] = c->list.s[i + 1];
-	--c->ttl;
+	if (i < c->list.n) {
+		c->list.n = c->list.n - 1;
+		free(c->list.s[i]);
+		for (; i < c->list.n; ++i)
+			c->list.s[i] = c->list.s[i + 1];
+		--c->ttl;
+	}
 }
 
 static void
@@ -451,11 +479,14 @@ election(hg_handle_t h)
 		while (1) {
 			next = ring_get_next();
 			ret = ring_rpc_election(next, &in, self);
-			ring_release_next();
 			if (ret == HG_SUCCESS)
 				break;
-			ring_fix_next(0);
+			log_notice("election: %s", HG_Error_to_string(ret));
+			if (ring_fix_next(next, 0) == -1)
+				break;
+			ring_release_next();
 		}
+		ring_release_next();
 	} else {
 		in3.ttl = in.n - 1;
 		in3.list = in;
@@ -464,9 +495,12 @@ election(hg_handle_t h)
 			ret = ring_rpc_coordinator(next, &in3);
 			if (ret == HG_SUCCESS)
 				break;
+			log_notice("election (coordinator): %s",
+				HG_Error_to_string(ret));
 			remove_host(&in3, next);
+			if (ring_fix_next(next, 0) == -1)
+				break;
 			ring_release_next();
-			ring_fix_next(0);
 		}
 		ring_release_next();
 	}
@@ -479,6 +513,15 @@ election(hg_handle_t h)
 	assert(ret == HG_SUCCESS);
 }
 DEFINE_MARGO_RPC_HANDLER(election)
+
+static int coordinator_rpc_done = 0;
+
+void
+ring_wait_coordinator_rpc()
+{
+	while (!coordinator_rpc_done)
+		sleep(1);
+}
 
 static void
 coordinator(hg_handle_t h)
@@ -493,6 +536,8 @@ coordinator(hg_handle_t h)
 	ret = margo_get_input(h, &in);
 	assert(ret == HG_SUCCESS);
 
+	for (i = 0; i < in.list.n; ++i)
+		log_debug("[%d] %s", i, in.list.s[i]);
 	if (in.ttl > 0) {
 		--in.ttl;
 		while (1) {
@@ -500,9 +545,11 @@ coordinator(hg_handle_t h)
 			ret = ring_rpc_coordinator(next, &in);
 			if (ret == HG_SUCCESS)
 				break;
+			log_notice("coordinator: %s", HG_Error_to_string(ret));
 			remove_host(&in, next);
+			if (ring_fix_next(next, 0) == -1)
+				break;
 			ring_release_next();
-			ring_fix_next(0);
 		}
 		ring_release_next();
 	}
@@ -526,5 +573,7 @@ coordinator(hg_handle_t h)
 
 	ret = margo_destroy(h);
 	assert(ret == HG_SUCCESS);
+
+	coordinator_rpc_done = 1;
 }
 DEFINE_MARGO_RPC_HANDLER(coordinator)
