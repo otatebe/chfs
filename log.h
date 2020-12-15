@@ -14,7 +14,7 @@ void log_debug(const char *, ...) LOG_PRINTF_ARG(1, 2);
 void log_fatal(const char *, ...) LOG_PRINTF_ARG(1, 2);
 
 void log_syslog_open(const char *, int, int);
-void log_file_open(const char *);
+int log_file_open(const char *);
 void log_term();
 int log_priority_from_name(char *);
 void log_set_priority_max_level(int);

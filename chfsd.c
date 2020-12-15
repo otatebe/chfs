@@ -168,9 +168,10 @@ main(int argc, char *argv[])
 	argv += optind;
 
 	if (!debug) {
-		if (log_file)
-			log_file_open(log_file);
-		else
+		if (log_file) {
+			if (log_file_open(log_file) == -1)
+				log_fatal("%s: %s", log_file, strerror(errno));
+		} else
 			log_syslog_open(prog_name, LOG_PID, LOG_LOCAL0);
 		if (daemon(1, 0) == -1)
 			log_fatal("daemon");

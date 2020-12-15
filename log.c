@@ -155,19 +155,20 @@ log_syslog_open(const char *log_identifier, int option, int facility)
 	log_msg = log_msg_syslog;
 }
 
-void
+int
 log_file_open(const char *path)
 {
 	FILE *f;
 
 	f = fopen(path, "a");
 	if (f == NULL)
-		return;
+		return (-1);
 	if (log_file != NULL)
 		fclose(log_file);
 	setbuf(f, NULL);
 	log_file = f;
 	log_msg = log_msg_file;
+	return (0);
 }
 
 void
