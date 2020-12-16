@@ -210,7 +210,6 @@ main(int argc, char *argv[])
 	ring_list_init(addr_str);
 	ring_rpc_init(mid, rpc_timeout_msec);
 	ring_list_rpc_init(mid, rpc_timeout_msec);
-	fs_server_init(mid, db_dir, rpc_timeout_msec);
 
 	if (server_info_file) {
 		FILE *fp = fopen(server_info_file, "w");
@@ -221,6 +220,9 @@ main(int argc, char *argv[])
 		} else
 			log_error("%s: %s", server_info_file, strerror(errno));
 	}
+
+	fs_server_init(mid, db_dir, rpc_timeout_msec);
+
 	ring_set_heartbeat_timeout(heartbeat_interval * 10);
 	log_debug("heartbeat interval: %d (timeout %d)",
 		heartbeat_interval, heartbeat_interval * 10);
