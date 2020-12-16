@@ -26,7 +26,7 @@ host_getaddr(char *hostname)
 
 	r = getaddrinfo(hostname, NULL, &hints, &res);
 	if (r != 0) {
-		log_error("getaddrinfo: %s", gai_strerror(r));
+		log_info("getaddrinfo: %s", gai_strerror(r));
 		return (NULL);
 	}
 	switch (res->ai_family) {
@@ -37,7 +37,7 @@ host_getaddr(char *hostname)
 		addr = &((struct sockaddr_in6 *)res->ai_addr)->sin6_addr;
 		break;
 	default:
-		log_error("getaddr: unsupported family: %d", res->ai_family);
+		log_info("getaddr: unsupported family: %d", res->ai_family);
 		freeaddrinfo(res);
 		return (NULL);
 	}
