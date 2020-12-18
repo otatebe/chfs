@@ -18,7 +18,7 @@ static void inode_readdir(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(inode_readdir)
 
 void
-fs_server_init_more(margo_instance_id mid, char *db_dir)
+fs_server_init_more(margo_instance_id mid, char *db_dir, size_t db_size)
 {
 	hg_id_t read_rdma_rpc, readdir_rpc;
 
@@ -28,7 +28,7 @@ fs_server_init_more(margo_instance_id mid, char *db_dir)
 		fs_readdir_out_t, inode_readdir);
 
 	fs_client_init_more_internal(read_rdma_rpc, readdir_rpc);
-	kv_init(db_dir, "cmap", "kv.db", 256 * 1024 * 1024);
+	kv_init(db_dir, "cmap", "kv.db", db_size);
 }
 
 void

@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <syslog.h>
+#include <sys/stat.h>
 #include <libgen.h>
 #include <errno.h>
 #include <margo.h>
@@ -97,13 +98,33 @@ handle_sig(void *arg)
 	exit(1);
 }
 
+static void
+check_directory(char *dir)
+{
+	struct stat sb;
+	int r;
+
+	r = stat(dir, &sb);
+	if (r == -1) {
+		if (errno != ENOENT)
+			log_fatal("%s: %s", dir, strerror(errno));
+		r = mkdir(dir, 0755);
+		if (r == -1)
+			log_fatal("%s: %s", dir, strerror(errno));
+		log_info("%s: created", dir);
+	} else if (!S_ISDIR(sb.st_mode))
+		log_fatal("%s: not a directory", dir);
+	return;
+}
+
 void
 usage(char *prog_name)
 {
-	fprintf(stderr, "Usage: %s [-d] [-c db_dir] [-p protocol] [-h host] "
-		"[-l log_file]\n\t[-S server_info_file] [-t rpc_timeout_msec]\n"
-		"\t[-H heartbeat_interval] [-L log_priority] [server]\n",
-		prog_name);
+	fprintf(stderr, "Usage: %s [-d] [-c db_dir] [-s db_size] "
+		"[-p protocol]\n\t[-h host[:port]/device] [-l log_file] "
+		"[-S server_info_file]\n\t[-t rpc_timeout_msec] "
+		"[-T nthreads] [-H heartbeat_interval]\n\t[-L log_priority] "
+		"[server]\n", prog_name);
 	exit(EXIT_FAILURE);
 }
 
@@ -111,7 +132,7 @@ int
 main(int argc, char *argv[])
 {
 	char addr_str[PATH_MAX], *host_addr;
-	size_t addr_str_size = sizeof(addr_str);
+	size_t addr_str_size = sizeof(addr_str), db_size = 256 * 1024 * 1024;
 	hg_addr_t my_address;
 	pthread_t t;
 	static sigset_t sigset;
@@ -119,13 +140,13 @@ main(int argc, char *argv[])
 	char *db_dir = "/tmp", *hostname = NULL, *log_file = NULL;
 	char *protocol = "sockets", info_string[PATH_MAX];
 	char *server_info_file = NULL;
-	int opt, debug = 0, rpc_timeout_msec = 0;
+	int opt, debug = 0, rpc_timeout_msec = 0, nthreads = 5;
 	int heartbeat_interval = 10, log_priority = -1;
 	char *prog_name;
 
 	prog_name = basename(argv[0]);
 
-	while ((opt = getopt(argc, argv, "c:dh:H:l:L:p:S:t:")) != -1) {
+	while ((opt = getopt(argc, argv, "c:dh:H:l:L:p:s:S:t:T:")) != -1) {
 		switch (opt) {
 		case 'c':
 			db_dir = optarg;
@@ -152,11 +173,17 @@ main(int argc, char *argv[])
 		case 'p':
 			protocol = optarg;
 			break;
+		case 's':
+			db_size = atol(optarg);
+			break;
 		case 'S':
 			server_info_file = optarg;
 			break;
 		case 't':
 			rpc_timeout_msec = atoi(optarg);
+			break;
+		case 'T':
+			nthreads = atoi(optarg);
 			break;
 		default:
 			usage(prog_name);
@@ -167,6 +194,7 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
+	check_directory(db_dir);
 	if (!debug) {
 		if (log_file) {
 			if (log_file_open(log_file) == -1)
@@ -197,7 +225,7 @@ main(int argc, char *argv[])
 		}
 	}
 	log_info("information string %s", info_string);
-	mid = margo_init(info_string, MARGO_SERVER_MODE, 1, 5);
+	mid = margo_init(info_string, MARGO_SERVER_MODE, 1, nthreads);
 	if (mid == MARGO_INSTANCE_NULL)
 		log_fatal("margo_init failed, abort");
 
@@ -221,7 +249,7 @@ main(int argc, char *argv[])
 			log_error("%s: %s", server_info_file, strerror(errno));
 	}
 
-	fs_server_init(mid, db_dir, rpc_timeout_msec);
+	fs_server_init(mid, db_dir, db_size, rpc_timeout_msec);
 
 	ring_set_heartbeat_timeout(heartbeat_interval * 10);
 	log_debug("heartbeat interval: %d (timeout %d)",

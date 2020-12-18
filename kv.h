@@ -1,4 +1,4 @@
-void kv_init(char *db_dir, char *engine, char *path, uint64_t size);
+void kv_init(char *db_dir, char *engine, char *path, size_t size);
 void kv_term();
 
 int kv_put(void *key, size_t key_size, void *value, size_t value_size);

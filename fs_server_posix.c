@@ -19,7 +19,7 @@ static void inode_readdir(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(inode_readdir)
 
 void
-fs_server_init_more(margo_instance_id mid, char *db_dir)
+fs_server_init_more(margo_instance_id mid, char *db_dir, size_t db_size)
 {
 	hg_id_t read_rdma_rpc, readdir_rpc;
 

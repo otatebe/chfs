@@ -25,7 +25,7 @@ kv_err(int pmemkv_err)
 }
 
 void
-kv_init(char *db_dir, char *engine, char *path, uint64_t size)
+kv_init(char *db_dir, char *engine, char *path, size_t size)
 {
 	pmemkv_config *cfg;
 	char *p;
@@ -61,6 +61,7 @@ kv_init(char *db_dir, char *engine, char *path, uint64_t size)
 	r = pmemkv_open(engine, cfg, &db);
 	if (r != PMEMKV_STATUS_OK)
 		log_fatal("%s", pmemkv_errormsg());
+	log_debug("%s: created", p);
 free_p:
 	assert(db);
 	free(p);
