@@ -76,10 +76,8 @@ fs_inode_stat(char *key, size_t key_size, struct fs_stat *stat)
 	stat->gid = inode.gid;
 	stat->size = inode.size;
 	stat->chunk_size = inode.chunk_size;
-	stat->mtime.sec = inode.mtime.sec;
-	stat->mtime.nsec = inode.mtime.nsec;
-	stat->ctime.sec = inode.ctime.sec;
-	stat->ctime.nsec = inode.ctime.nsec;
+	stat->mtime = inode.mtime;
+	stat->ctime = inode.ctime;
 	return (KV_SUCCESS);
 }
 
