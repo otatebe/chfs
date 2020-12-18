@@ -5,6 +5,7 @@ lib_LTLIBRARIES = libchfs.la
 include_HEADERS = chfs.h
 noinst_HEADERS = ring_list.h ring_list_rpc.h ring_types.h ring_rpc.h ring.h \
 	kv_types.h kv.h kv_err.h fs_rpc.h fs_types.h fs.h host.h log.h
+EXTRA_DIST = README.md
 
 chlist_LDADD = libchfs.la @MARGO_LIBS@ @OPENSSL_LIBS@
 chmkdir_LDADD = libchfs.la @MARGO_LIBS@ @OPENSSL_LIBS@
@@ -31,3 +32,5 @@ AM_CPPFLAGS = -Wall -pthread
 AM_CFLAGS = @MARGO_CFLAGS@ @OPENSSL_CFLAGS@
 AM_LDFLAGS = -pthread
 ACLOCAL_AMFLAGS = -I m4
+
+SUBDIRS = doc

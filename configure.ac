@@ -68,5 +68,5 @@ AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_CHECK_FUNCS([memset mkdir rmdir strchr strdup strerror])
 
-AC_CONFIG_FILES([Makefile chfsctl])
+AC_CONFIG_FILES([Makefile doc/Makefile chfsctl])
 AC_OUTPUT

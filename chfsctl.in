@@ -7,9 +7,10 @@ export PATH
 
 PROTO=sockets
 DBDIR=/tmp/$USER
-CHFSD=chfsd
+DBSIZE=$((256 * 1024 * 1024))
 LOG_DIR=$HOME
 IFACES=default
+CHFSD=chfsd
 
 program=$(basename $0)
 
@@ -20,7 +21,7 @@ err() {
 
 usage() {
 	[ "X$*" = X ] || echo >&2 $*
-	echo >&2 "usage: $program [-c db_dir] [-p proto] [-I interfaces] [-L log_dir]"
+	echo >&2 "usage: $program [-c db_dir] [-s db_size] [-p proto] [-I interfaces] [-L log_dir]"
 	echo >&2 "		[-h hostfile] [-O options] start | stop | status | kill"
 	exit 1
 }
@@ -32,6 +33,7 @@ while [ $# -gt 0 ]; do
 	    -c) shift; DBDIR=$1 ;;
 	    -O) shift; OPTIONS="$1" ;;
 	    -p) shift; PROTO=$1 ;;
+	    -s) shift; DBSIZE=$1 ;;
 	    -I) shift; IFACES="$1" ;;
 	    -L) shift; LOG_DIR=$1 ;;
 	    -*) echo "unknown option: $1"
@@ -50,7 +52,7 @@ done
 PKILL_FLAG=
 [ "$mode" = kill ] && PKILL_FLAG=-9
 
-CHFS_OPTIONS="-p $PROTO $OPTIONS"
+CHFS_OPTIONS="-p $PROTO -s $DBSIZE $OPTIONS"
 SERVER_INFO_FILE=/tmp/server-info-file-$USER
 MYHOSTNAMES="$(hostname) $(hostname -f) $(hostname -A) $(hostname -I)"
 case $mode in
