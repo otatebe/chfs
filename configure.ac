@@ -4,8 +4,8 @@
 AC_PREREQ([2.69])
 AC_INIT([CHFS], [1.0.0])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
-AC_CONFIG_SRCDIR([chfs.c])
-AC_CONFIG_HEADERS([config.h])
+AC_CONFIG_SRCDIR([README.md])
+AC_CONFIG_HEADERS([lib/config.h])
 AC_CONFIG_MACRO_DIRS([m4])
 
 # Checks for programs.
@@ -68,5 +68,5 @@ AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_CHECK_FUNCS([memset mkdir rmdir strchr strdup strerror])
 
-AC_CONFIG_FILES([Makefile doc/Makefile chfsctl])
+AC_CONFIG_FILES([Makefile lib/Makefile chfsd/Makefile client/Makefile client/chfsctl doc/Makefile])
 AC_OUTPUT
