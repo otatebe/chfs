@@ -37,7 +37,7 @@ chfsd - CHFS server
 : specifies a timeout for RPC in milliseconds.  Default is 0 (no timeout).
 
 -T nthreads
-: specifies the number of threads of the chfsd.
+: specifies the number of threads of the chfsd.  Default is 5.
 
 -H heartbeat_interval
 : specifies the interval of heartbeat in second.  Default is 10 seconds.

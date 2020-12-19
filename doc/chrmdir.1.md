@@ -19,4 +19,4 @@ CHFS_RPC_TIMEOUT_MSEC
 : RPC timeout in milliseconds
 
 CHFS_LOG_PRIORITY:
-: max log priority to report
+: maximum log priority to report

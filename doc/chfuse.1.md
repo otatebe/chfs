@@ -20,13 +20,13 @@ CHFS_SERVER
 : one of server addresses
 
 CHFS_CHUNK_SIZE
-: chunk size
+: chunk size.  Default is 4 KiB.
 
 CHFS_RDMA_THRESH
-: RDMA transfer used when the size is larger than CHFS_RDMA_THRESH
+: RDMA transfer is used when the size is larger than or equel to CHFS_RDMA_THRESH.  Default is 2 KiB.
 
 CHFS_RPC_TIMEOUT_MSEC
-: RPC timeout in milliseconds
+: RPC timeout in milliseconds.  Default is 0 (no timeout).
 
 CHFS_LOG_PRIORITY:
-: max log priority to report
+: maximum log priority to report.  Default is notice.
