@@ -81,6 +81,7 @@ for device in $IFACES; do
 	HOPT=
 done
 echo "CHFS_SERVER=\"$SERVER\"; export CHFS_SERVER"
+CHFS_SERVER="$SERVER"; export CHFS_SERVER
 ;;
 stop|kill)
 pkill $PKILL_FLAG $CHFSD
@@ -99,7 +100,12 @@ esac
 
 [ "X$HOSTFILE" = X ] && exit 0
 
-MAX_JOBS=1
+if [ $mode = start ]; then
+	set $(chlist | awk '{ print $1 }')
+	MAX_JOBS=$#
+else
+	MAX_JOBS=8
+fi
 p=0
 for host in `sed -e 's/#.*//' -e '/^[ 	]*$/d' $HOSTFILE | awk '{ print $1 }'`
 do
@@ -110,12 +116,15 @@ do
 		[ $device = default ] || HOPT="-h $device"
 		COPT="-c $DBDIR/$device"
 		LOPT="-l $LOG_DIR/$host-$device"
-		ssh $host LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH\" PATH=\"$PATH\" $CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT \"$SERVER\" &
+		ssh $host LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH\" PATH=\"$PATH\" $CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT \"$1\" &
+		shift
 		HOPT=
 		p=$((p + 1))
 		if [ $p -ge $MAX_JOBS ]; then
 			p=0
 			wait
+			set $(chlist | awk '{ print $1 }')
+			MAX_JOBS=$#
 		fi
 	done
 	;;
@@ -131,6 +140,10 @@ do
 	if [ $p -ge $MAX_JOBS ]; then
 		p=0
 		wait
+		if [ $mode = start ]; then
+			set $(chlist | awk '{ print $1 }')
+			MAX_JOBS=$#
+		fi
 	fi
 done
 wait
