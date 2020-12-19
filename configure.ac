@@ -13,6 +13,9 @@ AC_PROG_CC
 AM_PROG_AR
 LT_INIT
 
+AC_CHECK_PROG([PANDOC], [pandoc], [yes])
+AM_CONDITIONAL([HAVE_PANDOC], [test x$PANDOC = xyes])
+
 AC_MSG_CHECKING([whether xattr is used for metadata])
 AC_ARG_ENABLE([xattr],
   [AS_HELP_STRING([--enable-xattr],
