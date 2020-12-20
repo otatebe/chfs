@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
@@ -46,7 +45,6 @@ join_ring(margo_instance_id mid, const char *server)
 	ret = ring_rpc_join(addr_str, self, &prev);
 	ring_release_self();
 	ring_fatal(ret, "join:rpc_join");
-	assert(prev != NULL);
 	ring_set_prev(prev);
 	free(prev);
 }

@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -54,10 +53,8 @@ ring_set_node(const char *host, ring_node_t *node, const char *diag)
 	ABT_mutex_lock(node->mutex);
 	if (node->ref_count > 0)
 		index = 1;
-	if (node->host[index])
-		free(node->host[index]);
+	free(node->host[index]);
 	node->host[index] = strdup(host);
-	assert(node->host[index]);
 	ABT_mutex_unlock(node->mutex);
 	if (diag)
 		ring_print_node(node, diag);
