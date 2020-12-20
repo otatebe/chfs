@@ -37,6 +37,8 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
 
        % eval `chfsctl [-h hostfile] start`
 
+   For details, see manual page of chfsctl.
+
 ## How to use
 
 1. Mount the CHFS
@@ -47,15 +49,17 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
 
 - CHFS_SERVER - one of server addresses
 - CHFS_CHUNK_SIZE - chunk size
-- CHFS_RDMA_THRESH - RDMA transfer used when the size is larger than CHFS_RDMA_THRESH
+- CHFS_RDMA_THRESH - RDMA transfer is used when the size is larger than or equal to CHFS_RDMA_THRESH
 - CHFS_RPC_TIMEOUT_MSEC - RPC timeout in milliseconds
-- CHFS_LOG_PRIORITY - max log priority to report
+- CHFS_LOG_PRIORITY - maximum log priority to report
 
 ## IOR and mdtest
 
 1. Installation
 
        % git clone https://github.com/otatebe/ior.git -b feature/chfs
+       % cd ior
+       % ./bootstrap
        % spack load mochi-margo
        % ./configure --with-chfs=PREFIX [--prefix=PREFIX]
        % make

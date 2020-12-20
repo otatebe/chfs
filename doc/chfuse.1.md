@@ -23,7 +23,7 @@ CHFS_CHUNK_SIZE
 : chunk size.  Default is 4 KiB.
 
 CHFS_RDMA_THRESH
-: RDMA transfer is used when the size is larger than or equel to CHFS_RDMA_THRESH.  Default is 2 KiB.
+: RDMA transfer is used when the size is larger than or equal to CHFS_RDMA_THRESH.  Default is 2 KiB.
 
 CHFS_RPC_TIMEOUT_MSEC
 : RPC timeout in milliseconds.  Default is 0 (no timeout).
