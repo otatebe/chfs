@@ -21,21 +21,23 @@ err() {
 
 usage() {
 	[ "X$*" = X ] || echo >&2 $*
-	echo >&2 "usage: $program [-c db_dir] [-s db_size] [-p proto] [-I interfaces] [-L log_dir]"
-	echo >&2 "		[-h hostfile] [-O options] start | stop | status | kill"
+	echo >&2 "usage: $program [-h hostfile] [-c scratch_dir] [-m mount_point] [-s db_size]"
+	echo >&2 "		[-p proto] [-I interfaces] [-L log_dir] [-O options]"
+	echo >&2 "		start | stop | status | kill"
 	exit 1
 }
 
 while [ $# -gt 0 ]; do
 	case $1 in
 	    start|stop|status|kill) mode=$1 ;;
-	    -h) shift; HOSTFILE=$1 ;;
 	    -c) shift; DBDIR=$1 ;;
+	    -h) shift; HOSTFILE=$1 ;;
+	    -I) shift; IFACES="$1" ;;
+	    -L) shift; LOG_DIR=$1 ;;
+	    -m) shift; MDIR=$1 ;;
 	    -O) shift; OPTIONS="$1" ;;
 	    -p) shift; PROTO=$1 ;;
 	    -s) shift; DBSIZE=$1 ;;
-	    -I) shift; IFACES="$1" ;;
-	    -L) shift; LOG_DIR=$1 ;;
 	    -*) echo "unknown option: $1"
 		usage ;;
 	    *) usage ;;
@@ -82,10 +84,17 @@ for device in $IFACES; do
 done
 echo "CHFS_SERVER=\"$SERVER\"; export CHFS_SERVER"
 CHFS_SERVER="$SERVER"; export CHFS_SERVER
+if [ X"$MDIR" != X ]; then
+	[ -d "$MDIR" ] || mkdir -p "$MDIR"
+	[ -d "$MDIR" ] || err $MDIR: no mount directory
+	chmkdir "$MDIR"
+	chfuse -o direct_io,modules=subdir,subdir="$MDIR" $MDIR
+fi
 ;;
 stop|kill)
 pkill $PKILL_FLAG $CHFSD
 rm -f $SERVER_INFO_FILE
+[ X"$MDIR" != X ] && fusermount -u "$MDIR"
 ;;
 status)
 if [ -s $SERVER_INFO_FILE ]; then
@@ -95,6 +104,7 @@ else
 fi
 echo $(hostname -f)
 ps -ef | grep $CHFSD | egrep -v grep
+[ X"$MDIR" != X ] && ps -ef | grep chfuse | egrep -v grep
 ;;
 esac
 
@@ -127,13 +137,23 @@ do
 			MAX_JOBS=$#
 		fi
 	done
+	if [ X"$MDIR" != X ]; then
+		ssh $host mkdir -p "$MDIR"
+		ssh $host LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH\" PATH=\"$PATH\" CHFS_SERVER=\"$CHFS_SERVER\" chfuse -o direct_io,modules=subdir,subdir="$MDIR" "$MDIR"
+	fi
 	;;
 	stop|kill)
 	ssh $host pkill $PKILL_FLAG $CHFSD &
+	if [ X"$MDIR" != X ]; then
+		ssh $host fusermount -u "$MDIR" &
+	fi
 	;;
 	status)
 	echo $host
 	ssh $host "ps -ef | grep $CHFSD | egrep -v grep"
+	if [ X"$MDIR" != X ]; then
+		ssh $host "ps -ef | grep chfuse | egrep -v grep"
+	fi
 	;;
 	esac
 	p=$((p + 1))
