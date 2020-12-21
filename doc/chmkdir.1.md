@@ -1,15 +1,19 @@
 % chmkdir(1) CHFS
 %
-% December 18, 2020
+% December 21, 2020
 
 # NAME
 chmkdir - create a directory in CHFS
 
 # SYNOPSIS
-**chmkdir** _mode_ _directory_
+**chmkdir** [-m _mode_] _directory_
 
 # DESCRIPTION
 **chmkdir** creates a directory in CHFS.
+
+# OPTIONS
+-m
+: specifies the mode
 
 # ENVIRONMENT
 CHFS_SERVER
