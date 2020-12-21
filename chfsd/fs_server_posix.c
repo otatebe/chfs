@@ -73,7 +73,7 @@ inode_read_rdma(hg_handle_t h)
 		assert(buf);
 		out.err = fs_inode_read(in.key.v, in.key.s, buf,
 			&out.value_size, in.offset);
-		if (out.err == 0) {
+		if (out.err == 0 && out.value_size > 0) {
 			ret = margo_bulk_create(mid, 1, &buf, &out.value_size,
 				HG_BULK_READ_ONLY, &bulk);
 			assert(ret == HG_SUCCESS);
