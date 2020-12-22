@@ -34,15 +34,20 @@ static void coordinator(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(coordinator)
 
 static hg_return_t
-create_rpc_handle(const char *server, hg_id_t rpc_id, hg_handle_t *h)
+create_rpc_handle(const char *server, hg_id_t rpc_id, hg_handle_t *h,
+	const char *diag)
 {
 	hg_addr_t addr;
 	hg_return_t ret;
 
 	ret = margo_addr_lookup(env.mid, server, &addr);
-	if (ret != HG_SUCCESS)
+	if (ret != HG_SUCCESS) {
+		log_error("%s (lookup): %s", diag, HG_Error_to_string(ret));
 		return (ret);
+	}
 	ret = margo_create(env.mid, addr, rpc_id, h);
+	if (ret != HG_SUCCESS)
+		log_error("%s (create): %s", diag, HG_Error_to_string(ret));
 	margo_addr_free(env.mid, addr);
 	return (ret);
 }
@@ -53,20 +58,27 @@ ring_rpc_join(const char *server, char *self, char **prev)
 	hg_handle_t h;
 	hg_return_t ret, ret2;
 	char *out, *save_out = NULL;
+	static const char diag[] = "ring_rpc_join";
 
-	ret = create_rpc_handle(server, env.join_rpc, &h);
+	ret = create_rpc_handle(server, env.join_rpc, &h, diag);
 	if (ret != HG_SUCCESS)
 		return (ret);
 
 	ret = margo_forward_timed(h, &self, ring_rpc_timeout_msec);
-	if (ret != HG_SUCCESS)
+	if (ret != HG_SUCCESS) {
+		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
 		goto err;
-
+	}
 	ret = margo_get_output(h, &out);
-	if (ret != HG_SUCCESS)
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_output): %s", diag, HG_Error_to_string(ret));
 		goto err;
-	assert(out);
-	save_out = strdup(out);
+	}
+	if (out == NULL) {
+		log_error("%s: out is NULL", diag);
+		save_out = out;
+	} else
+		save_out = strdup(out);
 	ret = margo_free_output(h, &out);
 err:
 	ret2 = margo_destroy(h);
@@ -82,12 +94,15 @@ ring_rpc_set_next(const char *server, char *host)
 {
 	hg_handle_t h;
 	hg_return_t ret, ret2;
+	static const char diag[] = "ring_rpc_set_next";
 
-	ret = create_rpc_handle(server, env.set_next_rpc, &h);
+	ret = create_rpc_handle(server, env.set_next_rpc, &h, diag);
 	if (ret != HG_SUCCESS)
 		return (ret);
 
 	ret = margo_forward_timed(h, &host, ring_rpc_timeout_msec);
+	if (ret != HG_SUCCESS)
+		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
 
 	ret2 = margo_destroy(h);
 	if (ret == HG_SUCCESS)
@@ -100,12 +115,15 @@ ring_rpc_set_prev(const char *server, char *host)
 {
 	hg_handle_t h;
 	hg_return_t ret, ret2;
+	static const char diag[] = "ring_rpc_set_prev";
 
-	ret = create_rpc_handle(server, env.set_prev_rpc, &h);
+	ret = create_rpc_handle(server, env.set_prev_rpc, &h, diag);
 	if (ret != HG_SUCCESS)
 		return (ret);
 
 	ret = margo_forward_timed(h, &host, ring_rpc_timeout_msec);
+	if (ret != HG_SUCCESS)
+		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
 
 	ret2 = margo_destroy(h);
 	if (ret == HG_SUCCESS)
@@ -119,8 +137,9 @@ ring_rpc_list(const char *server, string_list_t *list, char *self)
 	hg_handle_t h;
 	hg_return_t ret, ret2;
 	string_list_t new_list = { 1, &self };
+	static const char diag[] = "ring_rpc_list";
 
-	ret = create_rpc_handle(server, env.list_rpc, &h);
+	ret = create_rpc_handle(server, env.list_rpc, &h, diag);
 	if (ret != HG_SUCCESS)
 		return (ret);
 
@@ -132,6 +151,8 @@ ring_rpc_list(const char *server, string_list_t *list, char *self)
 		++list->n;
 	}
 	ret = margo_forward_timed(h, list, ring_rpc_timeout_msec);
+	if (ret != HG_SUCCESS)
+		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
 	/* decrement required not to free 'self' above in margo_free_input */
 	--list->n;
 
@@ -147,8 +168,9 @@ ring_rpc_election(const char *server, string_list_t *list, char *self)
 	hg_handle_t h;
 	hg_return_t ret, ret2;
 	string_list_t new_list = { 1, &self };
+	static const char diag[] = "ring_rpc_election";
 
-	ret = create_rpc_handle(server, env.election_rpc, &h);
+	ret = create_rpc_handle(server, env.election_rpc, &h, diag);
 	if (ret != HG_SUCCESS)
 		return (ret);
 
@@ -159,6 +181,8 @@ ring_rpc_election(const char *server, string_list_t *list, char *self)
 		++list->n;
 	}
 	ret = margo_forward_timed(h, list, ring_rpc_timeout_msec);
+	if (ret != HG_SUCCESS)
+		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
 	--list->n;
 
 	ret2 = margo_destroy(h);
@@ -172,12 +196,15 @@ ring_rpc_coordinator(const char *server, coordinator_t *list)
 {
 	hg_handle_t h;
 	hg_return_t ret, ret2;
+	static const char diag[] = "ring_rpc_coordinator";
 
-	ret = create_rpc_handle(server, env.coordinator_rpc, &h);
+	ret = create_rpc_handle(server, env.coordinator_rpc, &h, diag);
 	if (ret != HG_SUCCESS)
 		return (ret);
 
 	ret = margo_forward_timed(h, list, ring_rpc_timeout_msec);
+	if (ret != HG_SUCCESS)
+		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
 
 	ret2 = margo_destroy(h);
 	if (ret == HG_SUCCESS)
@@ -218,39 +245,48 @@ join(hg_handle_t h)
 	hg_return_t ret;
 	char *in, *prev;
 	int prev_prev = 0;
+	static const char diag[] = "join RPC";
 
-	log_debug("join RPC");
+	log_debug("%s", diag);
 	ret = margo_get_input(h, &in);
-	assert(ret == HG_SUCCESS);
-
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		return;
+	}
 	ABT_mutex_lock(join_mutex);
 	prev = ring_get_prev();
 	/* election starts */
 	ret = ring_rpc_set_next(prev, in);
 	if (ret != HG_SUCCESS) {
+		log_notice("%s (rpc_set_next): %s", diag,
+			HG_Error_to_string(ret));
 		ring_release_prev();
 		prev = ring_get_prev_prev();
 		/* election starts */
 		ret = ring_rpc_set_next(prev, in);
-		assert(ret == HG_SUCCESS);
+		if (ret != HG_SUCCESS)
+			log_error("%s (rpc_set_next): %s", diag,
+				HG_Error_to_string(ret));
 		prev_prev = 1;
 	}
 	ring_set_prev(in);
 	ABT_mutex_unlock(join_mutex);
 
 	ret = margo_free_input(h, &in);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
 
 	ret = margo_respond(h, &prev);
 	if (ret != HG_SUCCESS)
-		log_error("join: %s", HG_Error_to_string(ret));
+		log_error("%s (respond): %s", diag, HG_Error_to_string(ret));
 	if (prev_prev == 0)
 		ring_release_prev();
 	else
 		ring_release_prev_prev();
 
 	ret = margo_destroy(h);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
 }
 DEFINE_MARGO_RPC_HANDLER(join)
 
@@ -360,18 +396,23 @@ set_next(hg_handle_t h)
 {
 	hg_return_t ret;
 	char *in;
+	static const char diag[] = "set_next RPC";
 
-	log_debug("set_next RPC");
+	log_debug("%s", diag);
 	ret = margo_get_input(h, &in);
-	assert(ret == HG_SUCCESS);
-
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		return;
+	}
 	ring_set_next(in);
 
 	ret = margo_free_input(h, &in);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
 
 	ret = margo_destroy(h);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
 
 	ring_start_election();
 }
@@ -382,18 +423,23 @@ set_prev(hg_handle_t h)
 {
 	hg_return_t ret;
 	char *in;
+	static const char diag[] = "set_prev RPC";
 
-	log_debug("set_prev RPC");
+	log_debug("%s", diag);
 	ret = margo_get_input(h, &in);
-	assert(ret == HG_SUCCESS);
-
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		return;
+	}
 	ring_set_prev(in);
 
 	ret = margo_free_input(h, &in);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
 
 	ret = margo_destroy(h);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
 }
 DEFINE_MARGO_RPC_HANDLER(set_prev)
 
@@ -404,12 +450,15 @@ list(hg_handle_t h)
 	string_list_t in;
 	char *self, *next;
 	int i;
+	static const char diag[] = "list RPC";
 
-	log_debug("list RPC");
+	log_debug("%s", diag);
 	heartbeat_time = time(NULL);
 	ret = margo_get_input(h, &in);
-	assert(ret == HG_SUCCESS);
-
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		return;
+	}
 	self = ring_get_self();
 	for (i = 0; i < in.n; ++i)
 		log_debug("[%d] %s", i, in.s[i]);
@@ -432,10 +481,12 @@ list(hg_handle_t h)
 	ring_release_self();
 
 	ret = margo_free_input(h, &in);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
 
 	ret = margo_destroy(h);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
 }
 DEFINE_MARGO_RPC_HANDLER(list)
 
@@ -465,12 +516,15 @@ election(hg_handle_t h)
 	coordinator_t in3;
 	char *self, *next;
 	int i;
+	static const char diag[] = "election RPC";
 
-	log_debug("election RPC");
+	log_debug("%s", diag);
 	heartbeat_time = time(NULL);
 	ret = margo_get_input(h, &in);
-	assert(ret == HG_SUCCESS);
-
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		return;
+	}
 	self = ring_get_self();
 	for (i = 0; i < in.n; ++i)
 		if (strcmp(in.s[i], self) == 0)
@@ -507,10 +561,12 @@ election(hg_handle_t h)
 	ring_release_self();
 
 	ret = margo_free_input(h, &in);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
 
 	ret = margo_destroy(h);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
 }
 DEFINE_MARGO_RPC_HANDLER(election)
 
@@ -530,12 +586,15 @@ coordinator(hg_handle_t h)
 	coordinator_t in;
 	char *next, *self;
 	int i;
+	static const char diag[] = "coordinator RPC";
 
-	log_debug("coordinator RPC");
+	log_debug("%s", diag);
 	heartbeat_time = time(NULL);
 	ret = margo_get_input(h, &in);
-	assert(ret == HG_SUCCESS);
-
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		return;
+	}
 	for (i = 0; i < in.list.n; ++i)
 		log_debug("[%d] %s", i, in.list.s[i]);
 	if (in.ttl > 0) {
@@ -545,7 +604,7 @@ coordinator(hg_handle_t h)
 			ret = ring_rpc_coordinator(next, &in);
 			if (ret == HG_SUCCESS)
 				break;
-			log_notice("coordinator: %s", HG_Error_to_string(ret));
+			log_notice("%s: %s", diag, HG_Error_to_string(ret));
 			remove_host(&in, next);
 			if (ring_fix_next(next, 0) == -1)
 				break;
@@ -569,10 +628,12 @@ coordinator(hg_handle_t h)
 	ring_set_prev_prev(in.list.s[i]);
 
 	ret = margo_free_input(h, &in);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
 
 	ret = margo_destroy(h);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
 
 	coordinator_rpc_done = 1;
 }

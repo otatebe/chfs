@@ -47,18 +47,27 @@ inode_read_rdma(hg_handle_t h)
 	hg_addr_t client_addr;
 	hg_bulk_t bulk;
 	void *buf;
+	static const char diag[] = "inode_read_rdma RPC";
 
 	ret = margo_get_input(h, &in);
-	assert(ret == HG_SUCCESS);
-	log_debug("inode_read_rdma: key=%s", (char *)in.key.v);
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		return;
+	}
+	log_debug("%s: key=%s", diag, (char *)in.key.v);
 
 	memset(&out, 0, sizeof(out));
+	out.value_size = in.value_size;
+	if (out.value_size == 0) {
+		out.err = KV_SUCCESS;
+		goto free_input;
+	}
 	ret = margo_addr_lookup(mid, in.client, &client_addr);
 	if (ret != HG_SUCCESS) {
+		log_error("%s (lookup): %s", diag, HG_Error_to_string(ret));
 		out.err = KV_ERR_LOOKUP;
-		goto err_free_input;
+		goto free_input;
 	}
-	out.value_size = in.value_size;
 
 	self = ring_get_self();
 	target = ring_list_lookup(in.key.v, in.key.s);
@@ -66,37 +75,57 @@ inode_read_rdma(hg_handle_t h)
 		ret = fs_rpc_inode_read_rdma_bulk(target, in.key.v, in.key.s,
 			in.client, in.value, &out.value_size, in.offset,
 			&out.err);
-		if (ret != HG_SUCCESS)
+		if (ret != HG_SUCCESS) {
+			log_error("%s (rpc_read_rdma_bulk): %s", diag,
+				HG_Error_to_string(ret));
 			out.err = KV_ERR_SERVER_DOWN;
+		}
 	} else {
 		buf = malloc(out.value_size);
-		assert(buf);
+		if (buf == NULL) {
+			log_error("%s: no memory", diag);
+			out.err = KV_ERR_NO_MEMORY;
+			goto free_target;
+		}
 		out.err = fs_inode_read(in.key.v, in.key.s, buf,
 			&out.value_size, in.offset);
 		if (out.err == 0 && out.value_size > 0) {
 			ret = margo_bulk_create(mid, 1, &buf, &out.value_size,
 				HG_BULK_READ_ONLY, &bulk);
-			assert(ret == HG_SUCCESS);
+			if (ret != HG_SUCCESS) {
+				log_error("%s (bulk_create): %s", diag,
+					HG_Error_to_string(ret));
+				goto free_buf;
+			}
 			ret = margo_bulk_transfer(mid, HG_BULK_PUSH,
 				client_addr, in.value, 0, bulk, 0,
 				out.value_size);
-			assert(ret == HG_SUCCESS);
+			if (ret != HG_SUCCESS)
+				log_error("%s (bulk_transfer): %s", diag,
+					HG_Error_to_string(ret));
 			ret = margo_bulk_free(bulk);
-			assert(ret == HG_SUCCESS);
+			if (ret != HG_SUCCESS)
+				log_error("%s (bulk_free): %s", diag,
+					HG_Error_to_string(ret));
 		}
+free_buf:
 		free(buf);
 	}
+free_target:
 	free(target);
 	ring_release_self();
 	margo_addr_free(mid, client_addr);
-err_free_input:
+free_input:
 	ret = margo_free_input(h, &in);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
 
 	ret = margo_respond(h, &out);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (respond) %s", diag, HG_Error_to_string(ret));
 	ret = margo_destroy(h);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (destroy) %s", diag, HG_Error_to_string(ret));
 
 	if (out.err == KV_ERR_SERVER_DOWN)
 		ring_start_election();
@@ -127,12 +156,18 @@ fs_add_entry(struct dirent *dent, void *arg)
 	log_debug("add_entry: %s", dent->d_name);
 	if (a->n >= a->size) {
 		tfi = realloc(a->fi, sizeof(a->fi[0]) * a->size * 2);
-		assert(tfi != NULL);
+		if (tfi == NULL) {
+			log_error("fs_add_entry: no memory");
+			return;
+		}
 		a->fi = tfi;
 		a->size *= 2;
 	}
 	a->fi[a->n].name = strdup(dent->d_name);
-	assert(a->fi[a->n].name);
+	if (a->fi[a->n].name == NULL) {
+		log_error("fs_add_entry: no memory");
+		return;
+	}
 	memset(&a->fi[a->n].sb, 0, sizeof(a->fi[a->n].sb));
 	a->fi[a->n].sb.mode = dent->d_type << 12;
 	++a->n;
@@ -145,30 +180,39 @@ inode_readdir(hg_handle_t h)
 	struct fs_readdir_arg a;
 	fs_readdir_out_t out;
 	hg_return_t ret;
+	static const char diag[] = "inode_readdir RPC";
 
 	ret = margo_get_input(h, &path);
-	assert(ret == HG_SUCCESS);
-	log_debug("inode_readdir: path=%s", path);
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		return;
+	}
+	log_debug("%s: path=%s", diag, path);
 
 	a.n = 0;
 	a.size = 1000;
 	a.fi = malloc(sizeof(a.fi[0]) * a.size);
-	assert(a.fi);
-
+	if (a.fi == NULL) {
+		log_error("%s: no memory", diag);
+		return;
+	}
 	memset(&out, 0, sizeof(out));
 	out.err = fs_inode_readdir(path, fs_add_entry, &a);
-	ret = margo_free_input(h, &path);
 	if (out.err == KV_SUCCESS) {
 		out.n = a.n;
 		out.fi = a.fi;
 	}
-	assert(ret == HG_SUCCESS);
+	ret = margo_free_input(h, &path);
+	if (ret != HG_SUCCESS)
+		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
 
 	ret = margo_respond(h, &out);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (respond): %s", diag, HG_Error_to_string(ret));
 	free_fs_readdir_arg(&a);
 
 	ret = margo_destroy(h);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
 }
 DEFINE_MARGO_RPC_HANDLER(inode_readdir)

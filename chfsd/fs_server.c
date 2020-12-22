@@ -61,10 +61,14 @@ inode_create(hg_handle_t h)
 	fs_create_in_t in;
 	int32_t err;
 	char *self, *target;
+	static const char diag[] = "inode_create RPC";
 
 	ret = margo_get_input(h, &in);
-	assert(ret == HG_SUCCESS);
-	log_debug("inode_create: key=%s", (char *)in.key.v);
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		return;
+	}
+	log_debug("%s: key=%s", diag, (char *)in.key.v);
 
 	self = ring_get_self();
 	target = ring_list_lookup(in.key.v, in.key.s);
@@ -80,12 +84,15 @@ inode_create(hg_handle_t h)
 	ring_release_self();
 
 	ret = margo_free_input(h, &in);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
 
 	ret = margo_respond(h, &err);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (respond): %s", diag, HG_Error_to_string(ret));
 	ret = margo_destroy(h);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
 
 	if (err == KV_ERR_SERVER_DOWN)
 		ring_start_election();
@@ -100,10 +107,14 @@ inode_stat(hg_handle_t h)
 	kv_byte_t in;
 	fs_stat_out_t out;
 	char *self, *target;
+	static const char diag[] = "inode_stat RPC";
 
 	ret = margo_get_input(h, &in);
-	assert(ret == HG_SUCCESS);
-	log_debug("inode_stat: key=%s", (char *)in.v);
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		return;
+	}
+	log_debug("%s: key=%s", diag, (char *)in.v);
 
 	memset(&out, 0, sizeof(out));
 	self = ring_get_self();
@@ -118,7 +129,8 @@ inode_stat(hg_handle_t h)
 	ring_release_self();
 
 	ret = margo_free_input(h, &in);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
 
 	log_debug("inode_stat: %s", kv_err_string(out.err));
 	if (out.err == KV_SUCCESS) {
@@ -131,9 +143,11 @@ inode_stat(hg_handle_t h)
 		out.st.ctime = sb.ctime;
 	}
 	ret = margo_respond(h, &out);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (respond): %s", diag, HG_Error_to_string(ret));
 	ret = margo_destroy(h);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
 
 	if (out.err == KV_ERR_SERVER_DOWN)
 		ring_start_election();
@@ -147,10 +161,14 @@ inode_write(hg_handle_t h)
 	fs_write_in_t in;
 	kv_get_rdma_out_t out;
 	char *self, *target;
+	static const char diag[] = "inode_write RPC";
 
 	ret = margo_get_input(h, &in);
-	assert(ret == HG_SUCCESS);
-	log_debug("inode_write: key=%s", (char *)in.key.v);
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		return;
+	}
+	log_debug("%s: key=%s", diag, (char *)in.key.v);
 
 	self = ring_get_self();
 	target = ring_list_lookup(in.key.v, in.key.s);
@@ -168,12 +186,15 @@ inode_write(hg_handle_t h)
 	ring_release_self();
 
 	ret = margo_free_input(h, &in);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
 
 	ret = margo_respond(h, &out);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (respond): %s", diag, HG_Error_to_string(ret));
 	ret = margo_destroy(h);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
 
 	if (out.err == KV_ERR_SERVER_DOWN)
 		ring_start_election();
@@ -187,16 +208,29 @@ inode_read(hg_handle_t h)
 	fs_read_in_t in;
 	kv_get_out_t out;
 	char *self, *target;
+	static const char diag[] = "inode_read RPC";
 
 	ret = margo_get_input(h, &in);
-	assert(ret == HG_SUCCESS);
-	log_debug("inode_read: key=%s", (char *)in.key.v);
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		return;
+	}
+	log_debug("%s: key=%s", diag, (char *)in.key.v);
 
 	self = ring_get_self();
 	target = ring_list_lookup(in.key.v, in.key.s);
 	out.value.s = in.size;
 	out.value.v = malloc(out.value.s);
-	assert(out.value.v);
+	if (out.value.s == 0) {
+		out.err = KV_SUCCESS;
+		goto skip;
+	}
+	if (out.value.v == NULL) {
+		log_error("%s: no memory", diag);
+		out.value.s = 0;
+		out.err = KV_ERR_NO_MEMORY;
+		goto skip;
+	}
 	if (strcmp(self, target) != 0) {
 		ret = fs_rpc_inode_read(target, in.key.v, in.key.s,
 			out.value.v, &out.value.s, in.offset, &out.err);
@@ -205,17 +239,21 @@ inode_read(hg_handle_t h)
 	} else
 		out.err = fs_inode_read(in.key.v, in.key.s, out.value.v,
 			&out.value.s, in.offset);
+skip:
 	free(target);
 	ring_release_self();
 
 	ret = margo_free_input(h, &in);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
 
 	ret = margo_respond(h, &out);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (respond): %s", diag, HG_Error_to_string(ret));
 	free(out.value.v);
 	ret = margo_destroy(h);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
 
 	if (out.err == KV_ERR_SERVER_DOWN)
 		ring_start_election();
@@ -229,10 +267,14 @@ inode_remove(hg_handle_t h)
 	kv_byte_t key;
 	int32_t err;
 	char *self, *target;
+	static const char diag[] = "inode_remove RPC";
 
 	ret = margo_get_input(h, &key);
-	assert(ret == HG_SUCCESS);
-	log_debug("inode_remove: key=%s", (char *)key.v);
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		return;
+	}
+	log_debug("%s: key=%s", diag, (char *)key.v);
 
 	self = ring_get_self();
 	target = ring_list_lookup(key.v, key.s);
@@ -246,12 +288,15 @@ inode_remove(hg_handle_t h)
 	ring_release_self();
 
 	ret = margo_free_input(h, &key);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
 
 	ret = margo_respond(h, &err);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (respond): %s", diag, HG_Error_to_string(ret));
 	ret = margo_destroy(h);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
 
 	if (err == KV_ERR_SERVER_DOWN)
 		ring_start_election();

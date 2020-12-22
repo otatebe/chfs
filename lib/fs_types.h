@@ -58,10 +58,11 @@ hg_proc_fs_readdir_out_t(hg_proc_t proc, void *data)
 		return (ret);
 	if (hg_proc_get_op(proc) == HG_DECODE)
 		k->fi = malloc(sizeof(fs_file_info_t) * k->n);
-	for (i = 0; i < k->n; ++i)
+	for (i = 0; i < k->n; ++i) {
 		ret = hg_proc_fs_file_info_t(proc, &k->fi[i]);
-	if (ret != HG_SUCCESS)
-		return (ret);
+		if (ret != HG_SUCCESS)
+			return (ret);
+	}
 	if (hg_proc_get_op(proc) == HG_FREE)
 		free(k->fi);
 	return (ret);

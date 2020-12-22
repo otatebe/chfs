@@ -55,7 +55,8 @@ init_fd_table()
 
 	chfs_fd_table_size = 100;
 	chfs_fd_table = malloc(sizeof(*chfs_fd_table) * chfs_fd_table_size);
-	assert(chfs_fd_table);
+	if (chfs_fd_table == NULL)
+		log_fatal("init_fs_table: no memory");
 
 	for (i = 0; i < chfs_fd_table_size; ++i)
 		chfs_fd_table[i].path = NULL;
@@ -66,17 +67,18 @@ static char *
 margo_protocol(const char *server)
 {
 	int s = 0;
-	char *prot;
+	char *proto;
 
 	while (server[s] && server[s] != ':')
 		++s;
 	if (server[s] != ':')
 		return (NULL);
-	prot = malloc(s + 1);
-	assert(prot);
-	strncpy(prot, server, s);
-	prot[s] = '\0';
-	return (prot);
+	proto = malloc(s + 1);
+	if (proto == NULL)
+		return (NULL);
+	strncpy(proto, server, s);
+	proto[s] = '\0';
+	return (proto);
 }
 
 int
@@ -168,7 +170,10 @@ create_fd_unlocked(const char *path, mode_t mode, int chunk_size)
 			chfs_fd_table[i].path = NULL;
 	}
 	chfs_fd_table[fd].path = strdup(path);
-	assert(chfs_fd_table[fd].path);
+	if (chfs_fd_table[fd].path == NULL) {
+		log_error("create_fd: %s, no memory", path);
+		return (-1);
+	}
 	chfs_fd_table[fd].mode = mode;
 	chfs_fd_table[fd].chunk_size = chunk_size;
 	chfs_fd_table[fd].pos = 0;
@@ -477,7 +482,6 @@ chfs_pwrite(int fd, const void *buf, size_t size, off_t offset)
 
 	if (local_pos + s > chunk_size)
 		s = chunk_size - local_pos;
-	assert(s > 0);
 
 	path = path_index(tab->path, index, &psize);
 	release_fd_table(tab);
@@ -637,7 +641,8 @@ chfs_stat(const char *path, struct stat *st)
 	p_len = strlen(p);
 	if (p_len > 0 && p[p_len - 1] == '/') {
 		pp = strdup(p);
-		assert(pp);
+		if (pp == NULL)
+			return (-1);
 		pp[p_len - 1] = '\0';
 		ret = chfs_rpc_inode_stat(pp, p_len, &sb, &err);
 		free(pp);

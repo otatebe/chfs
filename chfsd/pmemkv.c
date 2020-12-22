@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -30,18 +29,25 @@ kv_init(char *db_dir, char *engine, char *path, size_t size)
 	pmemkv_config *cfg;
 	char *p;
 	int r;
+	static const char diag[] = "kv_init";
 
-	assert(db_dir);
-	assert(engine);
-	assert(path);
+	if (db_dir == NULL || engine == NULL || path == NULL)
+		log_fatal("%s: invalid argument", diag);
+
 	p = malloc(strlen(db_dir) + 1 + strlen(path) + 1);
+	if (p == NULL)
+		log_fatal("%s: no memory", diag);
 	sprintf(p, "%s/%s", db_dir, path);
 	log_info("kv_init: engine %s, path %s, size %ld", engine, p, size);
 
 	cfg = pmemkv_config_new();
-	assert(cfg != NULL);
+	if (cfg == NULL)
+		log_fatal("%s (pmemkv_config_new): %s", diag,
+			pmemkv_errormsg());
 	r = pmemkv_config_put_string(cfg, "path", p);
-	assert(r == PMEMKV_STATUS_OK);
+	if (r != PMEMKV_STATUS_OK)
+		log_fatal("%s (pmemkv_config_put_string:path): %s", diag,
+			pmemkv_errormsg());
 
 	r = pmemkv_open(engine, cfg, &db);
 	if (r == PMEMKV_STATUS_OK)
@@ -50,20 +56,29 @@ kv_init(char *db_dir, char *engine, char *path, size_t size)
 		log_debug("%s, continue", pmemkv_errormsg());
 
 	cfg = pmemkv_config_new();
-	assert(cfg != NULL);
+	if (cfg == NULL)
+		log_fatal("%s (pmemkv_config_new): %s", diag,
+			pmemkv_errormsg());
 	r = pmemkv_config_put_string(cfg, "path", p);
-	assert(r == PMEMKV_STATUS_OK);
+	if (r != PMEMKV_STATUS_OK)
+		log_fatal("%s (pmemkv_config_put_string:path): %s", diag,
+			pmemkv_errormsg());
 	r = pmemkv_config_put_uint64(cfg, "size", size);
-	assert(r == PMEMKV_STATUS_OK);
+	if (r != PMEMKV_STATUS_OK)
+		log_fatal("%s (pmemkv_config_put_uint64:size): %s", diag,
+			pmemkv_errormsg());
 	r = pmemkv_config_put_uint64(cfg, "force_create", 1);
-	assert(r == PMEMKV_STATUS_OK);
+	if (r != PMEMKV_STATUS_OK)
+		log_fatal("%s (pmemkv_config_put_uint64:force_create): %s",
+			diag, pmemkv_errormsg());
 
 	r = pmemkv_open(engine, cfg, &db);
 	if (r != PMEMKV_STATUS_OK)
-		log_fatal("%s", pmemkv_errormsg());
+		log_fatal("%s: %s", diag, pmemkv_errormsg());
 	log_debug("%s: created", p);
 free_p:
-	assert(db);
+	if (db == NULL)
+		log_fatal("%s: db is NULL", diag);
 	free(p);
 }
 

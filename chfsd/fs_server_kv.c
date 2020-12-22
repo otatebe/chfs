@@ -51,6 +51,7 @@ read_rdma_cb(const char *value, size_t value_size, void *arg)
 	void *v = (void *)value;
 	hg_bulk_t bulk;
 	hg_return_t ret;
+	static const char diag[] = "read_rdma_cb";
 
 	if (a->offset >= value_size)
 		value_size = 0;
@@ -63,12 +64,19 @@ read_rdma_cb(const char *value, size_t value_size, void *arg)
 	v += a->offset;
 	ret = margo_bulk_create(a->mid, 1, &v, &value_size, HG_BULK_READ_ONLY,
 		&bulk);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS) {
+		log_error("%s (bulk_create): %s", diag,
+			HG_Error_to_string(ret));
+		goto finish;
+	}
 	ret = margo_bulk_transfer(a->mid, HG_BULK_PUSH, a->addr, a->bulk, 0,
 		bulk, 0, value_size);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (bulk_transfer): %s", diag,
+			HG_Error_to_string(ret));
 	ret = margo_bulk_free(bulk);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (bulk_free): %s", diag, HG_Error_to_string(ret));
 finish:
 	a->value_size = value_size;
 }
@@ -83,10 +91,14 @@ inode_read_rdma(hg_handle_t h)
 	margo_instance_id mid = margo_hg_handle_get_instance(h);
 	hg_addr_t client_addr;
 	struct read_rdma_cb_arg a;
+	static const char diag[] = "inode_read_rdma RPC";
 
 	ret = margo_get_input(h, &in);
-	assert(ret == HG_SUCCESS);
-	log_debug("inode_read_rdma: key=%s", (char *)in.key.v);
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		return;
+	}
+	log_debug("%s: key=%s", diag, (char *)in.key.v);
 
 	memset(&out, 0, sizeof(out));
 	ret = margo_addr_lookup(mid, in.client, &client_addr);
@@ -119,12 +131,15 @@ inode_read_rdma(hg_handle_t h)
 	margo_addr_free(mid, client_addr);
 err_free_input:
 	ret = margo_free_input(h, &in);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
 
 	ret = margo_respond(h, &out);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (respond): %s", diag, HG_Error_to_string(ret));
 	ret = margo_destroy(h);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
 
 	if (out.err == KV_ERR_SERVER_DOWN)
 		ring_start_election();
@@ -160,12 +175,18 @@ fs_add_entry(const char *name, struct fs_stat *st, struct fs_readdir_arg *a)
 
 	if (a->n >= a->size) {
 		tfi = realloc(a->fi, sizeof(a->fi[0]) * a->size * 2);
-		assert(tfi != NULL);
+		if (tfi == NULL) {
+			log_error("fs_add_entry: no memory");
+			return;
+		}
 		a->fi = tfi;
 		a->size *= 2;
 	}
 	a->fi[a->n].name = strdup(name);
-	assert(a->fi[a->n].name);
+	if (a->fi[a->n].name == NULL) {
+		log_error("fs_add_entry: no memory");
+		return;
+	}
 	a->fi[a->n].sb = *st;
 	++a->n;
 }
@@ -191,37 +212,51 @@ inode_readdir(hg_handle_t h)
 	struct fs_readdir_arg a;
 	fs_readdir_out_t out;
 	hg_return_t ret;
+	static const char diag[] = "inode_readdir RPC";
 
 	ret = margo_get_input(h, &path);
-	assert(ret == HG_SUCCESS);
-	log_debug("inode_readdir: path=%s", path);
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		return;
+	}
+	log_debug("%s: path=%s", diag, path);
 
 	a.n = 0;
 	a.size = 1000;
 	a.fi = malloc(sizeof(a.fi[0]) * a.size);
-	assert(a.fi);
+	if (a.fi == NULL) {
+		log_error("%s: no memory", diag);
+		return;
+	}
 	a.pathlen = strlen(path);
+	if (a.pathlen > PATH_MAX - 2) {
+		log_error("%s: too long name: %s (%d)", diag, path, a.pathlen);
+		free(a.fi);
+		return;
+	}
 	strcpy(a.path, path);
 	if (a.pathlen > 0 && path[a.pathlen - 1] != '/') {
 		strcat(a.path, "/");
 		a.pathlen += 1;
 	}
-	assert(a.pathlen < PATH_MAX);
+	ret = margo_free_input(h, &path);
+	if (ret != HG_SUCCESS)
+		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
 
 	memset(&out, 0, sizeof(out));
 	out.err = kv_get_all_cb(fs_readdir_cb, &a);
-	ret = margo_free_input(h, &path);
 	if (out.err == KV_SUCCESS) {
 		out.n = a.n;
 		out.fi = a.fi;
 	}
-	assert(ret == HG_SUCCESS);
 
 	ret = margo_respond(h, &out);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (respond): %s", diag, HG_Error_to_string(ret));
 	free_fs_readdir_arg(&a);
 
 	ret = margo_destroy(h);
-	assert(ret == HG_SUCCESS);
+	if (ret != HG_SUCCESS)
+		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
 }
 DEFINE_MARGO_RPC_HANDLER(inode_readdir)

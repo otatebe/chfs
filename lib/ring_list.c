@@ -1,9 +1,9 @@
-#include <assert.h>
 #include <margo.h>
 #include <openssl/md5.h>
 #include "config.h"
 #include "ring_types.h"
 #include "ring_list.h"
+#include "log.h"
 
 typedef struct ring_node {
 	char *name;
@@ -46,9 +46,11 @@ ring_list_init(char *self)
 	} else {
 		ring_list.n = 1;
 		ring_list.nodes = malloc(sizeof(ring_list.nodes[0]));
-		assert(ring_list.nodes);
+		if (ring_list.nodes == NULL)
+			log_fatal("ring_list_init: %s, no memory", self);
 		ring_list.nodes[0].name = strdup(self);
-		assert(ring_list.nodes[0].name);
+		if (ring_list.nodes[0].name == NULL)
+			log_fatal("ring_list_init: %s, no memory", self);
 		MD5((unsigned char *)self, hostname_len(self),
 			ring_list.nodes[0].md5);
 	}
@@ -104,10 +106,16 @@ ring_list_copy(string_list_t *list)
 	ABT_mutex_lock(ring_list_mutex);
 	list->n = ring_list.n;
 	list->s = malloc(sizeof(list->s[0]) * ring_list.n);
+	if (list->s == NULL) {
+		log_error("ring_list_copy: no memory");
+		goto unlock;
+	}
 	for (i = 0; i < ring_list.n; ++i) {
 		list->s[i] = strdup(ring_list.nodes[i].name);
-		assert(list->s[i]);
+		if (list->s[i] == NULL)
+			log_error("ring_list_copy: no memory");
 	}
+unlock:
 	ABT_mutex_unlock(ring_list_mutex);
 }
 

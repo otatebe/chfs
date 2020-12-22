@@ -4,6 +4,7 @@
 #include "kv_types.h"
 #include "fs_types.h"
 #include "fs_rpc.h"
+#include "log.h"
 
 static int fs_rpc_timeout_msec;
 
@@ -15,16 +16,21 @@ static struct env {
 } env;
 
 static hg_return_t
-create_rpc_handle(const char *server, hg_id_t rpc_id, hg_handle_t *h)
+create_rpc_handle(const char *server, hg_id_t rpc_id, hg_handle_t *h,
+	const char *diag)
 {
 	hg_addr_t addr;
 	hg_return_t ret;
 
 	ret = margo_addr_lookup(env.mid, server, &addr);
-	if (ret != HG_SUCCESS)
+	if (ret != HG_SUCCESS) {
+		log_error("%s (lookup): %s", diag, HG_Error_to_string(ret));
 		return (ret);
+	}
 	ret = margo_create(env.mid, addr, rpc_id, h);
 	margo_addr_free(env.mid, addr);
+	if (ret != HG_SUCCESS)
+		log_error("%s (create): %s", diag, HG_Error_to_string(ret));
 	return (ret);
 }
 
@@ -35,8 +41,9 @@ fs_rpc_inode_create(const char *server, void *key, size_t key_size, int32_t uid,
 	hg_handle_t h;
 	fs_create_in_t in;
 	hg_return_t ret, ret2;
+	static const char diag[] = "fs_rpc_inode_create";
 
-	ret = create_rpc_handle(server, env.create_rpc, &h);
+	ret = create_rpc_handle(server, env.create_rpc, &h, diag);
 	if (ret != HG_SUCCESS)
 		return (ret);
 
@@ -47,12 +54,15 @@ fs_rpc_inode_create(const char *server, void *key, size_t key_size, int32_t uid,
 	in.mode = mode;
 	in.chunk_size = chunk_size;
 	ret = margo_forward_timed(h, &in, fs_rpc_timeout_msec);
-	if (ret != HG_SUCCESS)
+	if (ret != HG_SUCCESS) {
+		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
 		goto err;
-
+	}
 	ret = margo_get_output(h, errp);
-	if (ret != HG_SUCCESS)
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_output): %s", diag, HG_Error_to_string(ret));
 		goto err;
+	}
 	ret = margo_free_output(h, errp);
 err:
 	ret2 = margo_destroy(h);
@@ -69,20 +79,24 @@ fs_rpc_inode_stat(const char *server, void *key, size_t key_size,
 	kv_byte_t in;
 	fs_stat_out_t out;
 	hg_return_t ret, ret2;
+	static const char diag[] = "fs_rpc_inode_stat";
 
-	ret = create_rpc_handle(server, env.stat_rpc, &h);
+	ret = create_rpc_handle(server, env.stat_rpc, &h, diag);
 	if (ret != HG_SUCCESS)
 		return (ret);
 
 	in.v = key;
 	in.s = key_size;
 	ret = margo_forward_timed(h, &in, fs_rpc_timeout_msec);
-	if (ret != HG_SUCCESS)
+	if (ret != HG_SUCCESS) {
+		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
 		goto err;
-
+	}
 	ret = margo_get_output(h, &out);
-	if (ret != HG_SUCCESS)
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_output): %s", diag, HG_Error_to_string(ret));
 		goto err;
+	}
 	*errp = out.err;
 	if (out.err == 0) {
 		st->mode = out.st.mode;
@@ -110,8 +124,9 @@ fs_rpc_inode_write(const char *server, void *key, size_t key_size,
 	hg_return_t ret, ret2;
 	fs_write_in_t in;
 	kv_get_rdma_out_t out;
+	static const char diag[] = "fs_rpc_inode_write";
 
-	ret = create_rpc_handle(server, env.write_rpc, &h);
+	ret = create_rpc_handle(server, env.write_rpc, &h, diag);
 	if (ret != HG_SUCCESS)
 		return (ret);
 
@@ -123,12 +138,15 @@ fs_rpc_inode_write(const char *server, void *key, size_t key_size,
 	in.mode = mode;
 	in.chunk_size = chunk_size;
 	ret = margo_forward_timed(h, &in, fs_rpc_timeout_msec);
-	if (ret != HG_SUCCESS)
+	if (ret != HG_SUCCESS) {
+		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
 		goto err;
-
+	}
 	ret = margo_get_output(h, &out);
-	if (ret != HG_SUCCESS)
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_output): %s", diag, HG_Error_to_string(ret));
 		goto err;
+	}
 	*errp = out.err;
 	if (out.err == 0 && *size > out.value_size)
 		*size = out.value_size;
@@ -148,8 +166,9 @@ fs_rpc_inode_read(const char *server, void *key, size_t key_size, void *buf,
 	hg_return_t ret, ret2;
 	fs_read_in_t in;
 	kv_get_out_t out;
+	static const char diag[] = "fs_rpc_inode_read";
 
-	ret = create_rpc_handle(server, env.read_rpc, &h);
+	ret = create_rpc_handle(server, env.read_rpc, &h, diag);
 	if (ret != HG_SUCCESS)
 		return (ret);
 
@@ -158,12 +177,15 @@ fs_rpc_inode_read(const char *server, void *key, size_t key_size, void *buf,
 	in.size = *size;
 	in.offset = offset;
 	ret = margo_forward_timed(h, &in, fs_rpc_timeout_msec);
-	if (ret != HG_SUCCESS)
+	if (ret != HG_SUCCESS) {
+		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
 		goto err;
-
+	}
 	ret = margo_get_output(h, &out);
-	if (ret != HG_SUCCESS)
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_output): %s", diag, HG_Error_to_string(ret));
 		goto err;
+	}
 	*errp = out.err;
 	if (out.err == 0) {
 		if (*size > out.value.s)
@@ -187,8 +209,9 @@ fs_rpc_inode_read_rdma_bulk(const char *server, void *key, size_t key_size,
 	hg_return_t ret, ret2;
 	kv_put_rdma_in_t in;
 	kv_get_rdma_out_t out;
+	static const char diag[] = "fs_rpc_inode_read_rdma_bulk";
 
-	ret = create_rpc_handle(server, env.read_rdma_rpc, &h);
+	ret = create_rpc_handle(server, env.read_rdma_rpc, &h, diag);
 	if (ret != HG_SUCCESS)
 		return (ret);
 
@@ -199,12 +222,15 @@ fs_rpc_inode_read_rdma_bulk(const char *server, void *key, size_t key_size,
 	in.value = buf;
 	in.value_size = *size;
 	ret = margo_forward_timed(h, &in, fs_rpc_timeout_msec);
-	if (ret != HG_SUCCESS)
+	if (ret != HG_SUCCESS) {
+		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
 		goto err;
-
+	}
 	ret = margo_get_output(h, &out);
-	if (ret != HG_SUCCESS)
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_output): %s", diag, HG_Error_to_string(ret));
 		goto err;
+	}
 	*errp = out.err;
 	if (out.err == 0)
 		*size = out.value_size;
@@ -223,11 +249,17 @@ fs_rpc_inode_read_rdma(const char *server, void *key, size_t key_size,
 {
 	hg_bulk_t bulk;
 	hg_return_t ret, ret2;
+	static const char diag[] = "fs_rpc_inode_read_rdma";
 
+	if (*size == 0)
+		return (HG_SUCCESS);
 	ret = margo_bulk_create(env.mid, 1, &buf, size,
 		HG_BULK_WRITE_ONLY, &bulk);
-	if (ret != HG_SUCCESS)
+	if (ret != HG_SUCCESS) {
+		log_error("%s (bulk_create): %s", diag,
+			HG_Error_to_string(ret));
 		return (ret);
+	}
 	ret = fs_rpc_inode_read_rdma_bulk(server, key, key_size, client,
 		bulk, size, offset, errp);
 
@@ -244,20 +276,24 @@ fs_rpc_inode_remove(const char *server, void *key, size_t key_size, int *errp)
 	hg_return_t ret, ret2;
 	kv_byte_t in;
 	int32_t err;
+	static const char diag[] = "fs_rpc_inode_remove";
 
-	ret = create_rpc_handle(server, env.remove_rpc, &h);
+	ret = create_rpc_handle(server, env.remove_rpc, &h, diag);
 	if (ret != HG_SUCCESS)
 		return (ret);
 
 	in.v = key;
 	in.s = key_size;
 	ret = margo_forward_timed(h, &in, fs_rpc_timeout_msec);
-	if (ret != HG_SUCCESS)
+	if (ret != HG_SUCCESS) {
+		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
 		goto err;
-
+	}
 	ret = margo_get_output(h, &err);
-	if (ret != HG_SUCCESS)
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_output): %s", diag, HG_Error_to_string(ret));
 		goto err;
+	}
 	*errp = err;
 	ret = margo_free_output(h, &err);
 err:
@@ -277,18 +313,22 @@ fs_rpc_readdir(const char *server, const char *path, void *buf,
 	struct stat sb;
 	hg_return_t ret, ret2;
 	int i;
+	static const char diag[] = "fs_rpc_readdir";
 
-	ret = create_rpc_handle(server, env.readdir_rpc, &h);
+	ret = create_rpc_handle(server, env.readdir_rpc, &h, diag);
 	if (ret != HG_SUCCESS)
 		return (ret);
 
 	ret = margo_forward_timed(h, &path, fs_rpc_timeout_msec);
-	if (ret != HG_SUCCESS)
+	if (ret != HG_SUCCESS) {
+		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
 		goto err;
-
+	}
 	ret = margo_get_output(h, &out);
-	if (ret != HG_SUCCESS)
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_output): %s", diag, HG_Error_to_string(ret));
 		goto err;
+	}
 	*errp = out.err;
 	if (out.err == 0) {
 		for (i = 0; i < out.n; ++i) {
