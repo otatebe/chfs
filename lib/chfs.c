@@ -56,7 +56,7 @@ init_fd_table()
 	chfs_fd_table_size = 100;
 	chfs_fd_table = malloc(sizeof(*chfs_fd_table) * chfs_fd_table_size);
 	if (chfs_fd_table == NULL)
-		log_fatal("init_fs_table: no memory");
+		log_fatal("init_fd_table: no memory");
 
 	for (i = 0; i < chfs_fd_table_size; ++i)
 		chfs_fd_table[i].path = NULL;
@@ -686,6 +686,8 @@ chfs_readdir(const char *path, void *buf,
 
 	ring_list_copy(&node_list);
 	for (i = 0; i < node_list.n; ++i) {
+		if (node_list.s[i] == NULL)
+			continue;
 		ret = fs_rpc_readdir(node_list.s[i], p, buf, filler, &err);
 		if (ret != HG_SUCCESS || err != KV_SUCCESS)
 			continue;
