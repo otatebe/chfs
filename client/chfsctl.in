@@ -15,12 +15,12 @@ CHFSD=chfsd
 program=$(basename $0)
 
 err() {
-	[ "X$*" = X ] || echo >&2 $*
+	[ "X$*" = X ] || echo >&2 $program: $*
 	exit 1
 }
 
 usage() {
-	[ "X$*" = X ] || echo >&2 $*
+	[ "X$*" = X ] || echo >&2 $program: $*
 	echo >&2 "usage: $program [-h hostfile] [-c scratch_dir] [-m mount_point] [-s db_size]"
 	echo >&2 "		[-p proto] [-I interfaces] [-L log_dir] [-O options]"
 	echo >&2 "		start | stop | status | kill"
@@ -46,7 +46,8 @@ while [ $# -gt 0 ]; do
 done
 
 [ "X$mode" = X ] && usage
-[ "X$HOSTFILE" != X -a ! -f $HOSTFILE ] && usage $HOSTFILE: no such file
+[ "X$HOSTFILE" != X ] &&
+	[ ! -f $HOSTFILE ] && usage $HOSTFILE: no such file
 [ "X$IFACES" = X ] && usage
 [ -d "$LOG_DIR" ] || mkdir -p "$LOG_DIR"
 [ -d "$LOG_DIR" ] || err $LOG_DIR: no such directory
@@ -59,6 +60,7 @@ SERVER_INFO_FILE=/tmp/server-info-file-$USER
 MYHOSTNAMES="$(hostname) $(hostname -f) $(hostname -A) $(hostname -I)"
 case $mode in
 start)
+nservers=0
 rm -f $SERVER_INFO_FILE
 SOPT="-S $SERVER_INFO_FILE"
 for device in $IFACES; do
@@ -70,6 +72,7 @@ for device in $IFACES; do
 	else
 		$CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $SOPT "$SERVER"
 	fi
+	nservers=$((nservers + 1))
 
 	if [ X"$SOPT" != X ]; then
 		timeout=10
@@ -87,8 +90,7 @@ CHFS_SERVER="$SERVER"; export CHFS_SERVER
 if [ X"$MDIR" != X ]; then
 	[ -d "$MDIR" ] || mkdir -p "$MDIR"
 	[ -d "$MDIR" ] || err $MDIR: no mount directory
-	chmkdir "$MDIR"
-	chfuse -o direct_io,modules=subdir,subdir="$MDIR" $MDIR
+	chfuse -o direct_io,modules=subdir,subdir="$MDIR" "$MDIR"
 fi
 ;;
 stop|kill)
@@ -127,6 +129,7 @@ do
 		COPT="-c $DBDIR/$device"
 		LOPT="-l $LOG_DIR/$host-$device"
 		ssh $host LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH\" PATH=\"$PATH\" $CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT \"$1\" &
+		nservers=$((nservers + 1))
 		shift
 		HOPT=
 		p=$((p + 1))
@@ -167,5 +170,16 @@ do
 	fi
 done
 wait
+if [ $mode = start -a X"$MDIR" != X ]; then
+	timeout=10
+	while [ $timeout -gt 0 -a $(chlist | wc -l) -lt $nservers ]; do
+		timeout=$((timeout - 1))
+		sleep 1;
+	done
+	if [ $(chlist | wc -l) -lt $nservers ]; then
+		echo >&2 "$program: timeout, you may need chmkdir $MDIR manually"
+	fi
+	chmkdir "$MDIR"
+fi
 
 exit 0
