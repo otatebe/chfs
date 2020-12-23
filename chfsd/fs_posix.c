@@ -159,20 +159,14 @@ fs_open(const char *path, int flags, mode_t mode, size_t *chunk_size)
 			return (-1);
 	}
 	fd = open(path, flags, mode);
-	if (fd == -1) {
-		if (flags & O_CREAT) {
-			d = fs_dirname(path);
-			if (d == NULL)
-				return (fd);
+	if (fd == -1 && ((flags & O_ACCMODE) != O_RDONLY)) {
+		d = fs_dirname(path);
+		if (d != NULL) {
 			/* mkdir_p() may fail due to race condition */
 			mkdir_p(d, 0755);
 			free(d);
 		}
-		switch (flags & O_ACCMODE) {
-		case O_WRONLY:
-		case O_RDWR:
-			flags |= O_CREAT;
-		}
+		flags |= O_CREAT;
 		fd = open(path, flags, mode);
 	}
 	if (fd == -1)
