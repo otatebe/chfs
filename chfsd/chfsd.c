@@ -17,6 +17,7 @@
 #include "fs_types.h"
 #include "fs_rpc.h"
 #include "host.h"
+#include "file.h"
 #include "log.h"
 
 void
@@ -106,7 +107,7 @@ check_directory(char *dir)
 	if (r == -1) {
 		if (errno != ENOENT)
 			log_fatal("%s: %s", dir, strerror(errno));
-		r = mkdir(dir, 0755);
+		r = mkdir_p(dir, 0755);
 		if (r == -1)
 			log_fatal("%s: %s", dir, strerror(errno));
 		log_info("%s: created", dir);

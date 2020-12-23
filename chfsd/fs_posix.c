@@ -13,10 +13,8 @@
 #include "kv_err.h"
 #include "fs_types.h"
 #include "fs.h"
+#include "file.h"
 #include "log.h"
-
-static int
-mkdir_p(char *path, mode_t mode);
 
 #ifndef USE_XATTR
 struct metadata {
@@ -78,46 +76,6 @@ fs_dirname(const char *path)
 	r[p] = '\0';
 	log_debug("fs_dirname: path %s dirname %s\n", path, r);
 	return (r);
-}
-
-#define DIR_LEVEL 20
-
-static int
-mkdir_p(char *path, mode_t mode)
-{
-	int r, p = strlen(path) - 1, pos[DIR_LEVEL], i;
-
-	log_debug("mkdir_p: %s", path);
-	r = mkdir(path, mode);
-	if (r == 0 || errno != ENOENT)
-		return (r);
-	while (p > 0 && path[p] == '/')
-		--p;
-	for (i = 0; i < DIR_LEVEL; ++i) {
-		while (p > 0 && path[p] != '/')
-			--p;
-		if (p == 0)
-			return (-1);
-		pos[i] = p;
-		path[p] = '\0';
-
-		log_debug("mkdir_p: [%d] %s", i, path);
-		r = mkdir(path, mode);
-		if (r == -1) {
-			if (errno == ENOENT)
-				continue;
-			if (errno != EEXIST)
-				return (r);
-		}
-		for (; i >= 0; --i) {
-			path[pos[i]] = '/';
-			r = mkdir(path, mode);
-			if (r == -1 && errno != EEXIST)
-				return (r);
-		}
-		return (0);
-	}
-	return (-1);
 }
 
 #define FS_XATTR_CHUNK_SIZE "user.chunk_size"
