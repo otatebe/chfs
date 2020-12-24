@@ -325,7 +325,7 @@ make_path(const char *dir, const char *entry)
 	return (p);
 }
 
-int
+static int
 rmdir_r(const char *dir)
 {
 	DIR *d;
