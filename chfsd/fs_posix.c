@@ -74,7 +74,7 @@ fs_dirname(const char *path)
 		return (NULL);
 	strncpy(r, path, p);
 	r[p] = '\0';
-	log_debug("fs_dirname: path %s dirname %s\n", path, r);
+	log_debug("fs_dirname: path %s dirname %s", path, r);
 	return (r);
 }
 
