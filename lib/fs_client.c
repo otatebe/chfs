@@ -28,9 +28,9 @@ create_rpc_handle(const char *server, hg_id_t rpc_id, hg_handle_t *h,
 		return (ret);
 	}
 	ret = margo_create(env.mid, addr, rpc_id, h);
-	margo_addr_free(env.mid, addr);
 	if (ret != HG_SUCCESS)
 		log_error("%s (create): %s", diag, HG_Error_to_string(ret));
+	margo_addr_free(env.mid, addr);
 	return (ret);
 }
 

@@ -133,7 +133,8 @@ free_input:
 DEFINE_MARGO_RPC_HANDLER(inode_read_rdma)
 
 struct fs_readdir_arg {
-	int n, size;
+	char path[PATH_MAX];
+	int n, size, pathlen;
 	fs_file_info_t *fi;
 };
 
@@ -152,8 +153,17 @@ fs_add_entry(struct dirent *dent, void *arg)
 {
 	struct fs_readdir_arg *a = arg;
 	fs_file_info_t *tfi;
+	int namelen = strlen(dent->d_name);
 
 	log_debug("add_entry: %s", dent->d_name);
+	if (a->pathlen + namelen + 1 > PATH_MAX) {
+		log_error("fs_add_entry: too long: %s%s (%d)", a->path,
+			dent->d_name, a->pathlen + namelen + 1);
+		return;
+	}
+	strcpy(a->path + a->pathlen, dent->d_name);
+	if (!ring_list_is_in_charge(a->path, a->pathlen + namelen + 1))
+		return;
 	if (a->n >= a->size) {
 		tfi = realloc(a->fi, sizeof(a->fi[0]) * a->size * 2);
 		if (tfi == NULL) {
@@ -189,19 +199,32 @@ inode_readdir(hg_handle_t h)
 	}
 	log_debug("%s: path=%s", diag, path);
 
+	memset(&out, 0, sizeof(out));
 	a.n = 0;
 	a.size = 1000;
 	a.fi = malloc(sizeof(a.fi[0]) * a.size);
 	if (a.fi == NULL) {
 		log_error("%s: no memory", diag);
-		return;
+		out.err = KV_ERR_NO_MEMORY;
+		goto free_input;
 	}
-	memset(&out, 0, sizeof(out));
+	a.pathlen = strlen(path);
+	if (a.pathlen > PATH_MAX - 2) {
+		log_error("%s: too long path: %s (%d)", diag, path, a.pathlen);
+		out.err = KV_ERR_TOO_LONG;
+		goto free_input;
+	}
+	strcpy(a.path, path);
+	if (a.pathlen > 0 && a.path[a.pathlen - 1] != '/') {
+		a.path[a.pathlen++] = '/';
+		a.path[a.pathlen] = '\0';
+	}
 	out.err = fs_inode_readdir(path, fs_add_entry, &a);
 	if (out.err == KV_SUCCESS) {
 		out.n = a.n;
 		out.fi = a.fi;
 	}
+free_input:
 	ret = margo_free_input(h, &path);
 	if (ret != HG_SUCCESS)
 		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));

@@ -199,8 +199,9 @@ fs_readdir_cb(const char *key, size_t key_size, const char *value,
 	int ksize = strlen(key);
 	struct fs_stat *st = (struct fs_stat *)value;
 
-	if (ksize + 1 == key_size && a->pathlen < ksize
-		&& strncmp(a->path, key, a->pathlen) == 0)
+	if (ksize + 1 == key_size && a->pathlen < ksize &&
+		strncmp(a->path, key, a->pathlen) == 0 &&
+		ring_list_is_in_charge(key, key_size))
 		fs_add_entry(key + a->pathlen, st, a);
 	return (0);
 }
@@ -221,34 +222,35 @@ inode_readdir(hg_handle_t h)
 	}
 	log_debug("%s: path=%s", diag, path);
 
+	memset(&out, 0, sizeof(out));
 	a.n = 0;
 	a.size = 1000;
 	a.fi = malloc(sizeof(a.fi[0]) * a.size);
 	if (a.fi == NULL) {
 		log_error("%s: no memory", diag);
-		return;
+		out.err = KV_ERR_NO_MEMORY;
+		goto free_input;
 	}
 	a.pathlen = strlen(path);
 	if (a.pathlen > PATH_MAX - 2) {
 		log_error("%s: too long name: %s (%d)", diag, path, a.pathlen);
-		free(a.fi);
-		return;
+		out.err = KV_ERR_TOO_LONG;
+		goto free_input;
 	}
 	strcpy(a.path, path);
-	if (a.pathlen > 0 && path[a.pathlen - 1] != '/') {
-		strcat(a.path, "/");
-		a.pathlen += 1;
+	if (a.pathlen > 0 && a.path[a.pathlen - 1] != '/') {
+		a.path[a.pathlen++] = '/';
+		a.path[a.pathlen] = '\0';
 	}
-	ret = margo_free_input(h, &path);
-	if (ret != HG_SUCCESS)
-		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
-
-	memset(&out, 0, sizeof(out));
 	out.err = kv_get_all_cb(fs_readdir_cb, &a);
 	if (out.err == KV_SUCCESS) {
 		out.n = a.n;
 		out.fi = a.fi;
 	}
+free_input:
+	ret = margo_free_input(h, &path);
+	if (ret != HG_SUCCESS)
+		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
 
 	ret = margo_respond(h, &out);
 	if (ret != HG_SUCCESS)

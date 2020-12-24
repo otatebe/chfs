@@ -6,6 +6,7 @@
 	X(KV_ERR_LOOKUP)	\
 	X(KV_ERR_NO_MEMORY)	\
 	X(KV_ERR_NOT_SUPPORTED)	\
+	X(KV_ERR_TOO_LONG)	\
 	X(KV_ERR_UNKNOWN)
 
 #define X(a) a,

@@ -87,11 +87,6 @@ for device in $IFACES; do
 done
 echo "CHFS_SERVER=\"$SERVER\"; export CHFS_SERVER"
 CHFS_SERVER="$SERVER"; export CHFS_SERVER
-if [ X"$MDIR" != X ]; then
-	[ -d "$MDIR" ] || mkdir -p "$MDIR"
-	[ -d "$MDIR" ] || err $MDIR: no mount directory
-	chfuse -o direct_io,modules=subdir,subdir="$MDIR" "$MDIR"
-fi
 ;;
 stop|kill)
 pkill $PKILL_FLAG $CHFSD
@@ -140,10 +135,6 @@ do
 			MAX_JOBS=$#
 		fi
 	done
-	if [ X"$MDIR" != X ]; then
-		ssh $host mkdir -p "$MDIR"
-		ssh $host LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH\" PATH=\"$PATH\" CHFS_SERVER=\"$CHFS_SERVER\" chfuse -o direct_io,modules=subdir,subdir="$MDIR" "$MDIR"
-	fi
 	;;
 	stop|kill)
 	ssh $host pkill $PKILL_FLAG $CHFSD &
@@ -177,9 +168,14 @@ if [ $mode = start -a X"$MDIR" != X ]; then
 		sleep 1;
 	done
 	if [ $(chlist | wc -l) -lt $nservers ]; then
-		echo >&2 "$program: timeout, you may need chmkdir $MDIR manually"
+		echo >&2 "$program: timeout, you may need chmkdir $MDIR and chfuse manually"
 	fi
 	chmkdir "$MDIR"
+	for host in `sed -e 's/#.*//' -e '/^[ 	]*$/d' $HOSTFILE | awk '{ print $1 }'`
+	do
+		ssh $host mkdir -p "$MDIR"
+		ssh $host LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH\" PATH=\"$PATH\" CHFS_SERVER=\"$CHFS_SERVER\" chfuse -o direct_io,modules=subdir,subdir="$MDIR" "$MDIR"
+	done
 fi
 
 exit 0
