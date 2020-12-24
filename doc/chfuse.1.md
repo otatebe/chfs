@@ -28,5 +28,8 @@ CHFS_RDMA_THRESH
 CHFS_RPC_TIMEOUT_MSEC
 : RPC timeout in milliseconds.  Default is 0 (no timeout).
 
+CHFS_NODE_LIST_CACHE_TIMEOUT
+: node list cache timeout in seconds.  Default is 120 seconds.
+
 CHFS_LOG_PRIORITY:
 : maximum log priority to report.  Default is notice.

@@ -5,6 +5,7 @@ int chfs_term();
 void chfs_set_chunk_size(int chunk_size);
 void chfs_set_get_rdma_thresh(int thresh);
 void chfs_set_rpc_timeout_msec(int timeout);
+void chfs_set_node_list_cache_timeout(int timeout);
 
 int chfs_create(const char *path, int32_t flags, mode_t mode);
 int chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,

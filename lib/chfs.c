@@ -16,7 +16,8 @@ static char chfs_client[PATH_MAX];
 static uint32_t chfs_uid, chfs_gid;
 static int chfs_chunk_size = 4096;
 static int chfs_get_rdma_thresh = 2048;
-static int chfs_rpc_timeout_msec = 0;	/* no timeout */
+static int chfs_rpc_timeout_msec = 0;		/* no timeout */
+static int chfs_node_list_cache_timeout = 120;	/* 120 seconds */
 
 static ABT_mutex chfs_fd_mutex;
 static int chfs_fd_table_size;
@@ -46,6 +47,13 @@ chfs_set_rpc_timeout_msec(int timeout)
 {
 	log_info("chfs_set_rpc_timeout_msec: %d", timeout);
 	chfs_rpc_timeout_msec = timeout;
+}
+
+void
+chfs_set_node_list_cache_timeout(int timeout)
+{
+	log_info("chfs_set_node_list_cache_timeout: %d", timeout);
+	chfs_node_list_cache_timeout = timeout;
 }
 
 static void
@@ -81,13 +89,15 @@ margo_protocol(const char *server)
 	return (proto);
 }
 
+static time_t node_list_cache_time;
+
 int
 chfs_init(const char *server)
 {
 	margo_instance_id mid;
 	size_t client_size = sizeof(chfs_client);
 	hg_addr_t client_addr;
-	char *chunk_size, *rdma_thresh, *rpc_timeout, *proto;
+	char *chunk_size, *rdma_thresh, *timeout, *proto;
 	char *log_priority;
 	int max_log_level;
 	hg_return_t ret;
@@ -114,9 +124,13 @@ chfs_init(const char *server)
 	if (rdma_thresh != NULL)
 		chfs_set_get_rdma_thresh(atoi(rdma_thresh));
 
-	rpc_timeout = getenv("CHFS_RPC_TIMEOUT_MSEC");
-	if (rpc_timeout != NULL)
-		chfs_set_rpc_timeout_msec(atoi(rpc_timeout));
+	timeout = getenv("CHFS_RPC_TIMEOUT_MSEC");
+	if (timeout != NULL)
+		chfs_set_rpc_timeout_msec(atoi(timeout));
+
+	timeout = getenv("CHFS_NODE_LIST_CACHE_TIMEOUT");
+	if (timeout != NULL)
+		chfs_set_node_list_cache_timeout(atoi(timeout));
 
 	proto = margo_protocol(server);
 	if (proto == NULL)
@@ -140,6 +154,7 @@ chfs_init(const char *server)
 	ret = ring_list_rpc_node_list(server);
 	if (ret != HG_SUCCESS)
 		log_fatal("%s: %s", server, HG_Error_to_string(ret));
+	node_list_cache_time = time(NULL);
 
 	return (0);
 }
@@ -675,6 +690,13 @@ chfs_stat(const char *path, struct stat *st)
 	return (0);
 }
 
+static int
+chfs_node_list_cache_is_timeout()
+{
+	return (time(NULL) - node_list_cache_time >
+		chfs_node_list_cache_timeout);
+}
+
 int
 chfs_readdir(const char *path, void *buf,
 	int (*filler)(void *, const char *, const struct stat *, off_t))
@@ -685,6 +707,23 @@ chfs_readdir(const char *path, void *buf,
 	int err, i;
 
 	ring_list_copy(&node_list);
+	if (chfs_node_list_cache_is_timeout()) {
+		log_debug("chfs_readdir: node_list cache timeout");
+		for (i = 0; i < node_list.n; ++i) {
+			if (node_list.s[i] == NULL)
+				continue;
+			ret = ring_list_rpc_node_list(node_list.s[i]);
+			if (ret == HG_SUCCESS)
+				break;
+			log_notice("%s: %s", node_list.s[i],
+				HG_Error_to_string(ret));
+		}
+		if (i == node_list.n)
+			log_fatal("chfs_readdir: no server");
+		ring_list_copy_free(&node_list);
+		ring_list_copy(&node_list);
+		node_list_cache_time = time(NULL);
+	}
 	for (i = 0; i < node_list.n; ++i) {
 		if (node_list.s[i] == NULL)
 			continue;
