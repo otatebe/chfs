@@ -702,7 +702,7 @@ chfs_readdir(const char *path, void *buf,
 	int (*filler)(void *, const char *, const struct stat *, off_t))
 {
 	const char *p = skip_slash(path);
-	string_list_t node_list;
+	node_list_t node_list;
 	hg_return_t ret;
 	int err, i;
 
@@ -710,12 +710,12 @@ chfs_readdir(const char *path, void *buf,
 	if (chfs_node_list_cache_is_timeout()) {
 		log_debug("chfs_readdir: node_list cache timeout");
 		for (i = 0; i < node_list.n; ++i) {
-			if (node_list.s[i] == NULL)
+			if (node_list.s[i].address == NULL)
 				continue;
-			ret = ring_list_rpc_node_list(node_list.s[i]);
+			ret = ring_list_rpc_node_list(node_list.s[i].address);
 			if (ret == HG_SUCCESS)
 				break;
-			log_notice("%s: %s", node_list.s[i],
+			log_notice("%s: %s", node_list.s[i].address,
 				HG_Error_to_string(ret));
 		}
 		if (i == node_list.n)
@@ -725,9 +725,10 @@ chfs_readdir(const char *path, void *buf,
 		node_list_cache_time = time(NULL);
 	}
 	for (i = 0; i < node_list.n; ++i) {
-		if (node_list.s[i] == NULL)
+		if (node_list.s[i].address == NULL)
 			continue;
-		ret = fs_rpc_readdir(node_list.s[i], p, buf, filler, &err);
+		ret = fs_rpc_readdir(node_list.s[i].address, p, buf, filler,
+			&err);
 		if (ret != HG_SUCCESS || err != KV_SUCCESS)
 			continue;
 	}

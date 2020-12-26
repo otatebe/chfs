@@ -11,6 +11,8 @@
 #include "fs.h"
 #include "log.h"
 
+static char *self;
+
 static void inode_create(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(inode_create)
 
@@ -46,6 +48,8 @@ fs_server_init(margo_instance_id mid, char *db_dir, size_t db_size, int timeout)
 	fs_client_init_internal(mid, timeout, create_rpc, stat_rpc, write_rpc,
 		read_rpc, remove_rpc);
 	fs_server_init_more(mid, db_dir, db_size);
+
+	self = ring_get_self();
 }
 
 void
@@ -60,7 +64,7 @@ inode_create(hg_handle_t h)
 	hg_return_t ret;
 	fs_create_in_t in;
 	int32_t err;
-	char *self, *target;
+	char *target;
 	static const char diag[] = "inode_create RPC";
 
 	ret = margo_get_input(h, &in);
@@ -70,7 +74,6 @@ inode_create(hg_handle_t h)
 	}
 	log_debug("%s: key=%s", diag, (char *)in.key.v);
 
-	self = ring_get_self();
 	target = ring_list_lookup(in.key.v, in.key.s);
 	if (strcmp(self, target) != 0) {
 		ret = fs_rpc_inode_create(target, in.key.v, in.key.s, in.uid,
@@ -81,7 +84,6 @@ inode_create(hg_handle_t h)
 		err = fs_inode_create(in.key.v, in.key.s, in.uid, in.gid,
 			in.mode, in.chunk_size);
 	free(target);
-	ring_release_self();
 
 	ret = margo_free_input(h, &in);
 	if (ret != HG_SUCCESS)
@@ -106,7 +108,7 @@ inode_stat(hg_handle_t h)
 	struct fs_stat sb;
 	kv_byte_t in;
 	fs_stat_out_t out;
-	char *self, *target;
+	char *target;
 	static const char diag[] = "inode_stat RPC";
 
 	ret = margo_get_input(h, &in);
@@ -117,7 +119,6 @@ inode_stat(hg_handle_t h)
 	log_debug("%s: key=%s", diag, (char *)in.v);
 
 	memset(&out, 0, sizeof(out));
-	self = ring_get_self();
 	target = ring_list_lookup(in.v, in.s);
 	if (strcmp(self, target) != 0) {
 		ret = fs_rpc_inode_stat(target, in.v, in.s, &sb, &out.err);
@@ -126,7 +127,6 @@ inode_stat(hg_handle_t h)
 	} else
 		out.err = fs_inode_stat(in.v, in.s, &sb);
 	free(target);
-	ring_release_self();
 
 	ret = margo_free_input(h, &in);
 	if (ret != HG_SUCCESS)
@@ -160,7 +160,7 @@ inode_write(hg_handle_t h)
 	hg_return_t ret;
 	fs_write_in_t in;
 	kv_get_rdma_out_t out;
-	char *self, *target;
+	char *target;
 	static const char diag[] = "inode_write RPC";
 
 	ret = margo_get_input(h, &in);
@@ -170,7 +170,6 @@ inode_write(hg_handle_t h)
 	}
 	log_debug("%s: key=%s", diag, (char *)in.key.v);
 
-	self = ring_get_self();
 	target = ring_list_lookup(in.key.v, in.key.s);
 	out.value_size = in.value.s;
 	if (strcmp(self, target) != 0) {
@@ -183,7 +182,6 @@ inode_write(hg_handle_t h)
 		out.err = fs_inode_write(in.key.v, in.key.s, in.value.v,
 			&out.value_size, in.offset, in.mode, in.chunk_size);
 	free(target);
-	ring_release_self();
 
 	ret = margo_free_input(h, &in);
 	if (ret != HG_SUCCESS)
@@ -207,7 +205,7 @@ inode_read(hg_handle_t h)
 	hg_return_t ret;
 	fs_read_in_t in;
 	kv_get_out_t out;
-	char *self, *target;
+	char *target;
 	static const char diag[] = "inode_read RPC";
 
 	ret = margo_get_input(h, &in);
@@ -217,7 +215,6 @@ inode_read(hg_handle_t h)
 	}
 	log_debug("%s: key=%s", diag, (char *)in.key.v);
 
-	self = ring_get_self();
 	target = ring_list_lookup(in.key.v, in.key.s);
 	out.value.s = in.size;
 	out.value.v = malloc(out.value.s);
@@ -241,7 +238,6 @@ inode_read(hg_handle_t h)
 			&out.value.s, in.offset);
 skip:
 	free(target);
-	ring_release_self();
 
 	ret = margo_free_input(h, &in);
 	if (ret != HG_SUCCESS)
@@ -266,7 +262,7 @@ inode_remove(hg_handle_t h)
 	hg_return_t ret;
 	kv_byte_t key;
 	int32_t err;
-	char *self, *target;
+	char *target;
 	static const char diag[] = "inode_remove RPC";
 
 	ret = margo_get_input(h, &key);
@@ -276,7 +272,6 @@ inode_remove(hg_handle_t h)
 	}
 	log_debug("%s: key=%s", diag, (char *)key.v);
 
-	self = ring_get_self();
 	target = ring_list_lookup(key.v, key.s);
 	if (strcmp(self, target) != 0) {
 		ret = fs_rpc_inode_remove(target, key.v, key.s, &err);
@@ -285,7 +280,6 @@ inode_remove(hg_handle_t h)
 	} else
 		err = fs_inode_remove(key.v, key.s);
 	free(target);
-	ring_release_self();
 
 	ret = margo_free_input(h, &key);
 	if (ret != HG_SUCCESS)

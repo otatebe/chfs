@@ -20,6 +20,8 @@
 #include "file.h"
 #include "log.h"
 
+static char *self;
+
 void
 ring_fatal(hg_return_t err, const char *diag)
 {
@@ -35,16 +37,14 @@ join_ring(margo_instance_id mid, const char *server)
 	hg_addr_t addr;
 	char addr_str[PATH_MAX];
 	size_t addr_str_size = sizeof(addr_str);
-	char *prev, *self;
+	char *prev;
 
 	ret = margo_addr_lookup(mid, server, &addr);
 	ring_fatal(ret, "join:lookup");
 	margo_addr_to_string(mid, addr_str, &addr_str_size, addr);
 	margo_addr_free(mid, addr);
 	ring_set_next(addr_str);
-	self = ring_get_self();
-	ret = ring_rpc_join(addr_str, self, &prev);
-	ring_release_self();
+	ret = ring_rpc_join(addr_str, &prev);
 	ring_fatal(ret, "join:rpc_join");
 	ring_set_prev(prev);
 	free(prev);
@@ -53,12 +53,11 @@ join_ring(margo_instance_id mid, const char *server)
 static void
 leave()
 {
-	char *next, *prev, *self;
+	char *next, *prev;
 	int prev_prev = 0;
 	hg_return_t ret;
 
 	log_debug("leave");
-	self = ring_get_self();
 	next = ring_get_next();
 	if (strcmp(self, next) == 0)
 		goto leave;
@@ -81,7 +80,6 @@ leave()
 		ring_release_prev_prev();
 leave:
 	ring_release_next();
-	ring_release_self();
 	fs_server_term();
 	log_term();
 }
@@ -120,8 +118,8 @@ void
 usage(char *prog_name)
 {
 	fprintf(stderr, "Usage: %s [-d] [-c db_dir] [-s db_size] "
-		"[-p protocol]\n\t[-h host[:port]/device] [-l log_file] "
-		"[-S server_info_file]\n\t[-t rpc_timeout_msec] "
+		"[-p protocol] [-n name]\n\t[-h host[:port]/device] "
+		"[-l log_file] [-S server_info_file]\n\t[-t rpc_timeout_msec] "
 		"[-T nthreads] [-H heartbeat_interval]\n\t[-L log_priority] "
 		"[server]\n", prog_name);
 	exit(EXIT_FAILURE);
@@ -138,14 +136,14 @@ main(int argc, char *argv[])
 	margo_instance_id mid;
 	char *db_dir = "/tmp", *hostname = NULL, *log_file = NULL;
 	char *protocol = "sockets", info_string[PATH_MAX];
-	char *server_info_file = NULL;
+	char *server_info_file = NULL, *virtual_name = NULL;
 	int opt, debug = 0, rpc_timeout_msec = 0, nthreads = 5;
 	int heartbeat_interval = 10, log_priority = -1;
 	char *prog_name;
 
 	prog_name = basename(argv[0]);
 
-	while ((opt = getopt(argc, argv, "c:dh:H:l:L:p:s:S:t:T:")) != -1) {
+	while ((opt = getopt(argc, argv, "c:dh:H:l:L:n:p:s:S:t:T:")) != -1) {
 		switch (opt) {
 		case 'c':
 			db_dir = optarg;
@@ -168,6 +166,9 @@ main(int argc, char *argv[])
 			log_priority = log_priority_from_name(optarg);
 			if (log_priority == -1)
 				log_error("%s: invalid log priority", optarg);
+			break;
+		case 'n':
+			virtual_name = optarg;
 			break;
 		case 'p':
 			protocol = optarg;
@@ -233,7 +234,8 @@ main(int argc, char *argv[])
 	margo_addr_free(mid, my_address);
 	log_info("Server running at address %s", addr_str);
 
-	ring_init(addr_str);
+	ring_init(addr_str, virtual_name);
+	self = ring_get_self();
 	ring_list_init(addr_str);
 	ring_rpc_init(mid, rpc_timeout_msec);
 	ring_list_rpc_init(mid, rpc_timeout_msec);

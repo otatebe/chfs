@@ -7,6 +7,7 @@
 #include "log.h"
 
 static int ring_rpc_timeout_msec;
+static char *self, *self_name;
 
 static struct env {
 	margo_instance_id mid;
@@ -53,7 +54,7 @@ create_rpc_handle(const char *server, hg_id_t rpc_id, hg_handle_t *h,
 }
 
 hg_return_t
-ring_rpc_join(const char *server, char *self, char **prev)
+ring_rpc_join(const char *server, char **prev)
 {
 	hg_handle_t h;
 	hg_return_t ret, ret2;
@@ -131,23 +132,32 @@ ring_rpc_set_prev(const char *server, char *host)
 	return (ret);
 }
 
-hg_return_t
-ring_rpc_list(const char *server, string_list_t *list, char *self)
+static hg_return_t
+ring_rpc_list(const char *server, node_list_t *list)
 {
 	hg_handle_t h;
 	hg_return_t ret, ret2;
-	string_list_t new_list = { 1, &self };
+	node_list_t new_list = { 0, NULL };
 	static const char diag[] = "ring_rpc_list";
 
 	ret = create_rpc_handle(server, env.list_rpc, &h, diag);
 	if (ret != HG_SUCCESS)
 		return (ret);
 
-	if (list == NULL)
+	if (list == NULL) {
+		new_list.n = 1;
+		new_list.s = malloc(sizeof(*new_list.s));
+		if (new_list.s == NULL) {
+			log_error("%s: no memory", diag);
+			return (HG_NOMEM);
+		}
+		new_list.s[0].address = self;
+		new_list.s[0].name = self_name;
 		list = &new_list;
-	else {
+	} else {
 		/* space already allocated in hg_proc_string_list_t() */
-		list->s[list->n] = self;
+		list->s[list->n].address = self;
+		list->s[list->n].name = self_name;
 		++list->n;
 	}
 	ret = margo_forward_timed(h, list, ring_rpc_timeout_msec);
@@ -159,25 +169,35 @@ ring_rpc_list(const char *server, string_list_t *list, char *self)
 	ret2 = margo_destroy(h);
 	if (ret == HG_SUCCESS)
 		ret = ret2;
+	free(new_list.s);
 	return (ret);
 }
 
-hg_return_t
-ring_rpc_election(const char *server, string_list_t *list, char *self)
+static hg_return_t
+ring_rpc_election(const char *server, node_list_t *list)
 {
 	hg_handle_t h;
 	hg_return_t ret, ret2;
-	string_list_t new_list = { 1, &self };
+	node_list_t new_list = { 0, NULL };
 	static const char diag[] = "ring_rpc_election";
 
 	ret = create_rpc_handle(server, env.election_rpc, &h, diag);
 	if (ret != HG_SUCCESS)
 		return (ret);
 
-	if (list == NULL)
+	if (list == NULL) {
+		new_list.n = 1;
+		new_list.s = malloc(sizeof(*new_list.s));
+		if (new_list.s == NULL) {
+			log_error("%s: no memory", diag);
+			return (HG_NOMEM);
+		}
+		new_list.s[0].address = self;
+		new_list.s[0].name = self_name;
 		list = &new_list;
-	else {
-		list->s[list->n] = self;
+	} else {
+		list->s[list->n].address = self;
+		list->s[list->n].name = self_name;
 		++list->n;
 	}
 	ret = margo_forward_timed(h, list, ring_rpc_timeout_msec);
@@ -188,10 +208,11 @@ ring_rpc_election(const char *server, string_list_t *list, char *self)
 	ret2 = margo_destroy(h);
 	if (ret == HG_SUCCESS)
 		ret = ret2;
+	free(new_list.s);
 	return (ret);
 }
 
-hg_return_t
+static hg_return_t
 ring_rpc_coordinator(const char *server, coordinator_t *list)
 {
 	hg_handle_t h;
@@ -227,9 +248,9 @@ ring_rpc_init(margo_instance_id mid, int timeout)
 	env.set_prev_rpc = MARGO_REGISTER(mid, "set_prev", hg_string_t, void,
 		set_prev);
 	margo_registered_disable_response(mid, env.set_prev_rpc, HG_TRUE);
-	env.list_rpc = MARGO_REGISTER(mid, "list", string_list_t, void, list);
+	env.list_rpc = MARGO_REGISTER(mid, "list", node_list_t, void, list);
 	margo_registered_disable_response(mid, env.list_rpc, HG_TRUE);
-	env.election_rpc = MARGO_REGISTER(mid, "election", string_list_t, void,
+	env.election_rpc = MARGO_REGISTER(mid, "election", node_list_t, void,
 		election);
 	margo_registered_disable_response(mid, env.election_rpc, HG_TRUE);
 	env.coordinator_rpc = MARGO_REGISTER(mid, "coordinator",
@@ -237,6 +258,8 @@ ring_rpc_init(margo_instance_id mid, int timeout)
 	margo_registered_disable_response(mid, env.coordinator_rpc, HG_TRUE);
 
 	ABT_mutex_create(&join_mutex);
+	self = ring_get_self();
+	self_name = ring_get_self_name();
 }
 
 static void
@@ -294,7 +317,7 @@ DEFINE_MARGO_RPC_HANDLER(join)
 static int
 ring_fix_next(char *next, int election)
 {
-	char *self, *next_next;
+	char *next_next;
 	static const char diag[] = "ring_fix_next";
 	hg_return_t ret;
 	int r = 0;
@@ -308,24 +331,21 @@ ring_fix_next(char *next, int election)
 	}
 	ring_set_next(next_next);
 
-	self = ring_get_self();
 	ret = ring_rpc_set_prev(next_next, self);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (set_prev): %s", diag, HG_Error_to_string(ret));
 		r = -1;
-		goto release_self;
+		goto release_next_next;
 	}
 	if (election) {
 		/* election starts */
-		ret = ring_rpc_election(next_next, NULL, self);
+		ret = ring_rpc_election(next_next, NULL);
 		if (ret != HG_SUCCESS) {
 			log_error("%s (election): %s", diag,
 				HG_Error_to_string(ret));
 			r = -1;
 		}
 	}
-release_self:
-	ring_release_self();
 release_next_next:
 	ring_release_next_next();
 	return (r);
@@ -343,14 +363,13 @@ ring_set_heartbeat_timeout(int timeout)
 void
 ring_heartbeat()
 {
-	char *self, *next;
+	char *next;
 	hg_return_t ret;
 
 	log_debug("heartbeat");
-	self = ring_get_self();
 	while (1) {
 		next = ring_get_next();
-		ret = ring_rpc_list(next, NULL, self);
+		ret = ring_rpc_list(next, NULL);
 		if (ret == HG_SUCCESS)
 			break;
 		log_notice("heartbeat: %s", HG_Error_to_string(ret));
@@ -359,7 +378,6 @@ ring_heartbeat()
 		ring_release_next();
 	}
 	ring_release_next();
-	ring_release_self();
 }
 
 int
@@ -371,15 +389,14 @@ ring_heartbeat_is_timeout()
 void
 ring_start_election()
 {
-	char *self, *next;
+	char *next;
 	hg_return_t ret;
 
 	log_debug("election starts");
 	heartbeat_time = time(NULL);
-	self = ring_get_self();
 	while (1) {
 		next = ring_get_next();
-		ret = ring_rpc_election(next, NULL, self);
+		ret = ring_rpc_election(next, NULL);
 		if (ret == HG_SUCCESS)
 			break;
 		log_notice("start_election: %s", HG_Error_to_string(ret));
@@ -388,7 +405,6 @@ ring_start_election()
 		ring_release_next();
 	}
 	ring_release_next();
-	ring_release_self();
 }
 
 static void
@@ -447,8 +463,8 @@ static void
 list(hg_handle_t h)
 {
 	hg_return_t ret;
-	string_list_t in;
-	char *self, *next;
+	node_list_t in;
+	char *next;
 	int i;
 	static const char diag[] = "list RPC";
 
@@ -459,16 +475,15 @@ list(hg_handle_t h)
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
 		return;
 	}
-	self = ring_get_self();
 	for (i = 0; i < in.n; ++i)
-		log_debug("[%d] %s", i, in.s[i]);
+		log_debug("[%d] %s %s", i, in.s[i].address, in.s[i].name);
 	for (i = 0; i < in.n; ++i)
-		if (strcmp(in.s[i], self) == 0)
+		if (strcmp(in.s[i].address, self) == 0)
 			break;
 	if (i == in.n) {
 		while (1) {
 			next = ring_get_next();
-			ret = ring_rpc_list(next, &in, self);
+			ret = ring_rpc_list(next, &in);
 			if (ret == HG_SUCCESS)
 				break;
 			log_notice("list: %s", HG_Error_to_string(ret));
@@ -478,7 +493,6 @@ list(hg_handle_t h)
 		}
 		ring_release_next();
 	}
-	ring_release_self();
 
 	ret = margo_free_input(h, &in);
 	if (ret != HG_SUCCESS)
@@ -497,11 +511,12 @@ remove_host(coordinator_t *c, char *host)
 
 	log_debug("remove_host: %s", host);
 	for (i = 0; i < c->list.n; ++i)
-		if (strcmp(c->list.s[i], host) == 0)
+		if (strcmp(c->list.s[i].address, host) == 0)
 			break;
 	if (i < c->list.n) {
 		c->list.n = c->list.n - 1;
-		free(c->list.s[i]);
+		free(c->list.s[i].address);
+		free(c->list.s[i].name);
 		for (; i < c->list.n; ++i)
 			c->list.s[i] = c->list.s[i + 1];
 		--c->ttl;
@@ -512,9 +527,9 @@ static void
 election(hg_handle_t h)
 {
 	hg_return_t ret;
-	string_list_t in;
+	node_list_t in;
 	coordinator_t in3;
-	char *self, *next;
+	char *next;
 	int i;
 	static const char diag[] = "election RPC";
 
@@ -525,14 +540,13 @@ election(hg_handle_t h)
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
 		return;
 	}
-	self = ring_get_self();
 	for (i = 0; i < in.n; ++i)
-		if (strcmp(in.s[i], self) == 0)
+		if (strcmp(in.s[i].address, self) == 0)
 			break;
 	if (i == in.n) {
 		while (1) {
 			next = ring_get_next();
-			ret = ring_rpc_election(next, &in, self);
+			ret = ring_rpc_election(next, &in);
 			if (ret == HG_SUCCESS)
 				break;
 			log_notice("election: %s", HG_Error_to_string(ret));
@@ -558,7 +572,6 @@ election(hg_handle_t h)
 		}
 		ring_release_next();
 	}
-	ring_release_self();
 
 	ret = margo_free_input(h, &in);
 	if (ret != HG_SUCCESS)
@@ -584,7 +597,7 @@ coordinator(hg_handle_t h)
 {
 	hg_return_t ret;
 	coordinator_t in;
-	char *next, *self;
+	char *next;
 	int i;
 	static const char diag[] = "coordinator RPC";
 
@@ -596,7 +609,8 @@ coordinator(hg_handle_t h)
 		return;
 	}
 	for (i = 0; i < in.list.n; ++i)
-		log_debug("[%d] %s", i, in.list.s[i]);
+		log_debug("[%d] %s %s", i, in.list.s[i].address,
+			in.list.s[i].name);
 	if (in.ttl > 0) {
 		--in.ttl;
 		while (1) {
@@ -612,20 +626,18 @@ coordinator(hg_handle_t h)
 		}
 		ring_release_next();
 	}
-	ring_list_update(&in.list);
+	ring_list_update(&in.list, 0);
 
-	self = ring_get_self();
 	for (i = 0; i < in.list.n; ++i)
-		if (strcmp(self, in.list.s[i]) == 0)
+		if (strcmp(self, in.list.s[i].address) == 0)
 			break;
-	ring_release_self();
 
 	i = (i + 2) % in.list.n;
-	ring_set_next_next(in.list.s[i]);
+	ring_set_next_next(in.list.s[i].address);
 	i = i - 4;
 	while (i < 0)
 		i += in.list.n;
-	ring_set_prev_prev(in.list.s[i]);
+	ring_set_prev_prev(in.list.s[i].address);
 
 	ret = margo_free_input(h, &in);
 	if (ret != HG_SUCCESS)

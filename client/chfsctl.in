@@ -2,7 +2,7 @@
 
 prefix=@prefix@
 exec_prefix=@exec_prefix@
-PATH=@sbindir@:$PATH
+PATH=@bindir@:@sbindir@:$PATH
 export PATH
 
 PROTO=sockets
@@ -10,6 +10,7 @@ DBDIR=/tmp/$USER
 DBSIZE=$((256 * 1024 * 1024))
 LOG_DIR=$HOME
 IFACES=default
+VNAMES=default
 CHFSD=chfsd
 
 program=$(basename $0)
@@ -22,7 +23,7 @@ err() {
 usage() {
 	[ "X$*" = X ] || echo >&2 $program: $*
 	echo >&2 "usage: $program [-h hostfile] [-c scratch_dir] [-m mount_point] [-s db_size]"
-	echo >&2 "		[-p proto] [-I interfaces] [-L log_dir] [-O options]"
+	echo >&2 "		[-p proto] [-N vnames] [-I interfaces] [-L log_dir] [-O options]"
 	echo >&2 "		start | stop | status | kill"
 	exit 1
 }
@@ -35,6 +36,7 @@ while [ $# -gt 0 ]; do
 	    -I) shift; IFACES="$1" ;;
 	    -L) shift; LOG_DIR=$1 ;;
 	    -m) shift; MDIR=$1 ;;
+	    -N) shift; VNAMES="$1" ;;
 	    -O) shift; OPTIONS="$1" ;;
 	    -p) shift; PROTO=$1 ;;
 	    -s) shift; DBSIZE=$1 ;;
@@ -63,14 +65,16 @@ start)
 nservers=0
 rm -f $SERVER_INFO_FILE
 SOPT="-S $SERVER_INFO_FILE"
+for name in $VNAMES; do
+	[ $name = default ] || NOPT="-n $name"
 for device in $IFACES; do
 	[ $device = default ] || HOPT="-h $device"
-	COPT="-c $DBDIR/$device"
-	LOPT="-l $LOG_DIR/$(hostname)-$device"
+	COPT="-c $DBDIR/$device-$name"
+	LOPT="-l $LOG_DIR/$(hostname)-$device-$name"
 	if [ X"$SERVER" = X ]; then
-		$CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $SOPT
+		$CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $NOPT $SOPT
 	else
-		$CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $SOPT "$SERVER"
+		$CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $NOPT $SOPT "$SERVER"
 	fi
 	nservers=$((nservers + 1))
 
@@ -82,8 +86,13 @@ for device in $IFACES; do
 		SERVER=`cat $SERVER_INFO_FILE`
 		[ X"$SERVER" = X ] && err $CHFSD: no server info
 		SOPT=
+	else
+		# XXX
+		sleep 1
 	fi
 	HOPT=
+done
+	NOPT=
 done
 echo "CHFS_SERVER=\"$SERVER\"; export CHFS_SERVER"
 CHFS_SERVER="$SERVER"; export CHFS_SERVER
@@ -119,11 +128,13 @@ do
 	echo $MYHOSTNAMES | grep $host > /dev/null && continue
 	case $mode in
 	start)
+	for name in $VNAMES; do
+		[ $name = default ] || NOPT="-n $name"
 	for device in $IFACES; do
 		[ $device = default ] || HOPT="-h $device"
-		COPT="-c $DBDIR/$device"
-		LOPT="-l $LOG_DIR/$host-$device"
-		ssh $host LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH\" PATH=\"$PATH\" $CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT \"$1\" &
+		COPT="-c $DBDIR/$device-$name"
+		LOPT="-l $LOG_DIR/$host-$device-$name"
+		ssh $host LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH\" PATH=\"$PATH\" $CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $NOPT \"$1\" &
 		nservers=$((nservers + 1))
 		shift
 		HOPT=
@@ -134,6 +145,8 @@ do
 			set $(chlist | awk '{ print $1 }')
 			MAX_JOBS=$#
 		fi
+	done
+		NOPT=
 	done
 	;;
 	stop|kill)
@@ -168,9 +181,9 @@ if [ $mode = start -a X"$MDIR" != X ]; then
 		sleep 1;
 	done
 	if [ $(chlist | wc -l) -lt $nservers ]; then
-		echo >&2 "$program: timeout, you may need chmkdir $MDIR and chfuse manually"
+		echo >&2 "$program: timeout, $(chlist | wc -l) of $nservers servers are running.  you may need chmkdir $MDIR manually"
 	fi
-	chmkdir "$MDIR"
+	chmkdir "$MDIR" > /dev/null 2>&1 || :
 	for host in `sed -e 's/#.*//' -e '/^[ 	]*$/d' $HOSTFILE | awk '{ print $1 }'`
 	do
 		ssh $host mkdir -p "$MDIR"

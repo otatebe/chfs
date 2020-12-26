@@ -39,7 +39,7 @@ ring_list_rpc_node_list(const char *server)
 	hg_handle_t h;
 	hg_return_t ret, ret2;
 	int32_t in = 0;
-	string_list_t out;
+	node_list_t out;
 	static const char diag[] = "ring_list_rpc_node_list";
 
 	ret = create_rpc_handle(server, env.node_list_rpc, &h, diag);
@@ -56,7 +56,7 @@ ring_list_rpc_node_list(const char *server)
 		log_error("%s (get_output): %s", diag, HG_Error_to_string(ret));
 		goto err;
 	}
-	ring_list_update(&out);
+	ring_list_update(&out, 1);
 	ret = margo_free_output(h, &out);
 err:
 	ret2 = margo_destroy(h);
@@ -71,7 +71,7 @@ ring_list_rpc_init(margo_instance_id mid, int timeout)
 	env.mid = mid;
 	ring_list_rpc_timeout_msec = timeout;
 	env.node_list_rpc = MARGO_REGISTER(mid, "node_list", int32_t,
-		string_list_t, node_list);
+		node_list_t, node_list);
 }
 
 static void
@@ -79,7 +79,7 @@ node_list(hg_handle_t h)
 {
 	hg_return_t ret;
 	int32_t in;
-	string_list_t out;
+	node_list_t out;
 	static const char diag[] = "node_list RPC";
 
 	log_debug("%s", diag);

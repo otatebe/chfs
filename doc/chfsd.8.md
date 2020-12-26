@@ -30,6 +30,9 @@ chfsd - CHFS server
 -l log_file
 : specifies a log file.
 
+-n virtual_name
+: specifies a virtual name.
+
 -S server_info_file
 : specifies a server info file where the server address will be written.
 

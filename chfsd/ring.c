@@ -3,6 +3,7 @@
 #include <string.h>
 #include <abt.h>
 #include "ring.h"
+#include "log.h"
 
 typedef struct {
 	char *host[2];
@@ -10,8 +11,9 @@ typedef struct {
 	ABT_mutex mutex;
 } ring_node_t;
 
-static ring_node_t self, next, prev;
+static ring_node_t next, prev;
 static ring_node_t next_next, prev_prev;
+static char *self, *self_name;
 
 static void
 ring_print_node(ring_node_t *node, const char *diag)
@@ -36,6 +38,7 @@ ring_init_node(const char *host, ring_node_t *node, const char *diag)
 		node->host[0] = NULL;
 	else
 		node->host[0] = strdup(host);
+
 	node->host[1] = NULL;
 	node->ref_count = 0;
 	ABT_mutex_create(&node->mutex);
@@ -50,6 +53,7 @@ ring_set_node(const char *host, ring_node_t *node, const char *diag)
 
 	if (host == NULL)
 		return;
+
 	ABT_mutex_lock(node->mutex);
 	if (node->ref_count > 0)
 		index = 1;
@@ -88,13 +92,26 @@ ring_release_node(ring_node_t *node)
 }
 
 void
-ring_init(const char *name)
+ring_init(const char *address, const char *name)
 {
-	ring_init_node(name, &self, "self");
-	ring_init_node(name, &next, "next");
-	ring_init_node(name, &next_next, "next_next");
-	ring_init_node(name, &prev, "prev");
-	ring_init_node(name, &prev_prev, "prev_prev");
+	if (address == NULL)
+		log_fatal("ring_init: NULL address");
+
+	self = strdup(address);
+	if (self == NULL)
+		log_fatal("ring_init: no memory");
+
+	ring_init_node(address, &next, "next");
+	ring_init_node(address, &next_next, "next_next");
+	ring_init_node(address, &prev, "prev");
+	ring_init_node(address, &prev_prev, "prev_prev");
+
+	if (name != NULL) {
+		self_name = strdup(name);
+		if (self_name == NULL)
+			log_fatal("ring_init: no memory");
+	} else
+		self_name = "";
 }
 
 void
@@ -122,9 +139,15 @@ ring_set_prev_prev(const char *name)
 }
 
 char *
+ring_get_self_name()
+{
+	return (self_name);
+}
+
+char *
 ring_get_self()
 {
-	return (ring_host(&self));
+	return (self);
 }
 
 char *
@@ -149,12 +172,6 @@ char *
 ring_get_prev_prev()
 {
 	return (ring_host(&prev_prev));
-}
-
-void
-ring_release_self()
-{
-	ring_release_node(&self);
 }
 
 void

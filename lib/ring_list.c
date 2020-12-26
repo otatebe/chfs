@@ -6,6 +6,7 @@
 #include "log.h"
 
 struct ring_node {
+	char *address;
 	char *name;
 	uint8_t md5[MD5_DIGEST_LENGTH];
 };
@@ -14,52 +15,70 @@ static struct ring_list {
 	int n;
 	struct ring_node *nodes;
 } ring_list;
+
 static char *ring_list_self;
 static int ring_list_self_index;
 static ABT_mutex ring_list_mutex;
 
-static int
-hostname_len(const char *name)
+static char *
+address_name_dup(char *address, char *name)
 {
-	int len = strlen(name);
-#ifndef ENABLE_HASH_PORT
-	int s;
+	int addrlen, namelen;
+	char *r;
 
-	/* eliminate port number */
-	s = len - 1;
-	while (s >= 0 && name[s] && name[s] != ':')
-		--s;
-	if (s >= 0 && name[s] == ':')
-		return (s);
+	if (address == NULL)
+		return (NULL);
+	addrlen = strlen(address);
+	if (name != NULL)
+		namelen = strlen(name);
 	else
+		namelen = 0;
+#ifndef ENABLE_HASH_PORT
+	int s = addrlen - 1;
+	while (s >= 0 && address[s] != ':')
+		--s;
+	if (s >= 0 && address[s] == ':')
+		addrlen = s;
 #endif
-		return (len);
+	r = malloc(addrlen + 1 + namelen + 1);
+	if (r == NULL)
+		return (r);
+	memcpy(r, address, addrlen);
+	r[addrlen++] = ':';
+	if (namelen > 0)
+		strcpy(r + addrlen, name);
+	else
+		r[addrlen] = '\0';
+	return (r);
 }
 
 void
 ring_list_init(char *self)
 {
+	node_list_t n;
+	static const char diag[] = "ring_list_init";
+
 	ABT_mutex_create(&ring_list_mutex);
 	if (self == NULL) {
 		ring_list.n = 0;
 		ring_list.nodes = NULL;
 		ring_list_self = NULL;
 		ring_list_self_index = -1;
-	} else {
-		ring_list.n = 1;
-		ring_list.nodes = malloc(sizeof(ring_list.nodes[0]));
-		if (ring_list.nodes == NULL)
-			log_fatal("ring_list_init: no memory");
-		ring_list.nodes[0].name = strdup(self);
-		if (ring_list.nodes[0].name == NULL)
-			log_fatal("ring_list_init: no memory");
-		MD5((unsigned char *)self, hostname_len(self),
-			ring_list.nodes[0].md5);
-		ring_list_self = strdup(self);
-		if (ring_list_self == NULL)
-			log_fatal("ring_list_init: no memory");
-		ring_list_self_index = 0;
+		return;
 	}
+	n.n = 1;
+	n.s = malloc(sizeof(n.s[0]));
+	if (n.s == NULL)
+		log_fatal("%s: no memory", diag);
+	n.s[0].address = self;
+	n.s[0].name = NULL;
+	ring_list_update(&n, 0);
+	free(n.s);
+
+	ring_list_self = strdup(self);
+	if (ring_list_self == NULL)
+		log_fatal("%s: no memory", diag);
+	ring_list_self_index = 0;
 }
 
 static void
@@ -67,7 +86,7 @@ ring_list_display_node(struct ring_node *node)
 {
 	int i;
 
-	printf("%s ", node->name);
+	printf("%s %s ", node->address, node->name);
 	for (i = 0; i < MD5_DIGEST_LENGTH; ++i)
 		printf("%02X", node->md5[i]);
 	printf("\n");
@@ -89,8 +108,10 @@ ring_list_clear()
 {
 	int i;
 
-	for (i = 0; i < ring_list.n; ++i)
+	for (i = 0; i < ring_list.n; ++i) {
+		free(ring_list.nodes[i].address);
 		free(ring_list.nodes[i].name);
+	}
 	free(ring_list.nodes);
 }
 
@@ -103,7 +124,7 @@ ring_list_cmp(const void *a1, const void *a2)
 }
 
 void
-ring_list_copy(string_list_t *list)
+ring_list_copy(node_list_t *list)
 {
 	int i;
 
@@ -115,25 +136,31 @@ ring_list_copy(string_list_t *list)
 		list->n = 0;
 	}
 	for (i = 0; i < list->n; ++i) {
-		list->s[i] = strdup(ring_list.nodes[i].name);
-		if (list->s[i] == NULL)
+		list->s[i].address = strdup(ring_list.nodes[i].address);
+		list->s[i].name = strdup(ring_list.nodes[i].name);
+		if (list->s[i].address == NULL || list->s[i].name == NULL)
 			log_error("ring_list_copy: no memory");
 	}
 	ABT_mutex_unlock(ring_list_mutex);
 }
 
 void
-ring_list_copy_free(string_list_t *list)
+ring_list_copy_free(node_list_t *list)
 {
 	int i;
 
-	for (i = 0; i < list->n; ++i)
-		free(list->s[i]);
+	for (i = 0; i < list->n; ++i) {
+		free(list->s[i].address);
+		free(list->s[i].name);
+	}
 	free(list->s);
 }
 
+/*
+ * flag: 0 - server, 1 - client
+ */
 void
-ring_list_update(string_list_t *src)
+ring_list_update(node_list_t *src, int flag)
 {
 	int i;
 
@@ -148,10 +175,21 @@ ring_list_update(string_list_t *src)
 		goto unlock;
 	}
 	for (i = 0; i < src->n; ++i) {
-		ring_list.nodes[i].name = strdup(src->s[i]);
-		if (ring_list.nodes[i].name == NULL)
+		ring_list.nodes[i].address = strdup(src->s[i].address);
+		if (flag == 0)
+			/* for server */
+			ring_list.nodes[i].name =
+				address_name_dup(src->s[i].address,
+					src->s[i].name);
+		else
+			/* for client */
+			ring_list.nodes[i].name =
+				strdup(src->s[i].name);
+		if (ring_list.nodes[i].address == NULL ||
+			ring_list.nodes[i].name == NULL)
 			log_fatal("ring_list_update: no memory");
-		MD5((unsigned char *)src->s[i], hostname_len(src->s[i]),
+		MD5((unsigned char *)ring_list.nodes[i].name,
+			strlen(ring_list.nodes[i].name),
 			ring_list.nodes[i].md5);
 	}
 	qsort(ring_list.nodes, ring_list.n, sizeof(ring_list.nodes[0]),
@@ -159,7 +197,7 @@ ring_list_update(string_list_t *src)
 	if (ring_list_self == NULL)
 		goto unlock;
 	for (i = 0; i < src->n; ++i)
-		if (strcmp(ring_list.nodes[i].name, ring_list_self) == 0)
+		if (strcmp(ring_list.nodes[i].address, ring_list_self) == 0)
 			break;
 	if (i < src->n)
 		ring_list_self_index = i;
@@ -180,9 +218,10 @@ ring_list_remove(char *host)
 		return;
 	ABT_mutex_lock(ring_list_mutex);
 	for (i = 0; i < ring_list.n; ++i)
-		if (strcmp(host, ring_list.nodes[i].name) == 0)
+		if (strcmp(host, ring_list.nodes[i].address) == 0)
 			break;
 	if (i < ring_list.n) {
+		free(ring_list.nodes[i].address);
 		free(ring_list.nodes[i].name);
 		--ring_list.n;
 		for (; i < ring_list.n; ++i)
@@ -228,7 +267,7 @@ ring_list_lookup_linear(const char *key, int key_size)
 			break;
 	if (i == ring_list.n)
 		i = 0;
-	r = strdup(ring_list.nodes[i].name);
+	r = strdup(ring_list.nodes[i].address);
 	ABT_mutex_unlock(ring_list_mutex);
 	return (r);
 }
@@ -239,7 +278,7 @@ ring_list_lookup_internal(uint8_t md5[], int low, int hi)
 	int mid = (low + hi) / 2;
 
 	if (hi - low == 1)
-		return (strdup(ring_list.nodes[hi].name));
+		return (strdup(ring_list.nodes[hi].address));
 	if (memcmp(&ring_list.nodes[mid].md5, md5, MD5_DIGEST_LENGTH) < 0)
 		return (ring_list_lookup_internal(md5, mid, hi));
 	else
@@ -257,7 +296,7 @@ ring_list_lookup_binary(const char *key, int key_size)
 	if (memcmp(&ring_list.nodes[0].md5, md5, MD5_DIGEST_LENGTH) >= 0 ||
 		memcmp(&ring_list.nodes[ring_list.n - 1].md5, md5,
 			MD5_DIGEST_LENGTH) < 0) {
-		r = strdup(ring_list.nodes[0].name);
+		r = strdup(ring_list.nodes[0].address);
 	} else
 		r = ring_list_lookup_internal(md5, 0, ring_list.n - 1);
 	ABT_mutex_unlock(ring_list_mutex);
@@ -280,7 +319,7 @@ ring_list_is_coordinator(char *self)
 
 	ABT_mutex_lock(ring_list_mutex);
 	for (i = 0; i < ring_list.n; ++i)
-		if (strcmp(self, ring_list.nodes[i].name) < 0)
+		if (strcmp(self, ring_list.nodes[i].address) < 0)
 			break;
 	if (i == ring_list.n)
 		ret = 1;

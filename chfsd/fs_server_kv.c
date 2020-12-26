@@ -11,6 +11,8 @@
 #include "fs.h"
 #include "log.h"
 
+static char *self;
+
 static void inode_read_rdma(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(inode_read_rdma)
 
@@ -29,6 +31,8 @@ fs_server_init_more(margo_instance_id mid, char *db_dir, size_t db_size)
 
 	fs_client_init_more_internal(read_rdma_rpc, readdir_rpc);
 	kv_init(db_dir, "cmap", "kv.db", db_size);
+
+	self = ring_get_self();
 }
 
 void
@@ -87,7 +91,7 @@ inode_read_rdma(hg_handle_t h)
 	hg_return_t ret;
 	kv_put_rdma_in_t in;
 	kv_get_rdma_out_t out;
-	char *self, *target;
+	char *target;
 	margo_instance_id mid = margo_hg_handle_get_instance(h);
 	hg_addr_t client_addr;
 	struct read_rdma_cb_arg a;
@@ -108,7 +112,6 @@ inode_read_rdma(hg_handle_t h)
 	}
 	out.value_size = in.value_size;
 
-	self = ring_get_self();
 	target = ring_list_lookup(in.key.v, in.key.s);
 	if (strcmp(self, target) != 0) {
 		ret = fs_rpc_inode_read_rdma_bulk(target, in.key.v, in.key.s,
@@ -127,7 +130,6 @@ inode_read_rdma(hg_handle_t h)
 			out.value_size = a.value_size;
 	}
 	free(target);
-	ring_release_self();
 	margo_addr_free(mid, client_addr);
 err_free_input:
 	ret = margo_free_input(h, &in);

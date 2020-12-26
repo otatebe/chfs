@@ -51,6 +51,7 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
 - CHFS_CHUNK_SIZE - chunk size
 - CHFS_RDMA_THRESH - RDMA transfer is used when the size is larger than or equal to CHFS_RDMA_THRESH
 - CHFS_RPC_TIMEOUT_MSEC - RPC timeout in milliseconds
+- CHFS_NODE_LIST_CACHE_TIMEOUT - node list cache timeout in seconds
 - CHFS_LOG_PRIORITY - maximum log priority to report
 
 ## IOR and mdtest
@@ -79,6 +80,7 @@ The following APIs are supported.
     void chfs_set_chunk_size(int chunk_size);
     void chfs_set_get_rdma_thresh(int thresh);
     void chfs_set_rpc_timeout_msec(int timeout);
+    void chfs_set_node_list_cache_timeout(int timeout);
 
     int chfs_create(const char *path, int32_t flags, mode_t mode);
     int chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,

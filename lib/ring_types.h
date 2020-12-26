@@ -1,14 +1,16 @@
 #include <mercury_proc_string.h>
 
+MERCURY_GEN_PROC(node_t, ((hg_string_t)(address))((hg_string_t)(name)))
+
 typedef struct node_list {
 	int32_t n;
-	hg_string_t *s;
-} string_list_t;
+	node_t *s;
+} node_list_t;
 
 static inline hg_return_t
-hg_proc_string_list_t(hg_proc_t proc, void *data)
+hg_proc_node_list_t(hg_proc_t proc, void *data)
 {
-	string_list_t *l = data;
+	node_list_t *l = data;
 	hg_return_t ret;
 	int i;
 
@@ -17,12 +19,12 @@ hg_proc_string_list_t(hg_proc_t proc, void *data)
 		return (ret);
 	if (hg_proc_get_op(proc) == HG_DECODE) {
 		/* allocate one more to add self entry in ring_rpc_list() */
-		l->s = malloc(sizeof(hg_string_t) * (l->n + 1));
+		l->s = malloc(sizeof(l->s[0]) * (l->n + 1));
 		if (l->s == NULL)
 			return (HG_NOMEM);
 	}
 	for (i = 0; i < l->n; ++i) {
-		ret = hg_proc_hg_string_t(proc, &l->s[i]);
+		ret = hg_proc_node_t(proc, &l->s[i]);
 		if (ret != HG_SUCCESS)
 			return (ret);
 	}
@@ -31,4 +33,4 @@ hg_proc_string_list_t(hg_proc_t proc, void *data)
 	return (ret);
 }
 
-MERCURY_GEN_PROC(coordinator_t, ((int32_t)(ttl))((string_list_t)(list)))
+MERCURY_GEN_PROC(coordinator_t, ((int32_t)(ttl))((node_list_t)(list)))
