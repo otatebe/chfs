@@ -602,16 +602,33 @@ chfs_unlink(const char *path)
 	return (0);
 }
 
+const char *
+delete_trailing_slash(const char *path)
+{
+	int len = strlen(path), l = len;
+	const char *p = NULL;
+
+	while (l > 0 && path[l - 1] == '/')
+		--l;
+	if (l > 0)
+		p = strndup(path, l);
+	return (p);
+}
+
 int
 chfs_mkdir(const char *path, mode_t mode)
 {
 	const char *p = skip_slash(path);
+	const char *pp = delete_trailing_slash(p);
 	hg_return_t ret;
 	int err;
 
+	if (pp != NULL)
+		p = pp;
 	mode |= S_IFDIR;
 	ret = chfs_rpc_inode_create((void *)p, strlen(p) + 1,
 		mode, 0, &err);
+	free((void *)pp);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS)
 		return (-1);
 	return (0);
@@ -621,11 +638,15 @@ int
 chfs_rmdir(const char *path)
 {
 	const char *p = skip_slash(path);
+	const char *pp = delete_trailing_slash(p);
 	hg_return_t ret;
 	int err;
 
+	if (pp != NULL)
+		p = pp;
 	/* XXX check child entries */
 	ret = chfs_rpc_remove((void *)p, strlen(p) + 1, &err);
+	free((void *)pp);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS)
 		return (-1);
 	return (0);
@@ -641,30 +662,25 @@ root_stat(struct stat *st)
 int
 chfs_stat(const char *path, struct stat *st)
 {
-	const char *p = skip_slash(path);
+	const char *p = skip_slash(path), *pp;
 	struct fs_stat sb;
 	size_t psize;
 	void *pi;
-	char *pp;
 	hg_return_t ret;
-	int err, i, p_len;
+	int err, i;
 
 	if (p[0] == '\0') {
 		root_stat(st);
 		return (0);
 	}
-	p_len = strlen(p);
-	if (p_len > 0 && p[p_len - 1] == '/') {
-		pp = strdup(p);
-		if (pp == NULL)
-			return (-1);
-		pp[p_len - 1] = '\0';
-		ret = chfs_rpc_inode_stat(pp, p_len, &sb, &err);
-		free(pp);
-	} else
-		ret = chfs_rpc_inode_stat((void *)p, p_len + 1, &sb, &err);
-	if (ret != HG_SUCCESS || err != KV_SUCCESS)
+	pp = delete_trailing_slash(p);
+	if (pp != NULL)
+		p = pp;
+	ret = chfs_rpc_inode_stat((void *)p, strlen(p) + 1, &sb, &err);
+	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
+		free((void *)pp);
 		return (-1);
+	}
 	st->st_mode = sb.mode;
 	st->st_uid = sb.uid;
 	st->st_gid = sb.gid;
@@ -672,9 +688,10 @@ chfs_stat(const char *path, struct stat *st)
 	st->st_mtim = sb.mtime;
 	st->st_ctim = sb.ctime;
 	st->st_nlink = 1;
-	if (S_ISDIR(sb.mode) || sb.size < sb.chunk_size)
+	if (S_ISDIR(sb.mode) || sb.size < sb.chunk_size) {
+		free((void *)pp);
 		return (0);
-
+	}
 	for (i = 1;; ++i) {
 		pi = path_index(p, i, &psize);
 		if (pi == NULL)
@@ -687,6 +704,7 @@ chfs_stat(const char *path, struct stat *st)
 		if (sb.size == 0 || sb.size < sb.chunk_size)
 			break;
 	}
+	free((void *)pp);
 	return (0);
 }
 
