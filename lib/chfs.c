@@ -91,6 +91,8 @@ margo_protocol(const char *server)
 
 static time_t node_list_cache_time;
 
+#define IS_NULL_STRING(str) (str == NULL || str[0] == '\0')
+
 int
 chfs_init(const char *server)
 {
@@ -103,33 +105,33 @@ chfs_init(const char *server)
 	hg_return_t ret;
 
 	log_priority = getenv("CHFS_LOG_PRIORITY");
-	if (log_priority != NULL) {
+	if (!IS_NULL_STRING(log_priority)) {
 		max_log_level = log_priority_from_name(log_priority);
 		if (max_log_level == -1)
 			log_error("%s: invalid log priority", log_priority);
 		else
 			log_set_priority_max_level(max_log_level);
 	}
-	if (server == NULL)
+	if (IS_NULL_STRING(server))
 		server = getenv("CHFS_SERVER");
-	if (server == NULL)
+	if (IS_NULL_STRING(server))
 		log_fatal("chfs_init: no server");
 	log_info("chfs_init: server %s", server);
 
 	chunk_size = getenv("CHFS_CHUNK_SIZE");
-	if (chunk_size != NULL)
+	if (!IS_NULL_STRING(chunk_size))
 		chfs_set_chunk_size(atoi(chunk_size));
 
 	rdma_thresh = getenv("CHFS_RDMA_THRESH");
-	if (rdma_thresh != NULL)
+	if (!IS_NULL_STRING(rdma_thresh))
 		chfs_set_get_rdma_thresh(atoi(rdma_thresh));
 
 	timeout = getenv("CHFS_RPC_TIMEOUT_MSEC");
-	if (timeout != NULL)
+	if (!IS_NULL_STRING(timeout))
 		chfs_set_rpc_timeout_msec(atoi(timeout));
 
 	timeout = getenv("CHFS_NODE_LIST_CACHE_TIMEOUT");
-	if (timeout != NULL)
+	if (!IS_NULL_STRING(timeout))
 		chfs_set_node_list_cache_timeout(atoi(timeout));
 
 	proto = margo_protocol(server);

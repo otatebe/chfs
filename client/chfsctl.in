@@ -114,7 +114,14 @@ ps -ef | grep $CHFSD | egrep -v grep
 ;;
 esac
 
-[ "X$HOSTFILE" = X ] && exit 0
+if [ "X$HOSTFILE" = X ]; then
+	# no host file.  mount if needed, and exit
+	if [ $mode = start -a X"$MDIR" != X ]; then
+		chmkdir "$MDIR" > /dev/null 2>&1 || :
+		mkdir -p "$MDIR"
+		chfuse -o direct_io,modules=subdir,subdir="$MDIR" "$MDIR"
+	fi
+else
 
 if [ $mode = start ]; then
 	set $(chlist | awk '{ print $1 }')
@@ -187,8 +194,10 @@ if [ $mode = start -a X"$MDIR" != X ]; then
 	for host in `sed -e 's/#.*//' -e '/^[ 	]*$/d' $HOSTFILE | awk '{ print $1 }'`
 	do
 		ssh $host mkdir -p "$MDIR"
-		ssh $host LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH\" PATH=\"$PATH\" CHFS_SERVER=\"$CHFS_SERVER\" chfuse -o direct_io,modules=subdir,subdir="$MDIR" "$MDIR"
+		ssh $host LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH\" PATH=\"$PATH\" CHFS_SERVER=\"$CHFS_SERVER\" CHFS_LOG_PRIORITY=$CHFS_LOG_PRIORITY CHFS_CHUNK_SIZE=$CHFS_CHUNK_SIZE CHFS_RDMA_THRESH=$CHFS_RDMA_THRESH CHFS_RPC_TIMEOUT_MSEC=$CHFS_RPC_TIMEOUT_MSEC CHFS_NODE_LIST_CACHE_TIMEOUT=$CHFS_NODE_LIST_CACHE_TIMEOUT chfuse -o direct_io,modules=subdir,subdir="$MDIR" "$MDIR"
 	done
+fi
+
 fi
 
 exit 0
