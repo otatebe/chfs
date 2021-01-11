@@ -10,6 +10,7 @@
 #include "fs_rpc.h"
 #include "fs.h"
 #include "log.h"
+#include "fs_kv.h"
 
 static char *self;
 
@@ -53,10 +54,13 @@ read_rdma_cb(const char *value, size_t value_size, void *arg)
 {
 	struct read_rdma_cb_arg *a = arg;
 	void *v = (void *)value;
+	struct inode *inode = v;
 	hg_bulk_t bulk;
 	hg_return_t ret;
 	static const char diag[] = "read_rdma_cb";
 
+	if (value_size > fs_msize + inode->size)
+		value_size = fs_msize + inode->size;
 	if (a->offset >= value_size)
 		value_size = 0;
 	else
@@ -122,7 +126,7 @@ inode_read_rdma(hg_handle_t h)
 	} else {
 		a.mid = mid;
 		a.addr = client_addr;
-		a.offset = in.offset + fs_inode_msize();
+		a.offset = in.offset + fs_msize;
 		a.bulk = in.value;
 		a.value_size = in.value_size;
 		out.err = kv_get_cb(in.key.v, in.key.s, read_rdma_cb, &a);

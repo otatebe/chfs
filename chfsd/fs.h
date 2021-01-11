@@ -2,7 +2,6 @@ struct fs_stat;
 struct dirent;
 
 void fs_inode_init(char *db_dir);
-int fs_inode_msize();
 int fs_inode_create(char *key, size_t key_size, int32_t uid, int32_t gid,
 	mode_t mode, size_t chunk_size);
 int fs_inode_stat(char *key, size_t key_size, struct fs_stat *stat);

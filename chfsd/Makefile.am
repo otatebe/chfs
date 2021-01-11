@@ -1,5 +1,5 @@
 sbin_PROGRAMS = chfsd
-noinst_HEADERS = ring.h ring_rpc.h fs.h kv.h host.h file.h
+noinst_HEADERS = ring.h ring_rpc.h fs.h kv.h host.h file.h fs_kv.h
 
 chfsd_SOURCES = chfsd.c ring.c ring_rpc.c fs_server.c host.c file.c
 if USE_PMEMKV

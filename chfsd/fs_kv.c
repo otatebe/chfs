@@ -5,23 +5,7 @@
 #include "kv_err.h"
 #include "fs_types.h"
 #include "fs.h"
-
-struct inode {
-	uint32_t mode;
-	uint32_t uid, gid;
-	uint32_t msize;
-	uint64_t size;
-	uint64_t chunk_size;
-	struct timespec mtime, ctime;
-};
-
-static int32_t fs_msize = sizeof(struct inode);
-
-int
-fs_inode_msize()
-{
-	return (fs_msize);
-}
+#include "fs_kv.h"
 
 static struct inode *
 create_inode(uint32_t uid, uint32_t gid, uint32_t mode, size_t chunk_size)
@@ -111,7 +95,23 @@ int
 fs_inode_read(char *key, size_t key_size, void *buf, size_t *size,
 	off_t offset)
 {
-	return (kv_pget(key, key_size, fs_msize + offset, buf, size));
+	struct inode inode;
+	size_t s = fs_msize, ss = *size;
+	int r;
+
+	r = kv_pget(key, key_size, 0, &inode, &s);
+	if (r != KV_SUCCESS)
+		return (r);
+	if (offset + *size > inode.size)
+		ss = inode.size - offset;
+	if (ss <= 0) {
+		*size = 0;
+		return (KV_SUCCESS);
+	}
+	r = kv_pget(key, key_size, fs_msize + offset, buf, &ss);
+	if (r == KV_SUCCESS)
+		*size = ss;
+	return (r);
 }
 
 int
