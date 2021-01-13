@@ -9,6 +9,7 @@
 #include "kv_err.h"
 #include "fs_types.h"
 #include "fs_rpc.h"
+#include "path.h"
 #include "log.h"
 #include "chfs.h"
 
@@ -389,29 +390,24 @@ chfs_rpc_inode_stat(void *key, size_t key_size, struct fs_stat *st, int *errp)
 	return (ret);
 }
 
-static const char *
-skip_slash(const char *p)
-{
-	while (*p && *p == '/')
-		++p;
-	return (p);
-}
-
 int
 chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,
 	int chunk_size)
 {
-	const char *p = skip_slash(path);
+	char *p = canonical_path(path);
 	hg_return_t ret;
 	int fd, err;
 
+	if (p == NULL)
+		return (-1);
 	mode |= S_IFREG;
 	fd = create_fd(p, mode, chunk_size);
-	if (fd < 0)
+	if (fd < 0) {
+		free(p);
 		return (-1);
-
-	ret = chfs_rpc_inode_create((void *)p, strlen(p) + 1, mode, chunk_size,
-		&err);
+	}
+	ret = chfs_rpc_inode_create(p, strlen(p) + 1, mode, chunk_size, &err);
+	free(p);
 	if (ret == HG_SUCCESS && err == KV_SUCCESS)
 		return (fd);
 
@@ -428,16 +424,20 @@ chfs_create(const char *path, int32_t flags, mode_t mode)
 int
 chfs_open(const char *path, int32_t flags)
 {
-	const char *p = skip_slash(path);
+	char *p = canonical_path(path);
 	struct fs_stat st;
 	hg_return_t ret;
 	int fd, err;
 
-	ret = chfs_rpc_inode_stat((void *)p, strlen(p) + 1, &st, &err);
-	if (ret != HG_SUCCESS || err != KV_SUCCESS)
+	if (p == NULL)
 		return (-1);
-
+	ret = chfs_rpc_inode_stat(p, strlen(p) + 1, &st, &err);
+	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
+		free(p);
+		return (-1);
+	}
 	fd = create_fd(p, st.mode, st.chunk_size);
+	free(p);
 	if (fd >= 0)
 		return (fd);
 	return (-1);
@@ -583,15 +583,18 @@ chfs_read(int fd, void *buf, size_t size)
 int
 chfs_unlink(const char *path)
 {
-	const char *p = skip_slash(path);
+	char *p = canonical_path(path);
 	int ret, err, i;
 	size_t psize;
 	void *pi;
 
-	ret = chfs_rpc_remove((void *)p, strlen(p) + 1, &err);
-	if (ret != HG_SUCCESS || err != KV_SUCCESS)
+	if (p == NULL)
 		return (-1);
-
+	ret = chfs_rpc_remove(p, strlen(p) + 1, &err);
+	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
+		free(p);
+		return (-1);
+	}
 	for (i = 1;; ++i) {
 		pi = path_index(p, i, &psize);
 		if (pi == NULL)
@@ -601,36 +604,22 @@ chfs_unlink(const char *path)
 		if (ret != HG_SUCCESS || err != KV_SUCCESS)
 			break;
 	}
+	free(p);
 	return (0);
-}
-
-const char *
-delete_trailing_slash(const char *path)
-{
-	int len = strlen(path), l = len;
-	const char *p = NULL;
-
-	while (l > 0 && path[l - 1] == '/')
-		--l;
-	if (l > 0)
-		p = strndup(path, l);
-	return (p);
 }
 
 int
 chfs_mkdir(const char *path, mode_t mode)
 {
-	const char *p = skip_slash(path);
-	const char *pp = delete_trailing_slash(p);
+	char *p = canonical_path(path);
 	hg_return_t ret;
 	int err;
 
-	if (pp != NULL)
-		p = pp;
+	if (p == NULL)
+		return (-1);
 	mode |= S_IFDIR;
-	ret = chfs_rpc_inode_create((void *)p, strlen(p) + 1,
-		mode, 0, &err);
-	free((void *)pp);
+	ret = chfs_rpc_inode_create(p, strlen(p) + 1, mode, 0, &err);
+	free(p);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS)
 		return (-1);
 	return (0);
@@ -639,16 +628,15 @@ chfs_mkdir(const char *path, mode_t mode)
 int
 chfs_rmdir(const char *path)
 {
-	const char *p = skip_slash(path);
-	const char *pp = delete_trailing_slash(p);
+	char *p = canonical_path(path);
 	hg_return_t ret;
 	int err;
 
-	if (pp != NULL)
-		p = pp;
+	if (p == NULL)
+		return (-1);
 	/* XXX check child entries */
-	ret = chfs_rpc_remove((void *)p, strlen(p) + 1, &err);
-	free((void *)pp);
+	ret = chfs_rpc_remove(p, strlen(p) + 1, &err);
+	free(p);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS)
 		return (-1);
 	return (0);
@@ -664,23 +652,23 @@ root_stat(struct stat *st)
 int
 chfs_stat(const char *path, struct stat *st)
 {
-	const char *p = skip_slash(path), *pp;
+	char *p = canonical_path(path);
 	struct fs_stat sb;
 	size_t psize;
 	void *pi;
 	hg_return_t ret;
 	int err, i;
 
+	if (p == NULL)
+		return (-1);
 	if (p[0] == '\0') {
 		root_stat(st);
+		free(p);
 		return (0);
 	}
-	pp = delete_trailing_slash(p);
-	if (pp != NULL)
-		p = pp;
-	ret = chfs_rpc_inode_stat((void *)p, strlen(p) + 1, &sb, &err);
+	ret = chfs_rpc_inode_stat(p, strlen(p) + 1, &sb, &err);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
-		free((void *)pp);
+		free(p);
 		return (-1);
 	}
 	st->st_mode = sb.mode;
@@ -691,7 +679,7 @@ chfs_stat(const char *path, struct stat *st)
 	st->st_ctim = sb.ctime;
 	st->st_nlink = 1;
 	if (S_ISDIR(sb.mode) || sb.size < sb.chunk_size) {
-		free((void *)pp);
+		free(p);
 		return (0);
 	}
 	for (i = 1;; ++i) {
@@ -706,7 +694,7 @@ chfs_stat(const char *path, struct stat *st)
 		if (sb.size == 0 || sb.size < sb.chunk_size)
 			break;
 	}
-	free((void *)pp);
+	free(p);
 	return (0);
 }
 
@@ -721,11 +709,13 @@ int
 chfs_readdir(const char *path, void *buf,
 	int (*filler)(void *, const char *, const struct stat *, off_t))
 {
-	const char *p = skip_slash(path);
+	char *p = canonical_path(path);
 	node_list_t node_list;
 	hg_return_t ret;
 	int err, i;
 
+	if (p == NULL)
+		return (-1);
 	ring_list_copy(&node_list);
 	if (chfs_node_list_cache_is_timeout()) {
 		log_debug("chfs_readdir: node_list cache timeout");
@@ -753,5 +743,6 @@ chfs_readdir(const char *path, void *buf,
 			continue;
 	}
 	ring_list_copy_free(&node_list);
+	free(p);
 	return (0);
 }
