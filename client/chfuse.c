@@ -30,6 +30,9 @@ chfuse_getattr(const char *path, struct stat *st)
 	ret = chfs_stat(path, st);
 	if (ret == -1)
 		return (-ENOENT);
+	/* FUSE requires at least 8 bytes for a directory */
+	if (S_ISDIR(st->st_mode) && st->st_size < 8)
+		st->st_size = 8;
 	return (0);
 }
 
