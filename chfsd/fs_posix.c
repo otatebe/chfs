@@ -66,15 +66,16 @@ static char *
 key_to_path(char *key, size_t key_size)
 {
 	size_t klen = strlen(key);
+	static const char diag[] = "key_to_path";
 
-	log_debug("key_to_path: key %s", key);
+	log_debug("%s: key %s", diag, key);
 	if (klen + 1 < key_size)
 		key[klen] = ':';
 	while (*key && *key == '/')
 		++key;
 	if (*key == '\0')
 		key = ".";
-	log_debug("key_to_path: path %s", key);
+	log_debug("%s: path %s", diag, key);
 	return (key);
 }
 
@@ -214,9 +215,9 @@ fs_inode_create(char *key, size_t key_size, int32_t uid, int32_t gid,
 {
 	char *p = key_to_path(key, key_size);
 	int r;
+	static const char diag[] = "fs_inode_create";
 
-	log_debug("fs_inode_create: %s mode %o chunk_size %ld", p, mode,
-		chunk_size);
+	log_debug("%s: %s mode %o chunk_size %ld", diag, p, mode, chunk_size);
 	if (S_ISREG(mode)) {
 		r = fs_open(p, O_CREAT|O_WRONLY|O_TRUNC, mode, &chunk_size);
 		if (r >= 0)
@@ -227,6 +228,8 @@ fs_inode_create(char *key, size_t key_size, int32_t uid, int32_t gid,
 			r = -errno;
 	} else
 		r = -ENOTSUP;
+	if (r < 0)
+		log_error("%s: %s", diag, strerror(-r));
 
 	return (fs_err(r));
 }
@@ -237,8 +240,9 @@ fs_inode_stat(char *key, size_t key_size, struct fs_stat *st)
 	char *p = key_to_path(key, key_size);
 	struct stat sb;
 	int r;
+	static const char diag[] = "fs_inode_stat";
 
-	log_debug("fs_inode_stat: %s", p);
+	log_debug("%s: %s", diag, p);
 	r = stat(p, &sb);
 	if (r == -1) {
 		r = -errno;
@@ -261,7 +265,7 @@ fs_inode_stat(char *key, size_t key_size, struct fs_stat *st)
 	st->mtime = sb.st_mtim;
 	st->ctime = sb.st_ctim;
 err:
-	log_debug("fs_inode_stat: %d", r);
+	log_debug("%s: %d", diag, r);
 	return (fs_err(r));
 }
 
@@ -272,8 +276,9 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 	char *p = key_to_path(key, key_size);
 	size_t ss;
 	int fd, r = 0;
+	static const char diag[] = "fs_inode_write";
 
-	log_debug("fs_inode_write: %s size %ld offset %ld", p, *size, offset);
+	log_debug("%s: %s size %ld offset %ld", diag, p, *size, offset);
 	ss = *size;
 	if (ss + offset > chunk_size)
 		ss = chunk_size - offset;
@@ -295,7 +300,10 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 		goto err;
 	*size = r;
 err:
-	log_debug("fs_inode_write: ret %d", r);
+	if (r < 0)
+		log_error("%s: %s", diag, strerror(-r));
+	else
+		log_debug("%s: ret %d", diag, r);
 	return (fs_err(r));
 }
 
@@ -306,12 +314,13 @@ fs_inode_read(char *key, size_t key_size, void *buf, size_t *size,
 	char *p = key_to_path(key, key_size);
 	size_t ss, chunk_size;
 	int fd, r;
+	static const char diag[] = "fs_inode_read";
 
-	log_debug("fs_inode_read: %s size %ld offset %ld", p, *size, offset);
+	log_debug("%s: %s size %ld offset %ld", diag, p, *size, offset);
 	fd = r = fs_open(p, O_RDONLY, 0644, &chunk_size);
 	if (r < 0)
 		goto err;
-	log_debug("fs_inode_read: chunk_size %ld", chunk_size);
+	log_debug("%s: chunk_size %ld", diag, chunk_size);
 
 	ss = *size;
 	if (ss + offset > chunk_size)
@@ -331,7 +340,7 @@ fs_inode_read(char *key, size_t key_size, void *buf, size_t *size,
 		goto err;
 	*size = r;
 err:
-	log_debug("fs_inode_read: ret %d", r);
+	log_debug("%s: ret %d", diag, r);
 	return (fs_err(r));
 }
 

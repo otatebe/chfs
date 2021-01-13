@@ -5,6 +5,7 @@
 #include "kv_err.h"
 #include "fs_types.h"
 #include "fs.h"
+#include "log.h"
 #include "fs_kv.h"
 
 static struct inode *
@@ -35,12 +36,15 @@ fs_inode_create(char *key, size_t key_size, int32_t uid, int32_t gid,
 {
 	struct inode *inode;
 	int r;
+	static const char diag[] = "fs_inode_create";
 
 	inode = create_inode(uid, gid, mode, chunk_size);
 	if (inode == NULL)
 		return (KV_ERR_NO_MEMORY);
 	r = kv_put(key, key_size, inode, fs_msize + chunk_size);
 	free(inode);
+	if (r != KV_SUCCESS)
+		log_error("%s: %s", diag, kv_err_string(r));
 	return (r);
 }
 
@@ -72,14 +76,17 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 	struct inode inode;
 	size_t s = fs_msize, ss;
 	int r;
+	static const char diag[] = "fs_inode_write";
 
 	r = kv_pget(key, key_size, 0, &inode, &s);
 	if (r != KV_SUCCESS) {
 		r = fs_inode_create(key, key_size, 0, 0, mode, chunk_size);
 		inode.size = 0;
 	}
-	if (r != KV_SUCCESS)
+	if (r != KV_SUCCESS) {
+		log_error("%s: %s", diag, kv_err_string(r));
 		return (r);
+	}
 	r = kv_update(key, key_size, fs_msize + offset, (void *)buf, size);
 	if (r == KV_SUCCESS) {
 		s = offset + *size;
@@ -87,7 +94,8 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 		if (inode.size < s)
 			r = kv_update(key, key_size,
 				offsetof(struct inode, size), &s, &ss);
-	}
+	} else
+		log_error("%s: %s", diag, kv_err_string(r));
 	return (r);
 }
 
