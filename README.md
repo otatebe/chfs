@@ -9,22 +9,26 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
        % git clone https://github.com/spack/spack.git
        % . spack/share/spack/setup-env.sh
 
-2. Install Mochi-margo
+1. Install Mochi-margo
 
        % git clone https://xgitlab.cels.anl.gov/sds/sds-repo.git
        % spack repo add sds-repo
        % spack install mochi-margo
 
-3. (Optional) Install pmemkv
+1. (Optional) Install pmemkv
 
        # apt install libpmemkv-dev
        # apt install libpmemobj-cpp-dev libmemkind-dev libtbb-dev
 
-4. Install Fuse
+1. Install Fuse
 
        # apt install libfuse-dev
 
-5. Install CHFS
+1. (Optional) Install pandoc
+
+       # apt install pandoc
+
+1. Install CHFS
 
        % spack load mochi-margo
        % autoreconf -i
@@ -67,7 +71,7 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
        % make
        # make install
 
-2. How to use
+1. How to use
 
        % spack load mochi-margo
        % mpirun -x LD_LIBRARY_PATH -x CHFS_SERVER ior -a CHFS [--chfs.chunk_size=SIZE]
