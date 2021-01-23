@@ -38,6 +38,16 @@ log_priority_from_name(char *name)
 	return (priority_names[i].val);
 }
 
+char *
+log_name_from_priority(int priority)
+{
+	if (priority < 0 || priority > LOG_DEBUG)
+		return ("unknown");
+	if (priority_names[priority].val == priority)
+		return (priority_names[priority].name);
+	return ("unknown");
+}
+
 void
 log_set_priority_max_level(int priority)
 {
@@ -45,25 +55,25 @@ log_set_priority_max_level(int priority)
 }
 
 static void
-log_msg_syslog(int priority, const char *buffer)
+log_msg_syslog(int priority, const char *buf)
 {
-	syslog(priority, "%s", buffer);
+	syslog(priority, "%s", buf);
 }
 
 static void
-log_msg_stderr(int priority, const char *buffer)
+log_msg_stderr(int priority, const char *buf)
 {
-	fprintf(stderr, "<%d> %s\n", priority, buffer);
+	fprintf(stderr, "<%s> %s\n", log_name_from_priority(priority), buf);
 }
 
 static void
-log_msg_file(int priority, const char *buffer)
+log_msg_file(int priority, const char *buf)
 {
-	fprintf(log_file, "<%d> %s\n", priority, buffer);
+	fprintf(log_file, "<%s> %s\n", log_name_from_priority(priority), buf);
 }
 
 static void
-(*log_msg)(int priority, const char *buffer)
+(*log_msg)(int priority, const char *buf)
 	= log_msg_stderr;
 
 static void
