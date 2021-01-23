@@ -1,5 +1,6 @@
 #include <dirent.h>
 #include <margo.h>
+#include "config.h"
 #include "ring.h"
 #include "ring_types.h"
 #include "ring_rpc.h"
@@ -14,19 +15,17 @@
 
 static char *self;
 
-static void inode_read_rdma(hg_handle_t h);
-DECLARE_MARGO_RPC_HANDLER(inode_read_rdma)
-
 static void inode_readdir(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(inode_readdir)
 
 void
 fs_server_init_more(margo_instance_id mid, char *db_dir, size_t db_size)
 {
-	hg_id_t read_rdma_rpc, readdir_rpc;
+	hg_id_t read_rdma_rpc = -1, readdir_rpc;
 
-	read_rdma_rpc = MARGO_REGISTER(mid, "inode_read_rdma", kv_put_rdma_in_t,
-		kv_get_rdma_out_t, inode_read_rdma);
+#ifdef USE_ZERO_COPY_READ_RDMA
+#error posix backend does not support --enable-zero-copy-read-rdma
+#endif
 	readdir_rpc = MARGO_REGISTER(mid, "inode_readdir", hg_string_t,
 		fs_readdir_out_t, inode_readdir);
 
@@ -39,100 +38,6 @@ fs_server_init_more(margo_instance_id mid, char *db_dir, size_t db_size)
 void
 fs_server_term_more()
 {}
-
-static void
-inode_read_rdma(hg_handle_t h)
-{
-	hg_return_t ret;
-	kv_put_rdma_in_t in;
-	kv_get_rdma_out_t out;
-	char *target;
-	margo_instance_id mid = margo_hg_handle_get_instance(h);
-	hg_addr_t client_addr;
-	hg_bulk_t bulk;
-	void *buf;
-	static const char diag[] = "inode_read_rdma RPC";
-
-	ret = margo_get_input(h, &in);
-	if (ret != HG_SUCCESS) {
-		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
-		return;
-	}
-	log_debug("%s: key=%s", diag, (char *)in.key.v);
-
-	memset(&out, 0, sizeof(out));
-	out.value_size = in.value_size;
-	if (out.value_size == 0) {
-		out.err = KV_SUCCESS;
-		goto free_input;
-	}
-	ret = margo_addr_lookup(mid, in.client, &client_addr);
-	if (ret != HG_SUCCESS) {
-		log_error("%s (lookup): %s", diag, HG_Error_to_string(ret));
-		out.err = KV_ERR_LOOKUP;
-		goto free_input;
-	}
-
-	target = ring_list_lookup(in.key.v, in.key.s);
-	if (strcmp(self, target) != 0) {
-		ret = fs_rpc_inode_read_rdma_bulk(target, in.key.v, in.key.s,
-			in.client, in.value, &out.value_size, in.offset,
-			&out.err);
-		if (ret != HG_SUCCESS) {
-			log_error("%s (rpc_read_rdma_bulk): %s", diag,
-				HG_Error_to_string(ret));
-			out.err = KV_ERR_SERVER_DOWN;
-		}
-	} else {
-		buf = malloc(out.value_size);
-		if (buf == NULL) {
-			log_error("%s: no memory", diag);
-			out.err = KV_ERR_NO_MEMORY;
-			goto free_target;
-		}
-		out.err = fs_inode_read(in.key.v, in.key.s, buf,
-			&out.value_size, in.offset);
-		if (out.err == 0 && out.value_size > 0) {
-			ret = margo_bulk_create(mid, 1, &buf, &out.value_size,
-				HG_BULK_READ_ONLY, &bulk);
-			if (ret != HG_SUCCESS) {
-				log_error("%s (bulk_create): %s", diag,
-					HG_Error_to_string(ret));
-				goto free_buf;
-			}
-			ret = margo_bulk_transfer(mid, HG_BULK_PUSH,
-				client_addr, in.value, 0, bulk, 0,
-				out.value_size);
-			if (ret != HG_SUCCESS)
-				log_error("%s (bulk_transfer): %s", diag,
-					HG_Error_to_string(ret));
-			ret = margo_bulk_free(bulk);
-			if (ret != HG_SUCCESS)
-				log_error("%s (bulk_free): %s", diag,
-					HG_Error_to_string(ret));
-		}
-free_buf:
-		free(buf);
-	}
-free_target:
-	free(target);
-	margo_addr_free(mid, client_addr);
-free_input:
-	ret = margo_free_input(h, &in);
-	if (ret != HG_SUCCESS)
-		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
-
-	ret = margo_respond(h, &out);
-	if (ret != HG_SUCCESS)
-		log_error("%s (respond) %s", diag, HG_Error_to_string(ret));
-	ret = margo_destroy(h);
-	if (ret != HG_SUCCESS)
-		log_error("%s (destroy) %s", diag, HG_Error_to_string(ret));
-
-	if (out.err == KV_ERR_SERVER_DOWN)
-		ring_start_election();
-}
-DEFINE_MARGO_RPC_HANDLER(inode_read_rdma)
 
 struct fs_readdir_arg {
 	char path[PATH_MAX];

@@ -19,6 +19,16 @@ fs_rpc_inode_read(const char *server, void *key, size_t key_size, void *buf,
 	size_t *size, size_t offset, int *errp);
 
 hg_return_t
+fs_rpc_inode_write_rdma_bulk(const char *server, void *key, size_t key_size,
+	char *client, hg_bulk_t buf, hg_size_t *size, size_t offset,
+	mode_t mode, size_t chunk_size, int *errp);
+
+hg_return_t
+fs_rpc_inode_write_rdma(const char *server, void *key, size_t key_size,
+	char *client, const void *buf, hg_size_t *size, size_t offset,
+	mode_t mode, size_t chunk_size, int *errp);
+
+hg_return_t
 fs_rpc_inode_read_rdma_bulk(const char *server, void *key, size_t key_size,
 	char *client, hg_bulk_t buf, hg_size_t *size, size_t offset,
 	int *errp);
@@ -39,7 +49,8 @@ fs_rpc_readdir(const char *server, const char *path, void *buf,
 void
 fs_client_init_internal(margo_instance_id mid, int timeout,
 	hg_id_t create_rpc, hg_id_t stat_rpc, hg_id_t write_rpc,
-	hg_id_t read_rpc, hg_id_t remove_rpc);
+	hg_id_t write_rdma_rpc, hg_id_t read_rpc, hg_id_t read_rdma_rpc,
+	hg_id_t remove_rpc);
 
 void
 fs_client_init_more_internal(hg_id_t read_rdma_rpc, hg_id_t readdir_rpc);

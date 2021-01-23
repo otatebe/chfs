@@ -33,6 +33,15 @@ MERCURY_GEN_PROC(fs_write_in_t,
 	((hg_size_t)(chunk_size))\
 	((uint32_t)(mode)))
 
+MERCURY_GEN_PROC(fs_write_rdma_in_t,
+	((kv_byte_t)(key))\
+	((hg_string_t)(client))\
+	((hg_size_t)(offset))\
+	((hg_size_t)(value_size))\
+	((hg_bulk_t)(value))\
+	((hg_size_t)(chunk_size))\
+	((uint32_t)(mode)))
+
 MERCURY_GEN_PROC(fs_read_in_t, ((kv_byte_t)(key))\
 	((hg_size_t)(size))((hg_size_t)(offset)))
 

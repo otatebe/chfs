@@ -16,7 +16,7 @@
 static char chfs_client[PATH_MAX];
 static uint32_t chfs_uid, chfs_gid;
 static int chfs_chunk_size = 4096;
-static int chfs_get_rdma_thresh = 2048;
+static int chfs_rdma_thresh = 2048;
 static int chfs_rpc_timeout_msec = 0;		/* no timeout */
 static int chfs_node_list_cache_timeout = 120;	/* 120 seconds */
 
@@ -37,10 +37,10 @@ chfs_set_chunk_size(int chunk_size)
 }
 
 void
-chfs_set_get_rdma_thresh(int thresh)
+chfs_set_rdma_thresh(int thresh)
 {
-	log_info("chfs_set_get_rdma_thresh: %d", thresh);
-	chfs_get_rdma_thresh = thresh;
+	log_info("chfs_set_rdma_thresh: %d", thresh);
+	chfs_rdma_thresh = thresh;
 }
 
 void
@@ -125,7 +125,7 @@ chfs_init(const char *server)
 
 	rdma_thresh = getenv("CHFS_RDMA_THRESH");
 	if (!IS_NULL_STRING(rdma_thresh))
-		chfs_set_get_rdma_thresh(atoi(rdma_thresh));
+		chfs_set_rdma_thresh(atoi(rdma_thresh));
 
 	timeout = getenv("CHFS_RPC_TIMEOUT_MSEC");
 	if (!IS_NULL_STRING(timeout))
@@ -319,8 +319,13 @@ chfs_rpc_inode_write(void *key, size_t key_size, const void *buf, size_t *size,
 
 	while (1) {
 		target = ring_list_lookup(key, key_size);
-		ret = fs_rpc_inode_write(target, key, key_size, buf,
-			size, offset, mode, chunk_size, errp);
+		if (*size < chfs_rdma_thresh)
+			ret = fs_rpc_inode_write(target, key, key_size, buf,
+				size, offset, mode, chunk_size, errp);
+		else
+			ret = fs_rpc_inode_write_rdma(target, key, key_size,
+				chfs_client, buf, size, offset, mode,
+				chunk_size, errp);
 		if (ret == HG_SUCCESS)
 			break;
 		ring_list_remove(target);
@@ -339,7 +344,7 @@ chfs_rpc_inode_read(void *key, size_t key_size, void *buf, size_t *size,
 
 	while (1) {
 		target = ring_list_lookup(key, key_size);
-		if (*size < chfs_get_rdma_thresh)
+		if (*size < chfs_rdma_thresh)
 			ret = fs_rpc_inode_read(target, key, key_size, buf,
 				size, offset, errp);
 		else

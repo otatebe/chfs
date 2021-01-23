@@ -34,7 +34,17 @@ AC_ARG_ENABLE([hash-port],
   [], [enableval=no])
 AC_MSG_RESULT([$enableval])
 if test x$enableval != xno; then
-  AC_DEFINE([ENABLE_HASH_PORT], [1], [Include port numner to hash])
+  AC_DEFINE([ENABLE_HASH_PORT], [1], [Include port number to hash])
+fi
+
+AC_MSG_CHECKING([whether zero copy read rdma is used])
+AC_ARG_ENABLE([zero-copy-read-rdma],
+  [AS_HELP_STRING([--enable-zero-copy-read-rdma],
+    [use zero copy read rdma @<:@default=no@:>@])],
+  [], [enableval=no])
+AC_MSG_RESULT([$enableval])
+if test x$enableval != xno; then
+  AC_DEFINE([USE_ZERO_COPY_READ_RDMA], [1], [Use zero copy read rdma])
 fi
 
 # Checks for libraries.

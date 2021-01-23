@@ -1,4 +1,5 @@
 #include <margo.h>
+#include "config.h"
 #include "ring.h"
 #include "ring_types.h"
 #include "ring_rpc.h"
@@ -10,23 +11,28 @@
 #include "fs_rpc.h"
 #include "fs.h"
 #include "log.h"
-#include "fs_kv.h"
 
-static char *self;
+#ifdef USE_ZERO_COPY_READ_RDMA
+#include "fs_kv.h"
 
 static void inode_read_rdma(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(inode_read_rdma)
+#endif
 
 static void inode_readdir(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(inode_readdir)
 
+static char *self;
+
 void
 fs_server_init_more(margo_instance_id mid, char *db_dir, size_t db_size)
 {
-	hg_id_t read_rdma_rpc, readdir_rpc;
+	hg_id_t read_rdma_rpc = -1, readdir_rpc;
 
+#ifdef USE_ZERO_COPY_READ_RDMA
 	read_rdma_rpc = MARGO_REGISTER(mid, "inode_read_rdma", kv_put_rdma_in_t,
 		kv_get_rdma_out_t, inode_read_rdma);
+#endif
 	readdir_rpc = MARGO_REGISTER(mid, "inode_readdir", hg_string_t,
 		fs_readdir_out_t, inode_readdir);
 
@@ -42,6 +48,7 @@ fs_server_term_more()
 	kv_term();
 }
 
+#ifdef USE_ZERO_COPY_READ_RDMA
 struct read_rdma_cb_arg {
 	margo_instance_id mid;
 	hg_addr_t addr;
@@ -151,6 +158,7 @@ err_free_input:
 		ring_start_election();
 }
 DEFINE_MARGO_RPC_HANDLER(inode_read_rdma)
+#endif
 
 struct fs_readdir_arg {
 	char path[PATH_MAX];
