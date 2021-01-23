@@ -296,13 +296,21 @@ chfs_rpc_inode_create(void *key, size_t key_size, mode_t mode, int chunk_size,
 {
 	char *target;
 	hg_return_t ret;
+	static const char diag[] = "rpc_inode_create";
 
 	while (1) {
 		target = ring_list_lookup(key, key_size);
+		if (target == NULL) {
+			log_error("%s: no server", diag);
+			return (HG_PROTOCOL_ERROR);
+		}
 		ret = fs_rpc_inode_create(target, key, key_size, chfs_uid,
 			chfs_gid, mode, chunk_size, errp);
 		if (ret == HG_SUCCESS)
 			break;
+
+		log_notice("%s: remove %s due to %s", diag, target,
+			HG_Error_to_string(ret));
 		ring_list_remove(target);
 		free(target);
 	}
@@ -316,9 +324,14 @@ chfs_rpc_inode_write(void *key, size_t key_size, const void *buf, size_t *size,
 {
 	char *target;
 	hg_return_t ret;
+	static const char diag[] = "rpc_inode_write";
 
 	while (1) {
 		target = ring_list_lookup(key, key_size);
+		if (target == NULL) {
+			log_error("%s: no server", diag);
+			return (HG_PROTOCOL_ERROR);
+		}
 		if (*size < chfs_rdma_thresh)
 			ret = fs_rpc_inode_write(target, key, key_size, buf,
 				size, offset, mode, chunk_size, errp);
@@ -328,6 +341,9 @@ chfs_rpc_inode_write(void *key, size_t key_size, const void *buf, size_t *size,
 				chunk_size, errp);
 		if (ret == HG_SUCCESS)
 			break;
+
+		log_notice("%s: remove %s due to %s", diag, target,
+			HG_Error_to_string(ret));
 		ring_list_remove(target);
 		free(target);
 	}
@@ -341,17 +357,26 @@ chfs_rpc_inode_read(void *key, size_t key_size, void *buf, size_t *size,
 {
 	char *target;
 	hg_return_t ret;
+	static const char diag[] = "rpc_inode_read";
 
 	while (1) {
 		target = ring_list_lookup(key, key_size);
+		if (target == NULL) {
+			log_error("%s: no server", diag);
+			return (HG_PROTOCOL_ERROR);
+		}
 		if (*size < chfs_rdma_thresh)
 			ret = fs_rpc_inode_read(target, key, key_size, buf,
 				size, offset, errp);
 		else
 			ret = fs_rpc_inode_read_rdma(target, key, key_size,
 				chfs_client, buf, size, offset, errp);
+
 		if (ret == HG_SUCCESS)
 			break;
+
+		log_notice("%s: remove %s due to %s", diag, target,
+			HG_Error_to_string(ret));
 		ring_list_remove(target);
 		free(target);
 	}
@@ -364,12 +389,20 @@ chfs_rpc_remove(void *key, size_t key_size, int *errp)
 {
 	char *target;
 	hg_return_t ret;
+	static const char diag[] = "rpc_inode_remove";
 
 	while (1) {
 		target = ring_list_lookup(key, key_size);
+		if (target == NULL) {
+			log_error("%s: no server", diag);
+			return (HG_PROTOCOL_ERROR);
+		}
 		ret = fs_rpc_inode_remove(target, key, key_size, errp);
 		if (ret == HG_SUCCESS)
 			break;
+
+		log_notice("%s: remove %s due to %s", diag, target,
+			HG_Error_to_string(ret));
 		ring_list_remove(target);
 		free(target);
 	}
@@ -382,12 +415,20 @@ chfs_rpc_inode_stat(void *key, size_t key_size, struct fs_stat *st, int *errp)
 {
 	char *target;
 	hg_return_t ret;
+	static const char diag[] = "rpc_inode_stat";
 
 	while (1) {
 		target = ring_list_lookup(key, key_size);
+		if (target == NULL) {
+			log_error("%s: no server", diag);
+			return (HG_PROTOCOL_ERROR);
+		}
 		ret = fs_rpc_inode_stat(target, key, key_size, st, errp);
 		if (ret == HG_SUCCESS)
 			break;
+
+		log_notice("%s: remove %s due to %s", diag, target,
+			HG_Error_to_string(ret));
 		ring_list_remove(target);
 		free(target);
 	}

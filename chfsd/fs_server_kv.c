@@ -124,7 +124,7 @@ inode_read_rdma(hg_handle_t h)
 	out.value_size = in.value_size;
 
 	target = ring_list_lookup(in.key.v, in.key.s);
-	if (strcmp(self, target) != 0) {
+	if (target && strcmp(self, target) != 0) {
 		ret = fs_rpc_inode_read_rdma_bulk(target, in.key.v, in.key.s,
 			in.client, in.value, &out.value_size, in.offset,
 			&out.err);

@@ -227,6 +227,11 @@ ring_list_remove(char *host)
 		for (; i < ring_list.n; ++i)
 			ring_list.nodes[i] = ring_list.nodes[i + 1];
 	}
+	if (ring_list.n == 0) {
+		log_warning("ring_list_remove: no server");
+		free(ring_list.nodes);
+		ring_list.nodes = NULL;
+	}
 	ABT_mutex_unlock(ring_list_mutex);
 }
 
@@ -306,6 +311,8 @@ ring_list_lookup_binary(const char *key, int key_size)
 char *
 ring_list_lookup(const char *key, int key_size)
 {
+	if (ring_list.n == 0)
+		return (NULL);
 	if (ring_list.n < 7)
 		return (ring_list_lookup_linear(key, key_size));
 	else
