@@ -371,7 +371,6 @@ chfs_rpc_inode_read(void *key, size_t key_size, void *buf, size_t *size,
 		else
 			ret = fs_rpc_inode_read_rdma(target, key, key_size,
 				chfs_client, buf, size, offset, errp);
-
 		if (ret == HG_SUCCESS)
 			break;
 
