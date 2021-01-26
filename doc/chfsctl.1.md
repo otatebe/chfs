@@ -28,7 +28,7 @@ chfsctl - manage CHFS servers
 : specifies a database size.  This option is only effective when using the pmemkv.  Default is 256 MiB.
 
 -N virtual_names
-: specifies virtual names of servers.
+: specifies virtual names of servers.  When you would like to execute three virtual servers on each node, specify -N "0 1 2", for example.  When you specify with -I option, virtual servers are executed for each interface on each node.
 
 -I interfaces
 : specifies interfaces to execute chfsd when there are multiple interfaces such as "eno1 eno2".  In the case of InfiniBand, you can specify -I "$(ibstat -l)".
