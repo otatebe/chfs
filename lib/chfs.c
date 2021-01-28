@@ -702,7 +702,7 @@ chfs_stat(const char *path, struct stat *st)
 	size_t psize;
 	void *pi;
 	hg_return_t ret;
-	int err, i;
+	int err, i, j;
 
 	if (p == NULL)
 		return (-1);
@@ -727,17 +727,28 @@ chfs_stat(const char *path, struct stat *st)
 		free(p);
 		return (0);
 	}
-	for (i = 1;; ++i) {
-		pi = path_index(p, i, &psize);
+	for (j = 0, i = 1;;) {
+		pi = path_index(p, j + i, &psize);
 		if (pi == NULL)
 			break;
 		ret = chfs_rpc_inode_stat(pi, psize, &sb, &err);
 		free(pi);
-		if (ret != HG_SUCCESS || err != KV_SUCCESS)
+		if (ret != HG_SUCCESS)
 			break;
-		st->st_size += sb.size;
-		if (sb.size == 0 || sb.size < sb.chunk_size)
+		if (err != KV_SUCCESS) {
+			if (i == 1)
+				break;
+			i /= 2;
+			st->st_size += sb.chunk_size * i;
+			j += i;
+			i = 1;
+			continue;
+		}
+		if (sb.size == 0 || sb.size < sb.chunk_size) {
+			st->st_size += sb.chunk_size * (i - 1) + sb.size;
 			break;
+		}
+		i *= 2;
 	}
 	free(p);
 	return (0);
