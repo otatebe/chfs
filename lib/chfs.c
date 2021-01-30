@@ -625,6 +625,11 @@ chfs_read(int fd, void *buf, size_t size)
 	return (s);
 }
 
+static int
+chfs_unlink_chunk_all(char *path);
+
+#define UNLINK_CHUNK_SIZE	10
+
 int
 chfs_unlink(const char *path)
 {
@@ -640,7 +645,7 @@ chfs_unlink(const char *path)
 		free(p);
 		return (-1);
 	}
-	for (i = 1;; ++i) {
+	for (i = 1; i < UNLINK_CHUNK_SIZE; ++i) {
 		pi = path_index(p, i, &psize);
 		if (pi == NULL)
 			break;
@@ -649,6 +654,8 @@ chfs_unlink(const char *path)
 		if (ret != HG_SUCCESS || err != KV_SUCCESS)
 			break;
 	}
+	if (i == UNLINK_CHUNK_SIZE)
+		chfs_unlink_chunk_all(p);
 	free(p);
 	return (0);
 }
@@ -761,6 +768,32 @@ chfs_node_list_cache_is_timeout()
 		chfs_node_list_cache_timeout);
 }
 
+static void
+chfs_ring_list_copy(node_list_t *node_list)
+{
+	int i;
+	hg_return_t ret;
+
+	ring_list_copy(node_list);
+	if (chfs_node_list_cache_is_timeout()) {
+		log_debug("chfs_ring_list_copy: node_list cache timeout");
+		for (i = 0; i < node_list->n; ++i) {
+			if (node_list->s[i].address == NULL)
+				continue;
+			ret = ring_list_rpc_node_list(node_list->s[i].address);
+			if (ret == HG_SUCCESS)
+				break;
+			log_notice("%s: %s", node_list->s[i].address,
+				HG_Error_to_string(ret));
+		}
+		if (i == node_list->n)
+			log_fatal("chfs_ring_list_copy: no server");
+		ring_list_copy_free(node_list);
+		ring_list_copy(node_list);
+		node_list_cache_time = time(NULL);
+	}
+}
+
 int
 chfs_readdir(const char *path, void *buf,
 	int (*filler)(void *, const char *, const struct stat *, off_t))
@@ -772,24 +805,7 @@ chfs_readdir(const char *path, void *buf,
 
 	if (p == NULL)
 		return (-1);
-	ring_list_copy(&node_list);
-	if (chfs_node_list_cache_is_timeout()) {
-		log_debug("chfs_readdir: node_list cache timeout");
-		for (i = 0; i < node_list.n; ++i) {
-			if (node_list.s[i].address == NULL)
-				continue;
-			ret = ring_list_rpc_node_list(node_list.s[i].address);
-			if (ret == HG_SUCCESS)
-				break;
-			log_notice("%s: %s", node_list.s[i].address,
-				HG_Error_to_string(ret));
-		}
-		if (i == node_list.n)
-			log_fatal("chfs_readdir: no server");
-		ring_list_copy_free(&node_list);
-		ring_list_copy(&node_list);
-		node_list_cache_time = time(NULL);
-	}
+	chfs_ring_list_copy(&node_list);
 	for (i = 0; i < node_list.n; ++i) {
 		if (node_list.s[i].address == NULL)
 			continue;
@@ -800,5 +816,24 @@ chfs_readdir(const char *path, void *buf,
 	}
 	ring_list_copy_free(&node_list);
 	free(p);
+	return (0);
+}
+
+static int
+chfs_unlink_chunk_all(char *p)
+{
+	node_list_t node_list;
+	hg_return_t ret;
+	int i;
+
+	chfs_ring_list_copy(&node_list);
+	for (i = 0; i < node_list.n; ++i) {
+		if (node_list.s[i].address == NULL)
+			continue;
+		ret = fs_rpc_inode_unlink_chunk_all(node_list.s[i].address, p);
+		if (ret != HG_SUCCESS)
+			continue;
+	}
+	ring_list_copy_free(&node_list);
 	return (0);
 }

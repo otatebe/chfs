@@ -42,6 +42,9 @@ hg_return_t
 fs_rpc_inode_remove(const char *server, void *key, size_t key_size, int *errp);
 
 hg_return_t
+fs_rpc_inode_unlink_chunk_all(const char *server, void *path);
+
+hg_return_t
 fs_rpc_readdir(const char *server, const char *path, void *buf,
 	int (*filler)(void *, const char *, const struct stat *, off_t),
 	int *errp);
@@ -53,7 +56,8 @@ fs_client_init_internal(margo_instance_id mid, int timeout,
 	hg_id_t remove_rpc);
 
 void
-fs_client_init_more_internal(hg_id_t read_rdma_rpc, hg_id_t readdir_rpc);
+fs_client_init_more_internal(hg_id_t read_rdma_rpc, hg_id_t readdir_rpc,
+	hg_id_t unlink_all_rpc);
 
 void fs_client_init(margo_instance_id mid, int timeout);
 void fs_server_init(margo_instance_id mid, char *db_dir, size_t db_size,

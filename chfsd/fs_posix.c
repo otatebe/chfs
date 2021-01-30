@@ -91,8 +91,10 @@ fs_dirname(const char *path)
 		return (NULL);
 
 	r = malloc(p + 1);
-	if (r == NULL)
+	if (r == NULL) {
+		log_error("fs_dirname: no memory");
 		return (NULL);
+	}
 	strncpy(r, path, p);
 	r[p] = '\0';
 	log_debug("fs_dirname: path %s dirname %s", path, r);
@@ -456,4 +458,59 @@ fs_inode_readdir(char *path, void (*cb)(struct dirent *, void *),
 		r = -errno;
 
 	return (fs_err(r));
+}
+
+static char *
+fs_basename(char *p)
+{
+	int len;
+
+	if (p == NULL || (len = strlen(p)) == 0)
+		return (NULL);
+	while (len > 0 && p[len - 1] != '/')
+		--len;
+	return (&p[len]);
+}
+
+int
+fs_inode_unlink_chunk_all(char *path)
+{
+	char *d, *b, p[PATH_MAX];
+	DIR *dp;
+	struct dirent *de;
+	int len, plen;
+
+	b = fs_basename(path);
+	if (b == NULL || b[0] == '\0')
+		return (0);
+	len = strlen(b);
+
+	d = fs_dirname(path);
+	dp = opendir(d != NULL ? d : ".");
+	if (dp == NULL) {
+		free(d);
+		return (fs_err(-errno));
+	}
+	if (d != NULL) {
+		strcpy(p, d);
+		plen = strlen(p);
+		p[plen++] = '/';
+		p[plen] = '\0';
+	}
+	while ((de = readdir(dp)) != NULL) {
+		if (de->d_name[0] == '.' && (de->d_name[1] == '\0' ||
+			(de->d_name[1] == '.' && de->d_name[2] == '\0')))
+			continue;
+		if (strncmp(de->d_name, b, len) == 0 &&
+			(de->d_name[len] == ':' || de->d_name[len] == '\0')) {
+			if (d != NULL) {
+				strcpy(&p[plen], de->d_name);
+				unlink(p);
+			} else
+				unlink(de->d_name);
+		}
+	}
+	closedir(dp);
+	free(d);
+	return (0);
 }

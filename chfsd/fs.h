@@ -10,5 +10,6 @@ int fs_inode_write(char *key, size_t key_size, const void *buf,
 int fs_inode_read(char *key, size_t key_size, void *buf, size_t *size,
 	off_t offset);
 int fs_inode_remove(char *key, size_t key_size);
+int fs_inode_unlink_chunk_all(char *path);
 int fs_inode_readdir(char *path, void (*cb)(struct dirent *, void *),
 	void *arg);

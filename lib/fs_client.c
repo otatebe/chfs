@@ -12,7 +12,7 @@ static struct env {
 	margo_instance_id mid;
 	hg_id_t create_rpc, stat_rpc;
 	hg_id_t write_rpc, read_rpc, write_rdma_rpc, read_rdma_rpc;
-	hg_id_t remove_rpc, readdir_rpc;
+	hg_id_t remove_rpc, readdir_rpc, unlink_all_rpc;
 } env;
 
 static hg_return_t
@@ -375,6 +375,27 @@ err:
 }
 
 hg_return_t
+fs_rpc_inode_unlink_chunk_all(const char *server, void *path)
+{
+	hg_handle_t h;
+	hg_return_t ret, ret2;
+	static const char diag[] = "fs_rpc_inode_unlink_chunk_all";
+
+	ret = create_rpc_handle(server, env.unlink_all_rpc, &h, diag);
+	if (ret != HG_SUCCESS)
+		return (ret);
+
+	ret = margo_forward_timed(h, &path, fs_rpc_timeout_msec);
+	if (ret != HG_SUCCESS)
+		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
+
+	ret2 = margo_destroy(h);
+	if (ret == HG_SUCCESS)
+		ret = ret2;
+	return (ret);
+}
+
+hg_return_t
 fs_rpc_readdir(const char *server, const char *path, void *buf,
 	int (*filler)(void *, const char *, const struct stat *, off_t),
 	int *errp)
@@ -439,11 +460,13 @@ fs_client_init_internal(margo_instance_id mid, int timeout,
 }
 
 void
-fs_client_init_more_internal(hg_id_t read_rdma_rpc, hg_id_t readdir_rpc)
+fs_client_init_more_internal(hg_id_t read_rdma_rpc, hg_id_t readdir_rpc,
+	hg_id_t unlink_all_rpc)
 {
 	if (read_rdma_rpc != -1)
 		env.read_rdma_rpc = read_rdma_rpc;
 	env.readdir_rpc = readdir_rpc;
+	env.unlink_all_rpc = unlink_all_rpc;
 }
 
 void
@@ -465,6 +488,9 @@ fs_client_init(margo_instance_id mid, int timeout)
 		kv_put_rdma_in_t, kv_get_rdma_out_t, NULL);
 	env.remove_rpc = MARGO_REGISTER(mid, "inode_remove", kv_byte_t,
 		int32_t, NULL);
-	env.readdir_rpc = MARGO_REGISTER(mid, "inode_readdir",
-		hg_string_t, fs_readdir_out_t, NULL);
+	env.readdir_rpc = MARGO_REGISTER(mid, "inode_readdir", hg_string_t,
+		fs_readdir_out_t, NULL);
+	env.unlink_all_rpc = MARGO_REGISTER(mid, "inode_unlink_chunk_all",
+		hg_string_t, void, NULL);
+	margo_registered_disable_response(mid, env.unlink_all_rpc, HG_TRUE);
 }
