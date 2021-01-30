@@ -109,8 +109,8 @@ check_directory(char *dir)
 		if (r == -1)
 			log_fatal("%s: %s", dir, strerror(errno));
 		log_info("%s: created", dir);
-	} else if (!S_ISDIR(sb.st_mode))
-		log_fatal("%s: not a directory", dir);
+	} else if (!S_ISDIR(sb.st_mode) && !S_ISCHR(sb.st_mode))
+		log_fatal("%s: not a directory or a character device", dir);
 	return;
 }
 

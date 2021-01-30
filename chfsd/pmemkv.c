@@ -1,3 +1,5 @@
+#include <sys/stat.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -29,6 +31,7 @@ kv_init(char *db_dir, char *engine, char *path, size_t size)
 	pmemkv_config *cfg;
 	char *p;
 	int r;
+	struct stat sb;
 	static const char diag[] = "kv_init";
 
 	if (db_dir == NULL || engine == NULL || path == NULL)
@@ -37,7 +40,13 @@ kv_init(char *db_dir, char *engine, char *path, size_t size)
 	p = malloc(strlen(db_dir) + 1 + strlen(path) + 1);
 	if (p == NULL)
 		log_fatal("%s: no memory", diag);
-	sprintf(p, "%s/%s", db_dir, path);
+	if (stat(db_dir, &sb))
+		log_fatal("%s: %s: %s",
+			diag, db_dir, strerror(errno));
+	if (S_ISDIR(sb.st_mode))
+		sprintf(p, "%s/%s", db_dir, path);
+	else
+		sprintf(p, "%s", db_dir);
 	log_info("kv_init: engine %s, path %s, size %ld", engine, p, size);
 
 	cfg = pmemkv_config_new();
