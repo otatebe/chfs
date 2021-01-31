@@ -16,7 +16,7 @@ chfsd - CHFS server
 : enables debug mode
 
 -c db_dir
-: specifies a database directory.  If the directory does not exist, it will be created.
+: specifies a database directory or a DAX device.  If the directory does not exist, it will be created.
 
 -s db_size
 : specifies a database size.  This option is only effective when using the pmemkv.  Default is 256 MiB.
