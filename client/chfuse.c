@@ -165,6 +165,12 @@ chfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	return (ret);
 }
 
+static int
+chfuse_utimens(const char *path, const struct timespec tv[2])
+{
+	return (0);
+}
+
 static const struct fuse_operations chfs_op = {
 	.init		= chfuse_init,
 	.getattr	= chfuse_getattr,
@@ -178,6 +184,7 @@ static const struct fuse_operations chfs_op = {
 	.mkdir		= chfuse_mkdir,
 	.rmdir		= chfuse_rmdir,
 	.readdir	= chfuse_readdir,
+	.utimens	= chfuse_utimens,
 };
 
 static struct options {
