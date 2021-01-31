@@ -478,7 +478,7 @@ fs_inode_unlink_chunk_all(char *path)
 	char *d, *b, p[PATH_MAX];
 	DIR *dp;
 	struct dirent *de;
-	int len, plen;
+	int len, plen = 0;
 
 	b = fs_basename(path);
 	if (b == NULL || b[0] == '\0')
