@@ -188,6 +188,7 @@ fs_add_entry(const char *name, struct fs_stat *st, struct fs_readdir_arg *a)
 {
 	fs_file_info_t *tfi;
 	const char *s = name;
+	static const char diag[] = "fs_add_entry";
 
 	while (*s && *s != '/')
 		++s;
@@ -197,7 +198,7 @@ fs_add_entry(const char *name, struct fs_stat *st, struct fs_readdir_arg *a)
 	if (a->n >= a->size) {
 		tfi = realloc(a->fi, sizeof(a->fi[0]) * a->size * 2);
 		if (tfi == NULL) {
-			log_error("fs_add_entry: no memory");
+			log_error("%s: no memory", diag);
 			return;
 		}
 		a->fi = tfi;
@@ -205,7 +206,7 @@ fs_add_entry(const char *name, struct fs_stat *st, struct fs_readdir_arg *a)
 	}
 	a->fi[a->n].name = strdup(name);
 	if (a->fi[a->n].name == NULL) {
-		log_error("fs_add_entry: no memory");
+		log_error("%s: no memory", diag);
 		return;
 	}
 	a->fi[a->n].sb = *st;
@@ -284,34 +285,91 @@ free_input:
 }
 DEFINE_MARGO_RPC_HANDLER(inode_readdir)
 
+struct fs_unlink_arg {
+	char *path;
+	int n, size;
+	struct {
+		void *name;
+		size_t size;
+	} *li;
+};
+
+static void
+free_fs_unlink_arg(struct fs_unlink_arg *a)
+{
+	int i;
+
+	for (i = 0; i < a->n; ++i)
+		free(a->li[i].name);
+	free(a->li);
+}
+
+static void
+fs_add_name(const char *key, size_t ksize, struct fs_unlink_arg *a)
+{
+	void *tli;
+	static const char diag[] = "fs_add_name";
+
+	if (a->n >= a->size) {
+		tli = realloc(a->li, sizeof(a->li[0]) * a->size * 2);
+		if (tli == NULL) {
+			log_error("%s: no memory", diag);
+			return;
+		}
+		a->li = tli;
+		a->size *= 2;
+	}
+	a->li[a->n].name = malloc(ksize);
+	if (a->li[a->n].name == NULL) {
+		log_error("%s: no memory", diag);
+		return;
+	}
+	memcpy(a->li[a->n].name, key, ksize);
+	a->li[a->n].size = ksize;
+	++a->n;
+}
+
 int
 fs_unlink_chunk_all_cb(const char *key, size_t key_size, const char *value,
-	size_t value_size, void *path)
+	size_t value_size, void *arg)
 {
-	if (strcmp(path, key) == 0)
-		kv_remove((void *)key, key_size);
+	struct fs_unlink_arg *a = arg;
+
+	if (strcmp(a->path, key) == 0)
+		fs_add_name(key, key_size, a);
 	return (0);
 }
 
 static void
 inode_unlink_chunk_all(hg_handle_t h)
 {
-	hg_string_t path;
+	struct fs_unlink_arg a;
 	hg_return_t ret;
+	int i;
 	static const char diag[] = "inode_unlink_chunk_all RPC";
 
-	ret = margo_get_input(h, &path);
+	ret = margo_get_input(h, &a.path);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
 		return;
 	}
-	log_debug("%s: path=%s", diag, path);
+	log_debug("%s: path=%s", diag, a.path);
 
-	kv_get_all_cb(fs_unlink_chunk_all_cb, path);
-
-	ret = margo_free_input(h, &path);
+	a.n = 0;
+	a.size = 1000;
+	a.li = malloc(sizeof(a.li[0]) * a.size);
+	if (a.li == NULL) {
+		log_error("%s: no memory", diag);
+		goto free_input;
+	}
+	kv_get_all_cb(fs_unlink_chunk_all_cb, &a);
+	for (i = 0; i < a.n; ++i)
+		kv_remove(a.li[i].name, a.li[i].size);
+free_input:
+	ret = margo_free_input(h, &a.path);
 	if (ret != HG_SUCCESS)
 		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
+	free_fs_unlink_arg(&a);
 
 	ret = margo_destroy(h);
 	if (ret != HG_SUCCESS)
