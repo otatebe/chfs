@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <margo.h>
+#include "config.h"
 #include "ring_types.h"
 #include "ring_list.h"
 #include "ring_list_rpc.h"
@@ -628,7 +629,11 @@ chfs_read(int fd, void *buf, size_t size)
 static int
 chfs_unlink_chunk_all(char *path);
 
+#if USE_PMEMKV
+#define UNLINK_CHUNK_SIZE	2000000000
+#else
 #define UNLINK_CHUNK_SIZE	10
+#endif
 
 int
 chfs_unlink(const char *path)
