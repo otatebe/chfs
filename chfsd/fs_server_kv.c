@@ -39,8 +39,7 @@ fs_server_init_more(margo_instance_id mid, char *db_dir, size_t db_size)
 	readdir_rpc = MARGO_REGISTER(mid, "inode_readdir", hg_string_t,
 		fs_readdir_out_t, inode_readdir);
 	unlink_all_rpc = MARGO_REGISTER(mid, "inode_unlink_chunk_all",
-		hg_string_t, void, inode_unlink_chunk_all);
-	margo_registered_disable_response(mid, unlink_all_rpc, HG_TRUE);
+		hg_string_t, int32_t, inode_unlink_chunk_all);
 
 	fs_client_init_more_internal(read_rdma_rpc, readdir_rpc,
 		unlink_all_rpc);
@@ -345,7 +344,7 @@ inode_unlink_chunk_all(hg_handle_t h)
 {
 	struct fs_unlink_arg a;
 	hg_return_t ret;
-	int i;
+	int i, err;
 	static const char diag[] = "inode_unlink_chunk_all RPC";
 
 	ret = margo_get_input(h, &a.path);
@@ -370,6 +369,11 @@ free_input:
 	if (ret != HG_SUCCESS)
 		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
 	free_fs_unlink_arg(&a);
+
+	err = 0;
+	ret = margo_respond(h, &err);
+	if (ret != HG_SUCCESS)
+		log_error("%s (respond): %s", diag, HG_Error_to_string(ret));
 
 	ret = margo_destroy(h);
 	if (ret != HG_SUCCESS)
