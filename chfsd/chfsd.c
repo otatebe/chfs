@@ -114,6 +114,14 @@ check_directory(char *dir)
 	return;
 }
 
+static char *
+skip_space(char *s)
+{
+	while (*s == ' ')
+		++s;
+	return (s);
+}
+
 void
 usage(char *prog_name)
 {
@@ -177,7 +185,7 @@ main(int argc, char *argv[])
 			db_size = atol(optarg);
 			break;
 		case 'S':
-			server_info_file = optarg;
+			server_info_file = skip_space(optarg);
 			break;
 		case 't':
 			rpc_timeout_msec = atoi(optarg);
