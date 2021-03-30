@@ -27,6 +27,9 @@ chfsctl - manage CHFS servers
 -s db_size
 : specifies a database size.  This option is only effective when using the pmemkv.  Default is 256 MiB.
 
+-D
+: use devdax.
+
 -N virtual_names
 : specifies virtual names of servers.  When you would like to execute three virtual servers on each node, specify -N "0 1 2", for example.  When you specify with -I option, virtual servers are executed for each interface on each node.
 
@@ -35,6 +38,9 @@ chfsctl - manage CHFS servers
 
 -L log_dir
 : specifies a log directory.  Default is $HOME.
+
+-S server
+: specifies a chfsd server.
 
 -O options
 : specifies options for chfsd.

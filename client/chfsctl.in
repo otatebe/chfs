@@ -12,6 +12,7 @@ LOG_DIR=$HOME
 IFACES=default
 VNAMES=default
 CHFSD=chfsd
+DEVDAX=false
 
 program=$(basename $0)
 
@@ -22,8 +23,9 @@ err() {
 
 usage() {
 	[ "X$*" = X ] || echo >&2 $program: $*
-	echo >&2 "usage: $program [-h hostfile] [-c scratch_dir] [-m mount_point] [-s db_size]"
-	echo >&2 "		[-p proto] [-N vnames] [-I interfaces] [-L log_dir] [-O options]"
+	echo >&2 "usage: $program [-h hostfile] [-c scratch_dir] [-D] [-m mount_point]"
+	echo >&2 "		[-p proto] [-s db_size] [-N vnames] [-I interfaces]"
+	echo >&2 "		[-L log_dir] [-S server] [-O options]"
 	echo >&2 "		start | stop | status | kill"
 	exit 1
 }
@@ -32,6 +34,7 @@ while [ $# -gt 0 ]; do
 	case $1 in
 	    start|stop|status|kill) mode=$1 ;;
 	    -c) shift; DBDIR=$1 ;;
+	    -D) DEVDAX=true ;;
 	    -h) shift; HOSTFILE=$1 ;;
 	    -I) shift; IFACES="$1" ;;
 	    -L) shift; LOG_DIR=$1 ;;
@@ -40,6 +43,7 @@ while [ $# -gt 0 ]; do
 	    -O) shift; OPTIONS="$1" ;;
 	    -p) shift; PROTO=$1 ;;
 	    -s) shift; DBSIZE=$1 ;;
+	    -S) shift; SERVER=$1 ;;
 	    -*) echo "unknown option: $1"
 		usage ;;
 	    *) usage ;;
@@ -56,36 +60,89 @@ done
 
 PKILL_FLAG=
 [ "$mode" = kill ] && PKILL_FLAG=-9
+NO_SERVER=false
+[ "X$SERVER" = X ] && NO_SERVER=true
+HOSTS=
+[ "X$HOSTFILE" = X ] ||
+	HOSTS="$(sed -e 's/#.*//' -e '/^[ 	]*$/d' $HOSTFILE | awk '{ print $1 }')"
 
 CHFS_OPTIONS="-p $PROTO -s $DBSIZE $OPTIONS"
 SERVER_INFO_FILE=/tmp/server-info-file-$USER
 MYHOSTNAMES="$(hostname) $(hostname -f) $(hostname -A) $(hostname -I)"
-case $mode in
-start)
+
+stop_chfs() {
+	rm -f $SERVER_INFO_FILE
+
+	if [ "X$HOSTS" = X ]; then
+		pkill $PKILL_FLAG $CHFSD
+		[ X"$MDIR" != X ] && fusermount -u "$MDIR"
+	fi
+	p=0
+	MAX_JOBS=8
+	for host in $HOSTS
+	do
+		ssh $host pkill $PKILL_FLAG $CHFSD &
+		if [ X"$MDIR" != X ]; then
+			ssh $host fusermount -u "$MDIR" &
+		fi
+
+		p=$((p + 1))
+		if [ $p -ge $MAX_JOBS ]; then
+			p=0
+			wait
+		fi
+	done
+	wait
+}
+
+status_chfs() {
+	if ! $NO_SERVER; then
+		chlist "$SERVER"
+	elif [ -s $SERVER_INFO_FILE ]; then
+		chlist $(cat $SERVER_INFO_FILE)
+	else
+		echo >&2 no server info file
+	fi
+
+	if [ "X$HOSTS" = X ]; then
+		echo $(hostname -f)
+		ps -ef | grep $CHFSD | egrep -v grep
+		[ X"$MDIR" != X ] && ps -ef | grep chfuse | egrep -v grep
+	fi
+	for host in $HOSTS
+	do
+		echo $host
+		ssh $host "ps -ef | grep $CHFSD | egrep -v grep"
+		if [ X"$MDIR" != X ]; then
+			ssh $host "ps -ef | grep chfuse | egrep -v grep"
+		fi
+	done
+}
+
+start_chfs() {
 nservers=0
-rm -f $SERVER_INFO_FILE
-SOPT="-S $SERVER_INFO_FILE"
+START_LOCAL_SERVERS=false
+if $NO_SERVER; then
+	rm -f $SERVER_INFO_FILE
+	SERVER="-S $SERVER_INFO_FILE"
+
 for name in $VNAMES; do
 	[ $name = default ] || NOPT="-n $name"
 for device in $IFACES; do
 	[ $device = default ] || HOPT="-h $device"
-	COPT="-c $DBDIR/$device-$name"
+	if $DEVDAX; then COPT="-c $DBDIR"; else COPT="-c $DBDIR/$device-$name"; fi
 	LOPT="-l $LOG_DIR/$(hostname)-$device-$name"
-	if [ X"$SERVER" = X ]; then
-		$CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $NOPT $SOPT
-	else
-		$CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $NOPT $SOPT "$SERVER"
-	fi
+	$CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $NOPT "$SERVER"
 	nservers=$((nservers + 1))
 
-	if [ X"$SOPT" != X ]; then
+	if $NO_SERVER; then
 		timeout=10
 		while [ ! -s $SERVER_INFO_FILE -a $timeout -gt 0 ]; do sleep 1; timeout=$((timeout - 1)); done
 		[ $timeout -eq 0 ] && err $CHFSD: timeout
 
 		SERVER=`cat $SERVER_INFO_FILE`
 		[ X"$SERVER" = X ] && err $CHFSD: no server info
-		SOPT=
+		NO_SERVER=false
 	else
 		# XXX
 		sleep 1
@@ -94,52 +151,27 @@ for device in $IFACES; do
 done
 	NOPT=
 done
+START_LOCAL_SERVERS=true
+fi
 echo "CHFS_SERVER=\"$SERVER\"; export CHFS_SERVER"
 CHFS_SERVER="$SERVER"; export CHFS_SERVER
-;;
-stop|kill)
-pkill $PKILL_FLAG $CHFSD
-rm -f $SERVER_INFO_FILE
-[ X"$MDIR" != X ] && fusermount -u "$MDIR"
-;;
-status)
-if [ -s $SERVER_INFO_FILE ]; then
-	chlist `cat $SERVER_INFO_FILE`
-else
-	echo >&2 no server info file
-fi
-echo $(hostname -f)
-ps -ef | grep $CHFSD | egrep -v grep
-[ X"$MDIR" != X ] && ps -ef | grep chfuse | egrep -v grep
-;;
-esac
 
-if [ "X$HOSTFILE" = X ]; then
-	# no host file.  mount if needed, and exit
-	if [ $mode = start -a X"$MDIR" != X ]; then
-		chmkdir "$MDIR" > /dev/null 2>&1 || :
-		mkdir -p "$MDIR"
-		chfuse -o direct_io,modules=subdir,subdir="$MDIR" "$MDIR"
-	fi
-else
+SERVERS="$(chlist | awk '{ print $1 }')"
+[ "X$SERVERS" = X ] && err chlist: no server
+set $SERVERS
+MAX_JOBS=$#
 
-if [ $mode = start ]; then
-	set $(chlist | awk '{ print $1 }')
-	MAX_JOBS=$#
-else
-	MAX_JOBS=8
-fi
 p=0
-for host in `sed -e 's/#.*//' -e '/^[ 	]*$/d' $HOSTFILE | awk '{ print $1 }'`
+for host in $HOSTS
 do
-	echo $MYHOSTNAMES | grep $host > /dev/null && continue
-	case $mode in
-	start)
+	if $START_LOCAL_SERVERS; then
+		echo $MYHOSTNAMES | grep $host > /dev/null && continue
+	fi
 	for name in $VNAMES; do
 		[ $name = default ] || NOPT="-n $name"
 	for device in $IFACES; do
 		[ $device = default ] || HOPT="-h $device"
-		COPT="-c $DBDIR/$device-$name"
+		if $DEVDAX; then COPT="-c $DBDIR"; else COPT="-c $DBDIR/$device-$name"; fi
 		LOPT="-l $LOG_DIR/$host-$device-$name"
 		ssh $host LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH\" PATH=\"$PATH\" $CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $NOPT \"$1\" &
 		nservers=$((nservers + 1))
@@ -155,33 +187,18 @@ do
 	done
 		NOPT=
 	done
-	;;
-	stop|kill)
-	ssh $host pkill $PKILL_FLAG $CHFSD &
-	if [ X"$MDIR" != X ]; then
-		ssh $host fusermount -u "$MDIR" &
-	fi
-	;;
-	status)
-	echo $host
-	ssh $host "ps -ef | grep $CHFSD | egrep -v grep"
-	if [ X"$MDIR" != X ]; then
-		ssh $host "ps -ef | grep chfuse | egrep -v grep"
-	fi
-	;;
-	esac
+
 	p=$((p + 1))
 	if [ $p -ge $MAX_JOBS ]; then
 		p=0
 		wait
-		if [ $mode = start ]; then
-			set $(chlist | awk '{ print $1 }')
-			MAX_JOBS=$#
-		fi
+
+		set $(chlist | awk '{ print $1 }')
+		MAX_JOBS=$#
 	fi
 done
 wait
-if [ $mode = start -a X"$MDIR" != X ]; then
+if [ X"$MDIR" != X ]; then
 	timeout=10
 	while [ $timeout -gt 0 -a $(chlist | wc -l) -lt $nservers ]; do
 		timeout=$((timeout - 1))
@@ -191,13 +208,28 @@ if [ $mode = start -a X"$MDIR" != X ]; then
 		echo >&2 "$program: timeout, $(chlist | wc -l) of $nservers servers are running.  you may need chmkdir $MDIR manually"
 	fi
 	chmkdir "$MDIR" > /dev/null 2>&1 || :
-	for host in `sed -e 's/#.*//' -e '/^[ 	]*$/d' $HOSTFILE | awk '{ print $1 }'`
+
+	if [ "X$HOSTS" = X ]; then
+		mkdir -p "$MDIR"
+		chfuse -o direct_io,modules=subdir,subdir="$MDIR" "$MDIR"
+	fi
+	for host in $HOSTS
 	do
 		ssh $host mkdir -p "$MDIR"
 		ssh $host LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH\" PATH=\"$PATH\" CHFS_SERVER=\"$CHFS_SERVER\" CHFS_LOG_PRIORITY=$CHFS_LOG_PRIORITY CHFS_CHUNK_SIZE=$CHFS_CHUNK_SIZE CHFS_RDMA_THRESH=$CHFS_RDMA_THRESH CHFS_RPC_TIMEOUT_MSEC=$CHFS_RPC_TIMEOUT_MSEC CHFS_NODE_LIST_CACHE_TIMEOUT=$CHFS_NODE_LIST_CACHE_TIMEOUT chfuse -o direct_io,modules=subdir,subdir="$MDIR" "$MDIR"
 	done
 fi
+}
 
-fi
+case $mode in
+start)
+	start_chfs ;;
+stop|kill)
+	stop_chfs ;;
+status)
+	status_chfs ;;
+*)
+	usage ;;
+esac
 
 exit 0
