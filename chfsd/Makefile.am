@@ -14,6 +14,5 @@ chfsd_LDADD += @LIBPMEMKV_LIBS@
 chfsd_CFLAGS = @LIBPMEMKV_CFLAGS@
 endif
 
-AM_CPPFLAGS = -Wall -pthread -I$(top_srcdir)/lib
-AM_CFLAGS = @MARGO_CFLAGS@ @OPENSSL_CFLAGS@
+AM_CPPFLAGS = -Wall -pthread -I$(top_srcdir)/lib @MARGO_CFLAGS@ @OPENSSL_CFLAGS@
 AM_LDFLAGS = -pthread
