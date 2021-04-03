@@ -121,18 +121,19 @@ status_chfs() {
 
 start_chfs() {
 nservers=0
-START_LOCAL_SERVERS=false
+START_LOCAL_SERVER=false
 if $NO_SERVER; then
 	rm -f $SERVER_INFO_FILE
 	SERVER="-S $SERVER_INFO_FILE"
 
 for name in $VNAMES; do
-	[ $name = default ] || NOPT="-n $name"
+	[ $name = default ] && NOPT= || NOPT="-n $name"
 for device in $IFACES; do
-	[ $device = default ] || HOPT="-h $device"
+	[ $device = default ] && HOPT= || HOPT="-h $device"
 	if $DEVDAX; then COPT="-c $DBDIR"; else COPT="-c $DBDIR/$device-$name"; fi
 	LOPT="-l $LOG_DIR/$(hostname)-$device-$name"
 	$CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $NOPT "$SERVER"
+	[ $? -eq 0 ] || continue
 	nservers=$((nservers + 1))
 
 	if $NO_SERVER; then
@@ -147,11 +148,9 @@ for device in $IFACES; do
 		# XXX
 		sleep 1
 	fi
-	HOPT=
 done
-	NOPT=
 done
-START_LOCAL_SERVERS=true
+START_LOCAL_SERVER=true
 fi
 echo "CHFS_SERVER=\"$SERVER\"; export CHFS_SERVER"
 CHFS_SERVER="$SERVER"; export CHFS_SERVER
@@ -164,40 +163,28 @@ MAX_JOBS=$#
 p=0
 for host in $HOSTS
 do
-	if $START_LOCAL_SERVERS; then
+	if $START_LOCAL_SERVER; then
 		echo $MYHOSTNAMES | grep $host > /dev/null && continue
 	fi
 	for name in $VNAMES; do
-		[ $name = default ] || NOPT="-n $name"
+		[ $name = default ] && NOPT= || NOPT="-n $name"
 	for device in $IFACES; do
-		[ $device = default ] || HOPT="-h $device"
+		[ $device = default ] && HOPT= || HOPT="-h $device"
 		if $DEVDAX; then COPT="-c $DBDIR"; else COPT="-c $DBDIR/$device-$name"; fi
 		LOPT="-l $LOG_DIR/$host-$device-$name"
-		ssh $host LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH\" PATH=\"$PATH\" $CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $NOPT \"$1\" &
+		ssh $host LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH\" PATH=\"$PATH\" $CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $NOPT \"$1\"
+		[ $? -eq 0 ] || continue
 		nservers=$((nservers + 1))
 		shift
-		HOPT=
 		p=$((p + 1))
 		if [ $p -ge $MAX_JOBS ]; then
 			p=0
-			wait
 			set $(chlist | awk '{ print $1 }')
 			MAX_JOBS=$#
 		fi
 	done
-		NOPT=
 	done
-
-	p=$((p + 1))
-	if [ $p -ge $MAX_JOBS ]; then
-		p=0
-		wait
-
-		set $(chlist | awk '{ print $1 }')
-		MAX_JOBS=$#
-	fi
 done
-wait
 if [ X"$MDIR" != X ]; then
 	timeout=10
 	while [ $timeout -gt 0 -a $(chlist | wc -l) -lt $nservers ]; do
