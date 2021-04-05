@@ -152,6 +152,7 @@ done
 done
 START_LOCAL_SERVER=true
 fi
+if $NO_SERVER; then err no server; fi
 echo "CHFS_SERVER=\"$SERVER\"; export CHFS_SERVER"
 CHFS_SERVER="$SERVER"; export CHFS_SERVER
 
