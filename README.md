@@ -11,8 +11,6 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
 
 1. Install Mochi-margo
 
-       % git clone https://xgitlab.cels.anl.gov/sds/sds-repo.git
-       % spack repo add sds-repo
        % spack install mochi-margo
 
 1. (Optional) Install pmemkv
@@ -50,6 +48,8 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
 
        % chfuse <mount_point>
 
+   For details, see manual page of chfuse.
+
 ## Environment variable
 
 - CHFS_SERVER - one of server addresses
@@ -74,7 +74,7 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
 1. How to use
 
        % spack load mochi-margo
-       % mpirun -x LD_LIBRARY_PATH -x CHFS_SERVER ior -a CHFS [--chfs.chunk_size=SIZE]
+       % mpirun -x PATH -x LD_LIBRARY_PATH -x CHFS_SERVER ior -a CHFS [--chfs.chunk_size=SIZE]
 
 ## CHFS API
 
