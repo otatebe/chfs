@@ -30,11 +30,14 @@ chfsctl - manage CHFS servers
 -D
 : use devdax.
 
--N virtual_names
-: specifies virtual names of servers.  When you would like to execute three virtual servers on each node, specify -N "0 1 2", for example.  When you specify with -I option, virtual servers are executed for each interface on each node.
+-C
+: specifies CPU socket number.
 
--I interfaces
-: specifies interfaces to execute chfsd when there are multiple interfaces such as "eno1 eno2".  In the case of InfiniBand, you can specify -I "$(ibstat -l)".
+-N virtual_name
+: specifies a virtual name of servers.
+
+-I interface
+: specifies an interface to execute chfsd when there are multiple interfaces such as mlx5_0 and mlx5_1.
 
 -L log_dir
 : specifies a log directory.  Default is $HOME.
