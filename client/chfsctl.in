@@ -72,7 +72,10 @@ stop_chfs() {
 
 	if [ "X$HOSTS" = Xlocalhost ]; then
 		pkill $PKILL_FLAG $CHFSD
-		[ X"$MDIR" != X ] && fusermount -u "$MDIR"
+		if [ X"$MDIR" != X ]; then
+			[ "$mode" = kill ] && pkill $PKILL_FLAG chfuse
+			fusermount -u "$MDIR"
+		fi
 		HOSTS=
 	fi
 	p=0
@@ -81,6 +84,7 @@ stop_chfs() {
 	do
 		ssh $host pkill $PKILL_FLAG $CHFSD &
 		if [ X"$MDIR" != X ]; then
+			[ "$mode" = kill ] && ssh $host pkill $PKILL_FLAG chfuse &
 			ssh $host fusermount -u "$MDIR" &
 		fi
 
@@ -105,16 +109,14 @@ status_chfs() {
 	if [ "X$HOSTS" = Xlocalhost ]; then
 		echo $(hostname -f)
 		ps -ef | grep $CHFSD | egrep -v grep
-		[ X"$MDIR" != X ] && ps -ef | grep chfuse | egrep -v grep
+		ps -ef | grep chfuse | egrep -v grep
 		HOSTS=
 	fi
 	for host in $HOSTS
 	do
 		echo $host
 		ssh $host "ps -ef | grep $CHFSD | egrep -v grep"
-		if [ X"$MDIR" != X ]; then
-			ssh $host "ps -ef | grep chfuse | egrep -v grep"
-		fi
+		ssh $host "ps -ef | grep chfuse | egrep -v grep"
 	done
 }
 
