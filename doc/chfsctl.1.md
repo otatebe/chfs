@@ -9,7 +9,7 @@ chfsctl - manage CHFS servers
 **chfsctl** [_options_] _mode_
 
 # DESCRIPTION
-**chfsctl** manages CHFS file servers for CHFS parallel consistent hashing file system.  The _mode_ should be start, stop, status or kill.  When the _mode_ is start, it executes CHFS servers and displays an environment variable to access the CHFS.
+**chfsctl** manages CHFS file servers for CHFS parallel consistent hashing file system.  The _mode_ should be start, stop, status, kill or clean.  When the _mode_ is start, it executes CHFS servers and displays an environment variable to access the CHFS.  When the _mode_ is clean, it removes all files and directories in _scratch_dir_ specified by the -c option.
 
 # OPTIONS
 -c scratch_dir

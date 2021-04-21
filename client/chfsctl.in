@@ -26,13 +26,13 @@ usage() {
 	echo >&2 "usage: $program [-h hostfile] [-c scratch_dir] [-D] [-m mount_point]"
 	echo >&2 "		[-p proto] [-s db_size] [-N vname] [-I interface]"
 	echo >&2 "		[-C socket#] [-L log_dir] [-S server] [-O options]"
-	echo >&2 "		start | stop | status | kill"
+	echo >&2 "		start | stop | status | kill | clean"
 	exit 1
 }
 
 while [ $# -gt 0 ]; do
 	case $1 in
-	    start|stop|status|kill) mode=$1 ;;
+	    start|stop|status|kill|clean) mode=$1 ;;
 	    -c) shift; DBDIR=$1 ;;
 	    -C) shift; CPUSOCKET=$1 ;;
 	    -D) DEVDAX=true ;;
@@ -67,6 +67,8 @@ done
 CHFS_OPTIONS="-p $PROTO -s $DBSIZE $OPTIONS"
 SERVER_INFO_FILE=/tmp/server-info-file-$USER
 
+MAX_JOBS=8
+
 stop_chfs() {
 	rm -f $SERVER_INFO_FILE
 
@@ -79,7 +81,6 @@ stop_chfs() {
 		HOSTS=
 	fi
 	p=0
-	MAX_JOBS=8
 	for host in $HOSTS
 	do
 		ssh $host pkill $PKILL_FLAG $CHFSD &
@@ -87,6 +88,27 @@ stop_chfs() {
 			[ "$mode" = kill ] && ssh $host pkill $PKILL_FLAG chfuse &
 			ssh $host fusermount -u "$MDIR" &
 		fi
+
+		p=$((p + 1))
+		if [ $p -ge $MAX_JOBS ]; then
+			p=0
+			wait
+		fi
+	done
+	wait
+}
+
+clean_chfs() {
+	[ -w / ] && err $mode: root not allowed
+
+	if [ "X$HOSTS" = Xlocalhost ]; then
+		rm -rf $DBDIR/*
+		HOSTS=
+	fi
+	p=0
+	for host in $HOSTS
+	do
+		ssh $host rm -rf $DBDIR/\* &
 
 		p=$((p + 1))
 		if [ $p -ge $MAX_JOBS ]; then
@@ -239,6 +261,8 @@ stop|kill)
 	stop_chfs ;;
 status)
 	status_chfs ;;
+clean)
+	clean_chfs ;;
 *)
 	usage ;;
 esac
