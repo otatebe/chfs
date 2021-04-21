@@ -74,8 +74,8 @@ stop_chfs() {
 
 	if [ "X$HOSTS" = Xlocalhost ]; then
 		pkill $PKILL_FLAG $CHFSD
+		[ "$mode" = kill ] && pkill $PKILL_FLAG chfuse
 		if [ X"$MDIR" != X ]; then
-			[ "$mode" = kill ] && pkill $PKILL_FLAG chfuse
 			fusermount -u "$MDIR"
 		fi
 		HOSTS=
@@ -84,8 +84,8 @@ stop_chfs() {
 	for host in $HOSTS
 	do
 		ssh $host pkill $PKILL_FLAG $CHFSD &
+		[ "$mode" = kill ] && ssh $host pkill $PKILL_FLAG chfuse &
 		if [ X"$MDIR" != X ]; then
-			[ "$mode" = kill ] && ssh $host pkill $PKILL_FLAG chfuse &
 			ssh $host fusermount -u "$MDIR" &
 		fi
 
