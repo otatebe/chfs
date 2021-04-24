@@ -5,10 +5,31 @@
 #include "ring_list.h"
 #include "log.h"
 
+#ifndef USE_DIGEST_MURMUR3
+typedef uint8_t HASH_T[MD5_DIGEST_LENGTH];
+#define HASH(data, len, hash) MD5(data, len, hash)
+#define HASH_CMP(a, b) memcmp(a, b, MD5_DIGEST_LENGTH)
+
+void display_hash(HASH_T hash)
+{
+	int i;
+
+	for (i = 0; i < MD5_DIGEST_LENGTH; ++i)
+		printf("%02X", hash[i]);
+}
+#else /* USE_DIGEST_MURMUR3 */
+#include "murmur3.h"
+
+typedef uint32_t HASH_T[1];
+#define HASH(data, len, hash) MurmurHash3_x86_32(data, len, 1234, hash)
+#define HASH_CMP(a, b) ((a[0] < b[0]) ? -1 : ((a[0] > b[0]) ? 1 : 0))
+#define display_hash(hash) printf("%08X", hash[0])
+#endif
+
 struct ring_node {
 	char *address;
 	char *name;
-	uint8_t md5[MD5_DIGEST_LENGTH];
+	HASH_T hash;
 };
 
 static struct ring_list {
@@ -84,11 +105,8 @@ ring_list_init(char *self)
 static void
 ring_list_display_node(struct ring_node *node)
 {
-	int i;
-
 	printf("%s %s ", node->address, node->name);
-	for (i = 0; i < MD5_DIGEST_LENGTH; ++i)
-		printf("%02X", node->md5[i]);
+	display_hash(node->hash);
 	printf("\n");
 }
 
@@ -120,7 +138,7 @@ ring_list_cmp(const void *a1, const void *a2)
 {
 	const struct ring_node *n1 = a1, *n2 = a2;
 
-	return (memcmp(n1->md5, n2->md5, MD5_DIGEST_LENGTH));
+	return (HASH_CMP(n1->hash, n2->hash));
 }
 
 void
@@ -188,9 +206,9 @@ ring_list_update(node_list_t *src, int flag)
 		if (ring_list.nodes[i].address == NULL ||
 			ring_list.nodes[i].name == NULL)
 			log_fatal("ring_list_update: no memory");
-		MD5((unsigned char *)ring_list.nodes[i].name,
+		HASH((unsigned char *)ring_list.nodes[i].name,
 			strlen(ring_list.nodes[i].name),
-			ring_list.nodes[i].md5);
+			ring_list.nodes[i].hash);
 	}
 	qsort(ring_list.nodes, ring_list.n, sizeof(ring_list.nodes[0]),
 		ring_list_cmp);
@@ -238,21 +256,19 @@ ring_list_remove(char *host)
 int
 ring_list_is_in_charge(const char *key, int key_size)
 {
-	uint8_t md5[MD5_DIGEST_LENGTH];
+	HASH_T hash;
 	int r = 1;
 
-	MD5((const unsigned char *)key, key_size, md5);
+	HASH((const unsigned char *)key, key_size, hash);
 	ABT_mutex_lock(ring_list_mutex);
 	if (ring_list_self_index > 0)
-		r = (memcmp(&ring_list.nodes[ring_list_self_index - 1].md5, md5,
-			MD5_DIGEST_LENGTH) < 0 &&
-			memcmp(md5, &ring_list.nodes[ring_list_self_index].md5,
-				MD5_DIGEST_LENGTH) <= 0);
+		r = (HASH_CMP(ring_list.nodes[ring_list_self_index - 1].hash,
+				hash) < 0 && HASH_CMP(hash,
+				ring_list.nodes[ring_list_self_index].hash)
+					<= 0);
 	else if (ring_list_self_index == 0)
-		r = (memcmp(&ring_list.nodes[ring_list.n - 1].md5, md5,
-			MD5_DIGEST_LENGTH) < 0 ||
-			memcmp(md5, &ring_list.nodes[0].md5,
-				MD5_DIGEST_LENGTH) <= 0);
+		r = (HASH_CMP(ring_list.nodes[ring_list.n - 1].hash, hash)
+			< 0 || HASH_CMP(hash, ring_list.nodes[0].hash) <= 0);
 	ABT_mutex_unlock(ring_list_mutex);
 	return (r);
 }
@@ -260,15 +276,14 @@ ring_list_is_in_charge(const char *key, int key_size)
 static char *
 ring_list_lookup_linear(const char *key, int key_size)
 {
-	uint8_t md5[MD5_DIGEST_LENGTH];
+	HASH_T hash;
 	char *r;
 	int i;
 
-	MD5((const unsigned char *)key, key_size, md5);
+	HASH((const unsigned char *)key, key_size, hash);
 	ABT_mutex_lock(ring_list_mutex);
 	for (i = 0; i < ring_list.n; ++i)
-		if (memcmp(&ring_list.nodes[i].md5, md5, MD5_DIGEST_LENGTH)
-		    >= 0)
+		if (HASH_CMP(ring_list.nodes[i].hash, hash) >= 0)
 			break;
 	if (i == ring_list.n)
 		i = 0;
@@ -278,32 +293,31 @@ ring_list_lookup_linear(const char *key, int key_size)
 }
 
 static char *
-ring_list_lookup_internal(uint8_t md5[], int low, int hi)
+ring_list_lookup_internal(HASH_T hash, int low, int hi)
 {
 	int mid = (low + hi) / 2;
 
 	if (hi - low == 1)
 		return (strdup(ring_list.nodes[hi].address));
-	if (memcmp(&ring_list.nodes[mid].md5, md5, MD5_DIGEST_LENGTH) < 0)
-		return (ring_list_lookup_internal(md5, mid, hi));
+	if (HASH_CMP(ring_list.nodes[mid].hash, hash) < 0)
+		return (ring_list_lookup_internal(hash, mid, hi));
 	else
-		return (ring_list_lookup_internal(md5, low, mid));
+		return (ring_list_lookup_internal(hash, low, mid));
 }
 
 static char *
 ring_list_lookup_binary(const char *key, int key_size)
 {
-	uint8_t md5[MD5_DIGEST_LENGTH];
+	HASH_T hash;
 	char *r;
 
-	MD5((const unsigned char *)key, key_size, md5);
+	HASH((const unsigned char *)key, key_size, hash);
 	ABT_mutex_lock(ring_list_mutex);
-	if (memcmp(&ring_list.nodes[0].md5, md5, MD5_DIGEST_LENGTH) >= 0 ||
-		memcmp(&ring_list.nodes[ring_list.n - 1].md5, md5,
-			MD5_DIGEST_LENGTH) < 0) {
+	if (HASH_CMP(ring_list.nodes[0].hash, hash) >= 0 ||
+		HASH_CMP(ring_list.nodes[ring_list.n - 1].hash, hash) < 0) {
 		r = strdup(ring_list.nodes[0].address);
 	} else
-		r = ring_list_lookup_internal(md5, 0, ring_list.n - 1);
+		r = ring_list_lookup_internal(hash, 0, ring_list.n - 1);
 	ABT_mutex_unlock(ring_list_mutex);
 	return (r);
 }

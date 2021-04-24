@@ -64,6 +64,16 @@ if test x$with_pmemkv != xno; then
   PKG_CHECK_MODULES([LIBPMEMKV], [libpmemkv])
 fi
 
+AC_MSG_CHECKING([digest-murmur3])
+AC_ARG_WITH([digest-murmur3],
+  [AS_HELP_STRING([--with-digest-murmur3],
+    [use murmur3 digest @<:@default=no@:>@])],
+  [], [with_digest_murmur3=no])
+AC_MSG_RESULT([$with_digest_murmur3])
+if test x$with_digest_murmur3 != xno; then
+  AC_DEFINE([USE_DIGEST_MURMUR3], [1], [Use murmur3 digest])
+fi
+
 # Checks for header files.
 AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h stddef.h stdlib.h string.h syslog.h unistd.h])
 
