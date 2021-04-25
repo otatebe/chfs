@@ -11,8 +11,10 @@ DBSIZE=$((256 * 1024 * 1024))
 LOG_DIR=$HOME
 IFACE=default
 VNAME=default
-CHFSD=chfsd
+CHFSD="env LD_LIBRARY_PATH=$LD_LIBRARY_PATH $(which chfsd)"
 DEVDAX=false
+NO_SERVER=true
+SUDO=
 
 program=$(basename $0)
 
@@ -25,7 +27,7 @@ usage() {
 	[ "X$*" = X ] || echo >&2 $program: $*
 	echo >&2 "usage: $program [-h hostfile] [-c scratch_dir] [-D] [-m mount_point]"
 	echo >&2 "		[-p proto] [-s db_size] [-N vname] [-I interface]"
-	echo >&2 "		[-C socket#] [-L log_dir] [-S server] [-O options]"
+	echo >&2 "		[-C socket#] [-L log_dir] [-A] [-O options]"
 	echo >&2 "		start | stop | status | kill | clean"
 	exit 1
 }
@@ -33,9 +35,10 @@ usage() {
 while [ $# -gt 0 ]; do
 	case $1 in
 	    start|stop|status|kill|clean) mode=$1 ;;
+	    -A) NO_SERVER=false ;;
 	    -c) shift; DBDIR=$1 ;;
 	    -C) shift; CPUSOCKET=$1 ;;
-	    -D) DEVDAX=true ;;
+	    -D) DEVDAX=true; SUDO=sudo ;;
 	    -h) shift; HOSTFILE=$1 ;;
 	    -I) shift; IFACE=$1 ;;
 	    -L) shift; LOG_DIR=$1 ;;
@@ -44,7 +47,6 @@ while [ $# -gt 0 ]; do
 	    -O) shift; OPTIONS="$1" ;;
 	    -p) shift; PROTO=$1 ;;
 	    -s) shift; DBSIZE=$1 ;;
-	    -S) shift; SERVER=$1 ;;
 	    -*) echo "unknown option: $1"
 		usage ;;
 	    *) usage ;;
@@ -59,10 +61,12 @@ done
 [ -d "$LOG_DIR" ] || err $LOG_DIR: no such directory
 
 [ "$mode" = kill ] && PKILL_FLAG=-9 || PKILL_FLAG=
-[ "X$SERVER" = X ] && NO_SERVER=true || NO_SERVER=false
 [ "X$HOSTFILE" = X ] && HOSTS=localhost ||
 	HOSTS="$(sed -e 's/#.*//' -e '/^[ 	]*$/d' $HOSTFILE | awk '{ print $1 }')"
 [ "X$CPUSOCKET" = X ] && NUMACTL= || NUMACTL="numactl -N $CPUSOCKET"
+if ! $NO_SERVER; then
+	[ X"$CHFS_SERVER" = X ] && err CHFS_SERVER not specified
+fi
 
 CHFS_OPTIONS="-p $PROTO -s $DBSIZE $OPTIONS"
 SERVER_INFO_FILE=/tmp/server-info-file-$USER
@@ -70,10 +74,10 @@ SERVER_INFO_FILE=/tmp/server-info-file-$USER
 MAX_JOBS=8
 
 stop_chfs() {
-	rm -f $SERVER_INFO_FILE
+	$SUDO rm -f $SERVER_INFO_FILE
 
 	if [ "X$HOSTS" = Xlocalhost ]; then
-		pkill $PKILL_FLAG $CHFSD
+		$SUDO pkill $PKILL_FLAG chfsd
 		[ "$mode" = kill ] && pkill $PKILL_FLAG chfuse
 		if [ X"$MDIR" != X ]; then
 			fusermount -u "$MDIR"
@@ -83,7 +87,7 @@ stop_chfs() {
 	p=0
 	for host in $HOSTS
 	do
-		ssh $host pkill $PKILL_FLAG $CHFSD &
+		ssh $host $SUDO pkill $PKILL_FLAG chfsd &
 		[ "$mode" = kill ] && ssh $host pkill $PKILL_FLAG chfuse &
 		if [ X"$MDIR" != X ]; then
 			ssh $host fusermount -u "$MDIR" &
@@ -121,7 +125,7 @@ clean_chfs() {
 
 status_chfs() {
 	if ! $NO_SERVER; then
-		chlist "$SERVER"
+		chlist
 	elif [ -s $SERVER_INFO_FILE ]; then
 		chlist $(cat $SERVER_INFO_FILE)
 	else
@@ -130,14 +134,14 @@ status_chfs() {
 
 	if [ "X$HOSTS" = Xlocalhost ]; then
 		echo $(hostname -f)
-		ps -ef | grep $CHFSD | egrep -v grep
+		ps -ef | grep chfsd | egrep -v grep
 		ps -ef | grep chfuse | egrep -v grep
 		HOSTS=
 	fi
 	for host in $HOSTS
 	do
 		echo $host
-		ssh $host "ps -ef | grep $CHFSD | egrep -v grep"
+		ssh $host "ps -ef | grep chfsd | egrep -v grep"
 		ssh $host "ps -ef | grep chfuse | egrep -v grep"
 	done
 }
@@ -147,9 +151,9 @@ remove_file() {
 	f=$2
 
 	if [ "X$h" = Xlocalhost ]; then
-		rm -f $f
+		$SUDO rm -f $f
 	else
-		ssh $h rm -f $f
+		ssh $h $SUDO rm -f $f
 	fi
 }
 
@@ -197,9 +201,10 @@ do
 	if $DEVDAX; then COPT="-c $DBDIR"; else COPT="-c $DBDIR/$IFACE-$VNAME"; fi
 	LOPT="-l $LOG_DIR/$host-$IFACE-$VNAME"
 	if [ "X$host" = Xlocalhost ]; then
-		$NUMACTL $CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $NOPT "$1"
+		$SUDO $NUMACTL $CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $NOPT "$1"
 	else
-		ssh $host LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH\" PATH=\"$PATH\" $NUMACTL $CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $NOPT \"$1\"
+		ssh $host $SUDO mkdir -p $LOG_DIR
+		ssh $host LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH\" PATH=\"$PATH\" $SUDO $NUMACTL $CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $NOPT \"$1\"
 	fi
 	[ $? -eq 0 ] || continue
 	nservers=$((nservers + 1))
@@ -230,6 +235,7 @@ do
 		MAX_JOBS=$#
 	fi
 done
+if $NO_SERVER; then err no server executed; fi
 if [ X"$MDIR" != X ]; then
 	timeout=10
 	while [ $timeout -gt 0 -a $(chlist | wc -l) -lt $nservers ]; do
