@@ -133,6 +133,18 @@ ring_list_clear()
 	free(ring_list.nodes);
 }
 
+void
+ring_list_term()
+{
+	ring_list_clear();
+	ring_list.n = 0;
+	ring_list.nodes = NULL;
+	ring_list_self = NULL;
+	ring_list_self_index = -1;
+
+	ABT_mutex_free(&ring_list_mutex);
+}
+
 int
 ring_list_cmp(const void *a1, const void *a2)
 {

@@ -510,3 +510,9 @@ fs_client_init(margo_instance_id mid, int timeout)
 	env.unlink_all_rpc = MARGO_REGISTER(mid, "inode_unlink_chunk_all",
 		hg_string_t, int32_t, NULL);
 }
+
+void
+fs_client_term()
+{
+	margo_finalize(env.mid);
+}

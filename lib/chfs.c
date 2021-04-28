@@ -59,18 +59,34 @@ chfs_set_node_list_cache_timeout(int timeout)
 }
 
 static void
-init_fd_table()
+fd_table_init()
 {
 	int i;
 
 	chfs_fd_table_size = 100;
 	chfs_fd_table = malloc(sizeof(*chfs_fd_table) * chfs_fd_table_size);
 	if (chfs_fd_table == NULL)
-		log_fatal("init_fd_table: no memory");
+		log_fatal("fd_table_init: no memory");
 
 	for (i = 0; i < chfs_fd_table_size; ++i)
 		chfs_fd_table[i].path = NULL;
 	ABT_mutex_create(&chfs_fd_mutex);
+}
+
+static void
+fd_table_term()
+{
+	int i;
+
+	for (i = 0; i < chfs_fd_table_size; ++i) {
+		free(chfs_fd_table[i].path);
+		chfs_fd_table[i].path = NULL;
+	}
+	chfs_fd_table_size = 0;
+	free(chfs_fd_table);
+	chfs_fd_table = NULL;
+
+	ABT_mutex_free(&chfs_fd_mutex);
 }
 
 static char *
@@ -151,7 +167,7 @@ chfs_init(const char *server)
 	margo_addr_to_string(mid, chfs_client, &client_size, client_addr);
 	margo_addr_free(mid, client_addr);
 
-	init_fd_table();
+	fd_table_init();
 	chfs_uid = getuid();
 	chfs_gid = getgid();
 
@@ -166,6 +182,10 @@ chfs_init(const char *server)
 int
 chfs_term()
 {
+	fd_table_term();
+	fs_client_term();
+	ring_list_term();
+
 	return (0);
 }
 
