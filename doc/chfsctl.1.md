@@ -22,7 +22,7 @@ chfsctl - manage CHFS servers
 : specifies a hostfile.
 
 -m mount_directory
-: specifies a mount directory.
+: specifies a mount directory.  When chfsctl start is executed multiple times with -A option, -m option should be specified at the last execution of chfsctl start.
 
 -p protocol
 : specifies a protocol like sm, sockets, tcp, and verbs.  Default is sockets.
