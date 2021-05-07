@@ -121,6 +121,19 @@ ring_list_display()
 	ABT_mutex_unlock(ring_list_mutex);
 }
 
+void
+ring_list_csv()
+{
+	int i;
+
+	ABT_mutex_lock(ring_list_mutex);
+	for (i = 0; i < ring_list.n - 1; ++i)
+		printf("%s,", ring_list.nodes[i].address);
+	if (i < ring_list.n)
+		printf("%s\n", ring_list.nodes[i].address);
+	ABT_mutex_unlock(ring_list_mutex);
+}
+
 static void
 ring_list_clear()
 {

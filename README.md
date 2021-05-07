@@ -53,6 +53,7 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
 ## Environment variable
 
 - CHFS_SERVER - one of server addresses
+- CHFS_SERVERS - server addresses separated by ','
 - CHFS_CHUNK_SIZE - chunk size
 - CHFS_RDMA_THRESH - RDMA transfer is used when the size is larger than or equal to CHFS_RDMA_THRESH
 - CHFS_RPC_TIMEOUT_MSEC - RPC timeout in milliseconds
@@ -78,7 +79,7 @@ When you use pmemkv, the following environment variable is recommended to set to
 1. How to use
 
        % spack load mochi-margo
-       % mpirun -x PATH -x LD_LIBRARY_PATH -x CHFS_SERVER ior -a CHFS [--chfs.chunk_size=SIZE]
+       % mpirun -x PATH -x LD_LIBRARY_PATH -x CHFS_SERVERS ior -a CHFS [--chfs.chunk_size=SIZE]
 
 ## CHFS API
 

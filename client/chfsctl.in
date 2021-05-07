@@ -65,7 +65,7 @@ done
 	HOSTS="$(sed -e 's/#.*//' -e '/^[ 	]*$/d' $HOSTFILE | awk '{ print $1 }')"
 [ "X$CPUSOCKET" = X ] && NUMACTL= || NUMACTL="numactl -N $CPUSOCKET"
 if ! $NO_SERVER; then
-	[ X"$CHFS_SERVER" = X ] && err CHFS_SERVER not specified
+	[ X"$CHFS_SERVER" = X -a X"$CHFS_SERVERS" = X ] && err CHFS_SERVER not specified
 fi
 
 CHFS_OPTIONS="-p $PROTO -s $DBSIZE $OPTIONS"
@@ -236,12 +236,14 @@ do
 	fi
 done
 if $NO_SERVER; then err no server executed; fi
+timeout=10
+while [ $timeout -gt 0 -a $(chlist | wc -l) -lt $nservers ]; do
+	timeout=$((timeout - 1))
+	sleep 1;
+done
+echo "CHFS_SERVERS=\"$(chlist -c)\"; export CHFS_SERVERS"
+CHFS_SERVERS="$(chlist -c)"; export CHFS_SERVERS
 if [ X"$MDIR" != X ]; then
-	timeout=10
-	while [ $timeout -gt 0 -a $(chlist | wc -l) -lt $nservers ]; do
-		timeout=$((timeout - 1))
-		sleep 1;
-	done
 	if [ $(chlist | wc -l) -lt $nservers ]; then
 		echo >&2 "$program: timeout, $(chlist | wc -l) of $nservers servers are running.  you may need chmkdir $MDIR manually"
 	fi
@@ -255,7 +257,7 @@ if [ X"$MDIR" != X ]; then
 	for host in $HOSTS
 	do
 		ssh $host mkdir -p "$MDIR"
-		ssh $host LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH\" PATH=\"$PATH\" CHFS_SERVER=\"$CHFS_SERVER\" CHFS_LOG_PRIORITY=$CHFS_LOG_PRIORITY CHFS_CHUNK_SIZE=$CHFS_CHUNK_SIZE CHFS_RDMA_THRESH=$CHFS_RDMA_THRESH CHFS_RPC_TIMEOUT_MSEC=$CHFS_RPC_TIMEOUT_MSEC CHFS_NODE_LIST_CACHE_TIMEOUT=$CHFS_NODE_LIST_CACHE_TIMEOUT chfuse -o direct_io,modules=subdir,subdir="$MDIR" "$MDIR"
+		ssh $host LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH\" PATH=\"$PATH\" CHFS_SERVER=\"$CHFS_SERVER\" CHFS_SERVERS=\"$CHFS_SERVERS\" CHFS_LOG_PRIORITY=$CHFS_LOG_PRIORITY CHFS_CHUNK_SIZE=$CHFS_CHUNK_SIZE CHFS_RDMA_THRESH=$CHFS_RDMA_THRESH CHFS_RPC_TIMEOUT_MSEC=$CHFS_RPC_TIMEOUT_MSEC CHFS_NODE_LIST_CACHE_TIMEOUT=$CHFS_NODE_LIST_CACHE_TIMEOUT chfuse -o direct_io,modules=subdir,subdir="$MDIR" "$MDIR"
 	done
 fi
 }

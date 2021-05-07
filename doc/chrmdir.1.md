@@ -15,6 +15,9 @@ chrmdir - remove a directory in CHFS
 CHFS_SERVER
 : one of server addresses
 
+CHFS_SERVERS
+: server addresses separated by ','
+
 CHFS_RPC_TIMEOUT_MSEC
 : RPC timeout in milliseconds
 

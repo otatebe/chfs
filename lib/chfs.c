@@ -109,6 +109,33 @@ margo_protocol(const char *server)
 
 static time_t node_list_cache_time;
 
+static int
+parse_servers(char *arg, char ***servers)
+{
+	char **s, **s1, *t, *savep = NULL, *delim = ",";
+	int n = 10, i = 0;
+
+	s = malloc(sizeof(*s) * n);
+	if (s == NULL)
+		return (-1);
+	t = strtok_r(arg, delim, &savep);
+	while (t != NULL) {
+		if (i >= n) {
+			n *= 2;
+			s1 = realloc(s, sizeof(*s) * n);
+			if (s1 == NULL) {
+				free(s);
+				return (-1);
+			}
+			s = s1;
+		}
+		s[i++] = t;
+		t = strtok_r(NULL, delim, &savep);
+	}
+	*servers = s;
+	return (i);
+}
+
 #define IS_NULL_STRING(str) (str == NULL || str[0] == '\0')
 
 int
@@ -118,8 +145,8 @@ chfs_init(const char *server)
 	size_t client_size = sizeof(chfs_client);
 	hg_addr_t client_addr;
 	char *chunk_size, *rdma_thresh, *timeout, *proto;
-	char *log_priority;
-	int max_log_level;
+	char *log_priority, *servs, **servers;
+	int max_log_level, nservs;
 	hg_return_t ret;
 
 	log_priority = getenv("CHFS_LOG_PRIORITY");
@@ -129,6 +156,18 @@ chfs_init(const char *server)
 			log_error("%s: invalid log priority", log_priority);
 		else
 			log_set_priority_max_level(max_log_level);
+	}
+
+	if (IS_NULL_STRING(server)) {
+		servs = getenv("CHFS_SERVERS");
+		if (!IS_NULL_STRING(servs)) {
+			nservs = parse_servers(servs, &servers);
+			if (nservs > 0) {
+				srandom(getpid());
+				server = servers[random() % nservs];
+				free(servers);
+			}
+		}
 	}
 	if (IS_NULL_STRING(server))
 		server = getenv("CHFS_SERVER");

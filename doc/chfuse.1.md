@@ -13,11 +13,14 @@ chfuse - mount CHFS
 
 # CHFUSE OPTIONS
 \--server=CHFS_SERVER
-: specifies a CHFS server.  The server can be specified by the CHFS_SERVER environment variable.
+: specifies a CHFS server.  The server can be specified by the CHFS_SERVER or CHFS_SERVERS environment variable.
 
 # ENVIRONMENT
 CHFS_SERVER
 : one of server addresses
+
+CHFS_SERVERS
+: server addresses separated by ','
 
 CHFS_CHUNK_SIZE
 : chunk size.  Default is 4 KiB.

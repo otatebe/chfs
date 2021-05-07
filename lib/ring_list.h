@@ -3,6 +3,7 @@ struct node_list;
 void ring_list_init(char *self);
 void ring_list_term(void);
 void ring_list_display(void);
+void ring_list_csv(void);
 void ring_list_copy(struct node_list *list);
 void ring_list_copy_free(struct node_list *list);
 void ring_list_update(struct node_list *src, int flag);

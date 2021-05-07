@@ -12,12 +12,15 @@ chmkdir - create a directory in CHFS
 **chmkdir** creates a directory in CHFS.
 
 # OPTIONS
--m
+-m _mode_
 : specifies the mode
 
 # ENVIRONMENT
 CHFS_SERVER
 : one of server addresses
+
+CHFS_SERVERS
+: server addresses separated by ','
 
 CHFS_RPC_TIMEOUT_MSEC
 : RPC timeout in milliseconds
