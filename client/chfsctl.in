@@ -38,7 +38,9 @@ while [ $# -gt 0 ]; do
 	    -A) NO_SERVER=false ;;
 	    -c) shift; DBDIR=$1 ;;
 	    -C) shift; CPUSOCKET=$1 ;;
-	    -D) DEVDAX=true; SUDO=sudo ;;
+	    -D) DEVDAX=true
+		[ -w / ] || SUDO=sudo
+		;;
 	    -h) shift; HOSTFILE=$1 ;;
 	    -I) shift; IFACE=$1 ;;
 	    -L) shift; LOG_DIR=$1 ;;
