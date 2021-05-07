@@ -186,6 +186,7 @@ if ! $NO_SERVER; then
 	[ "X$SERVERS" = X ] && err chlist: no server
 	set $SERVERS
 	MAX_JOBS=$#
+	nservers=$#
 fi
 p=0
 for host in $HOSTS
@@ -223,7 +224,7 @@ do
 		SERVER=`cat_file $host $SERVER_INFO_FILE`
 		[ X"$SERVER" = X ] && err $CHFSD: no server info
 		NO_SERVER=false
-		echo "CHFS_SERVER=\"$SERVER\"; export CHFS_SERVER"
+		echo "CHFS_SERVER=\"$SERVER\"; export CHFS_SERVER;"
 		CHFS_SERVER="$SERVER"; export CHFS_SERVER
 	fi
 
@@ -241,7 +242,7 @@ while [ $timeout -gt 0 -a $(chlist | wc -l) -lt $nservers ]; do
 	timeout=$((timeout - 1))
 	sleep 1;
 done
-echo "CHFS_SERVERS=\"$(chlist -c)\"; export CHFS_SERVERS"
+echo "CHFS_SERVERS=\"$(chlist -c)\"; export CHFS_SERVERS;"
 CHFS_SERVERS="$(chlist -c)"; export CHFS_SERVERS
 if [ X"$MDIR" != X ]; then
 	if [ $(chlist | wc -l) -lt $nservers ]; then
