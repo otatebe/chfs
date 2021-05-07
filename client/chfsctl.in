@@ -127,7 +127,7 @@ status_chfs() {
 	if ! $NO_SERVER; then
 		chlist
 	elif [ -s $SERVER_INFO_FILE ]; then
-		chlist $(cat $SERVER_INFO_FILE)
+		chlist -s $(cat $SERVER_INFO_FILE)
 	else
 		echo >&2 no server info file
 	fi
