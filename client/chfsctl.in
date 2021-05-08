@@ -228,6 +228,7 @@ do
 		NO_SERVER=false
 		echo "CHFS_SERVER=\"$SERVER\"; export CHFS_SERVER;"
 		CHFS_SERVER="$SERVER"; export CHFS_SERVER
+		CHFS_SERVERS="$SERVER"; export CHFS_SERVERS
 	fi
 
 	shift
