@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/xattr.h>
@@ -6,7 +8,10 @@
 #include <dirent.h>
 #include <errno.h>
 #include <margo.h>
-#include "config.h"
+#ifdef USE_ABT_IO
+#include <abt-io.h>
+#endif
+
 #include "ring_types.h"
 #include "kv_types.h"
 #include "kv.h"
@@ -22,6 +27,30 @@ struct metadata {
 };
 
 static int msize = sizeof(struct metadata);
+#endif
+
+#ifdef USE_ABT_IO
+static abt_io_instance_id abtio;
+static __thread int __r;
+
+#define open(path, flags, mode) \
+	((__r = abt_io_open(abtio, path, flags, mode)) < 0 ? \
+	 (errno = -__r), -1 : __r)
+#define close(fd) abt_io_close(abtio, fd)
+#define write(fd, buf, count) \
+	((__r = abt_io_write(abtio, fd, buf, count)) < 0 ? \
+	 (errno = -__r), -1 : __r)
+#define read(fd, buf, count) \
+	((__r = abt_io_read(abtio, fd, buf, count)) < 0 ? \
+	 (errno = -__r), -1 : __r)
+#define pwrite(fd, buf, count, off) \
+	((__r = abt_io_pwrite(abtio, fd, buf, count, off)) < 0 ? \
+	 (errno = -__r), -1 : __r)
+#define pread(fd, buf, count, off) \
+	((__r = abt_io_pread(abtio, fd, buf, count, off)) < 0 ? \
+	 (errno = -__r), -1 : __r)
+#define unlink(path) \
+	((__r = abt_io_unlink(abtio, path)) < 0 ? (errno = -__r), -1 : __r)
 #endif
 
 static int
@@ -58,6 +87,11 @@ fs_inode_init(char *dir)
 	if (r == -1)
 		log_fatal("%s: %s", dir, strerror(errno));
 
+#ifdef ABT_IO
+	abtio = abt_io_init(2);
+	if (abtio == ABT_IO_INSTANCE_NULL)
+		log_fatal("abt_io_init failed, abort");
+#endif
 	log_info("fs_inode_init: path %s", dir);
 }
 
@@ -120,7 +154,7 @@ set_chunk_size(const char *path, size_t size)
 		log_error("%s: %s", diag, strerror(errno));
 	}
 #else
-	fd = open(path, O_WRONLY);
+	fd = open(path, O_WRONLY, 0);
 	if (fd == -1) {
 		r = -errno;
 		log_error("%s: %s", diag, strerror(errno));
@@ -158,7 +192,7 @@ get_chunk_size(const char *path, size_t *size)
 		log_info("%s: %s", diag, strerror(errno));
 	}
 #else
-	fd = open(path, O_RDONLY);
+	fd = open(path, O_RDONLY, 0);
 	if (fd == -1) {
 		r = -errno;
 		log_info("%s: %s", diag, strerror(errno));

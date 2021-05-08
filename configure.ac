@@ -64,6 +64,18 @@ if test x$with_pmemkv != xno; then
   PKG_CHECK_MODULES([LIBPMEMKV], [libpmemkv])
 fi
 
+AC_MSG_CHECKING([abt-io])
+AC_ARG_WITH([abt-io],
+  [AS_HELP_STRING([--with-abt-io],
+    [use abt-io @<:@default=no@:>@])],
+  [], [with_abt_io=no])
+AC_MSG_RESULT([$with_abt_io])
+AM_CONDITIONAL([USE_ABT_IO], [test x$with_abt_io != xno])
+if test x$with_abt_io != xno; then
+  AC_DEFINE([USE_ABT_IO], [1], [Use abt-io])
+  PKG_CHECK_MODULES([ABT_IO], [abt-io])
+fi
+
 AC_MSG_CHECKING([digest-murmur3])
 AC_ARG_WITH([digest-murmur3],
   [AS_HELP_STRING([--with-digest-murmur3],

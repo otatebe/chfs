@@ -12,11 +12,14 @@ else
 chfsd_SOURCES += fs_server_posix.c fs_posix.c
 endif
 
-LDADD = $(top_builddir)/lib/libchfs.la @MARGO_LIBS@ @OPENSSL_LIBS@
-if USE_PMEMKV
-LDADD += @LIBPMEMKV_LIBS@
-AM_CFLAGS = @LIBPMEMKV_CFLAGS@
-endif
-
 AM_CPPFLAGS = -Wall -pthread -I$(top_srcdir)/lib @MARGO_CFLAGS@ @OPENSSL_CFLAGS@
 AM_LDFLAGS = -pthread
+LDADD = $(top_builddir)/lib/libchfs.la @MARGO_LIBS@ @OPENSSL_LIBS@
+if USE_PMEMKV
+AM_CPPFLAGS += @LIBPMEMKV_CFLAGS@
+LDADD += @LIBPMEMKV_LIBS@
+endif
+if USE_ABT_IO
+AM_CPPFLAGS += @ABT_IO_CFLAGS@
+LDADD += @ABT_IO_LIBS@
+endif
