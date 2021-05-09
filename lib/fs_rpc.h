@@ -66,7 +66,8 @@ fs_client_init_more_internal(hg_id_t read_rdma_rpc, hg_id_t readdir_rpc,
 void fs_client_init(margo_instance_id mid, int timeout);
 void fs_client_term(void);
 void fs_server_init(margo_instance_id mid, char *db_dir, size_t db_size,
-	int timeout);
-void fs_server_init_more(margo_instance_id mid, char *db_dir, size_t db_size);
+	int timeout, int niothreads);
+void fs_server_init_more(margo_instance_id mid, char *db_dir, size_t db_size,
+	int niothreads);
 void fs_server_term(void);
 void fs_server_term_more(void);

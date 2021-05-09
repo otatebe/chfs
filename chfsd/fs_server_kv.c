@@ -28,7 +28,8 @@ DECLARE_MARGO_RPC_HANDLER(inode_unlink_chunk_all)
 static char *self;
 
 void
-fs_server_init_more(margo_instance_id mid, char *db_dir, size_t db_size)
+fs_server_init_more(margo_instance_id mid, char *db_dir, size_t db_size,
+	int niothreads)
 {
 	hg_id_t read_rdma_rpc = -1, readdir_rpc, unlink_all_rpc;
 

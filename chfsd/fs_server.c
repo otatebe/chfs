@@ -38,7 +38,8 @@ static void inode_remove(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(inode_remove)
 
 void
-fs_server_init(margo_instance_id mid, char *db_dir, size_t db_size, int timeout)
+fs_server_init(margo_instance_id mid, char *db_dir, size_t db_size, int timeout,
+	int niothreads)
 {
 	hg_id_t create_rpc, stat_rpc, remove_rpc;
 	hg_id_t write_rpc, write_rdma_rpc, read_rpc, read_rdma_rpc = -1;
@@ -62,7 +63,7 @@ fs_server_init(margo_instance_id mid, char *db_dir, size_t db_size, int timeout)
 
 	fs_client_init_internal(mid, timeout, create_rpc, stat_rpc, write_rpc,
 		write_rdma_rpc, read_rpc, read_rdma_rpc, remove_rpc);
-	fs_server_init_more(mid, db_dir, db_size);
+	fs_server_init_more(mid, db_dir, db_size, niothreads);
 
 	self = ring_get_self();
 }

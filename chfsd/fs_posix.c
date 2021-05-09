@@ -74,7 +74,7 @@ fs_err(int err)
 }
 
 void
-fs_inode_init(char *dir)
+fs_inode_init(char *dir, int niothreads)
 {
 	int r;
 
@@ -88,7 +88,7 @@ fs_inode_init(char *dir)
 		log_fatal("%s: %s", dir, strerror(errno));
 
 #ifdef USE_ABT_IO
-	abtio = abt_io_init(2);
+	abtio = abt_io_init(niothreads);
 	if (abtio == ABT_IO_INSTANCE_NULL)
 		log_fatal("abt_io_init failed, abort");
 #endif

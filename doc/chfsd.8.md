@@ -13,7 +13,7 @@ chfsd - CHFS server
 
 # OPTIONS
 -d
-: enables debug mode
+: enables debug mode.  In the debug mode, the server is executed in the foreground.
 
 -c db_dir
 : specifies a database directory or a DAX device.  If the directory does not exist, it will be created.
@@ -41,6 +41,9 @@ chfsd - CHFS server
 
 -T nthreads
 : specifies the number of threads of the chfsd.  Default is 5.
+
+-I niothreads
+: specifies the number of I/O threads of the chfsd.  This option is effective with ABT-IO.  Default is 2.
 
 -H heartbeat_interval
 : specifies the interval of heartbeat in second.  Default is 10 seconds.

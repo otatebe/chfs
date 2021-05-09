@@ -22,7 +22,8 @@ static void inode_unlink_chunk_all(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(inode_unlink_chunk_all)
 
 void
-fs_server_init_more(margo_instance_id mid, char *db_dir, size_t db_size)
+fs_server_init_more(margo_instance_id mid, char *db_dir, size_t db_size,
+	int niothreads)
 {
 	hg_id_t read_rdma_rpc = -1, readdir_rpc, unlink_all_rpc;
 
@@ -36,7 +37,7 @@ fs_server_init_more(margo_instance_id mid, char *db_dir, size_t db_size)
 
 	fs_client_init_more_internal(read_rdma_rpc, readdir_rpc,
 		unlink_all_rpc);
-	fs_inode_init(db_dir);
+	fs_inode_init(db_dir, niothreads);
 
 	self = ring_get_self();
 }

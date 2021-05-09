@@ -128,8 +128,8 @@ usage(char *prog_name)
 	fprintf(stderr, "Usage: %s [-d] [-c db_dir] [-s db_size] "
 		"[-p protocol] [-n name]\n\t[-h host[:port]/device] "
 		"[-l log_file] [-S server_info_file]\n\t[-t rpc_timeout_msec] "
-		"[-T nthreads] [-H heartbeat_interval]\n\t[-L log_priority] "
-		"[server]\n", prog_name);
+		"[-T nthreads] [-I niothreads]\n\t[-H heartbeat_interval] "
+		"[-L log_priority] [server]\n", prog_name);
 	exit(EXIT_FAILURE);
 }
 
@@ -146,12 +146,12 @@ main(int argc, char *argv[])
 	char *protocol = "sockets", info_string[PATH_MAX];
 	char *server_info_file = NULL, *virtual_name = NULL;
 	int opt, debug = 0, rpc_timeout_msec = 0, nthreads = 5;
-	int heartbeat_interval = 10, log_priority = -1;
+	int heartbeat_interval = 10, log_priority = -1, niothreads = 2;
 	char *prog_name;
 
 	prog_name = basename(argv[0]);
 
-	while ((opt = getopt(argc, argv, "c:dh:H:l:L:n:p:s:S:t:T:")) != -1) {
+	while ((opt = getopt(argc, argv, "c:dh:H:I:l:L:n:p:s:S:t:T:")) != -1) {
 		switch (opt) {
 		case 'c':
 			db_dir = optarg;
@@ -166,6 +166,9 @@ main(int argc, char *argv[])
 			break;
 		case 'H':
 			heartbeat_interval = atoi(optarg);
+			break;
+		case 'I':
+			niothreads = atoi(optarg);
 			break;
 		case 'l':
 			log_file = optarg;
@@ -258,7 +261,7 @@ main(int argc, char *argv[])
 			log_error("%s: %s", server_info_file, strerror(errno));
 	}
 
-	fs_server_init(mid, db_dir, db_size, rpc_timeout_msec);
+	fs_server_init(mid, db_dir, db_size, rpc_timeout_msec, niothreads);
 
 	ring_set_heartbeat_timeout(heartbeat_interval * 10);
 	log_debug("heartbeat interval: %d (timeout %d)",
