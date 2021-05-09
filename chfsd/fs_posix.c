@@ -87,7 +87,7 @@ fs_inode_init(char *dir)
 	if (r == -1)
 		log_fatal("%s: %s", dir, strerror(errno));
 
-#ifdef ABT_IO
+#ifdef USE_ABT_IO
 	abtio = abt_io_init(2);
 	if (abtio == ABT_IO_INSTANCE_NULL)
 		log_fatal("abt_io_init failed, abort");
