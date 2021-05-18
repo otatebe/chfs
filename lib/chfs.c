@@ -159,7 +159,7 @@ chfs_init(const char *server)
 	}
 
 	if (IS_NULL_STRING(server)) {
-		servs = getenv("CHFS_SERVERS");
+		servs = getenv("CHFS_SERVER");
 		if (!IS_NULL_STRING(servs)) {
 			nservs = parse_servers(servs, &servers);
 			if (nservs > 0) {
@@ -169,8 +169,6 @@ chfs_init(const char *server)
 			}
 		}
 	}
-	if (IS_NULL_STRING(server))
-		server = getenv("CHFS_SERVER");
 	if (IS_NULL_STRING(server))
 		log_fatal("chfs_init: no server");
 	log_info("chfs_init: server %s", server);

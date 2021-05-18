@@ -17,9 +17,6 @@ chmkdir - create a directory in CHFS
 
 # ENVIRONMENT
 CHFS_SERVER
-: one of server addresses
-
-CHFS_SERVERS
 : server addresses separated by ','
 
 CHFS_RPC_TIMEOUT_MSEC

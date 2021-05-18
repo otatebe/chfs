@@ -111,25 +111,29 @@ ring_list_display_node(struct ring_node *node)
 }
 
 void
-ring_list_display()
+ring_list_display(int n)
 {
 	int i;
 
 	ABT_mutex_lock(ring_list_mutex);
-	for (i = 0; i < ring_list.n; ++i)
+	if (n <= 0 || n > ring_list.n)
+		n = ring_list.n;
+	for (i = 0; i < n; ++i)
 		ring_list_display_node(&ring_list.nodes[i]);
 	ABT_mutex_unlock(ring_list_mutex);
 }
 
 void
-ring_list_csv()
+ring_list_csv(int n)
 {
 	int i;
 
 	ABT_mutex_lock(ring_list_mutex);
-	for (i = 0; i < ring_list.n - 1; ++i)
+	if (n <= 0 || n > ring_list.n)
+		n = ring_list.n;
+	for (i = 0; i < n - 1; ++i)
 		printf("%s,", ring_list.nodes[i].address);
-	if (i < ring_list.n)
+	if (i < n)
 		printf("%s\n", ring_list.nodes[i].address);
 	ABT_mutex_unlock(ring_list_mutex);
 }

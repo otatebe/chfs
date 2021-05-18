@@ -13,16 +13,16 @@ chlist - list CHFS servers
 
 # CHLIST OPTIONS
 -c
-: list servers in CHFS_SERVERS format.
+: list servers in CHFS_SERVER format.
+
+-n num_servers
+: specifies the number of servers to display.
 
 -s server
-: specifies a CHFS server.  The server can be specified by the CHFS_SERVER or CHFS_SERVERS environment variable.
+: specifies a CHFS server.  The server can be specified by the CHFS_SERVER environment variable.
 
 # ENVIRONMENT
 CHFS_SERVER
-: one of server addresses
-
-CHFS_SERVERS
 : server addresses separated by ','
 
 CHFS_RPC_TIMEOUT_MSEC

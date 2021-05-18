@@ -13,7 +13,7 @@ chfsctl - manage CHFS servers
 
 # OPTIONS
 -A
-: adds chfsd servers to an existing server pool.  CHFS_SERVER or CHFS_SERVERS should be defined.
+: adds chfsd servers to an existing server pool.  CHFS_SERVER should be defined.
 
 -c scratch_dir
 : specifies a scratch directory.  If the directory does not exist, it will be created.  Default is /tmp/$USER.
@@ -44,6 +44,9 @@ chfsctl - manage CHFS servers
 
 -L log_dir
 : specifies a log directory.  If the directory does not exist, it will be created.  Default is $HOME.
+
+-n num_servers
+: specifies the number of servers for CHFS_SERVER.
 
 -O options
 : specifies options for chfsd.
