@@ -46,7 +46,7 @@ chfsctl - manage CHFS servers
 : specifies a log directory.  If the directory does not exist, it will be created.  Default is $HOME.
 
 -n num_servers
-: specifies the number of servers for CHFS_SERVER.
+: specifies the maximum number of servers for CHFS_SERVER.  Default is 32.
 
 -O options
 : specifies options for chfsd.

@@ -15,7 +15,7 @@ CHFSD="env LD_LIBRARY_PATH=$LD_LIBRARY_PATH $(which chfsd)"
 DEVDAX=false
 NO_SERVER=true
 SUDO=
-NUM_SERVS=0
+NUM_SERVS=32
 
 program=$(basename $0)
 
