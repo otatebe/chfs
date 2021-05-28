@@ -15,14 +15,9 @@
 #ifdef USE_ZERO_COPY_READ_RDMA
 #include "fs_kv.h"
 
-static void inode_read_rdma(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(inode_read_rdma)
 #endif
-
-static void inode_readdir(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(inode_readdir)
-
-static void inode_unlink_chunk_all(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(inode_unlink_chunk_all)
 
 static char *self;

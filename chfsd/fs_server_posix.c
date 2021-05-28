@@ -15,10 +15,7 @@
 
 static char *self;
 
-static void inode_readdir(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(inode_readdir)
-
-static void inode_unlink_chunk_all(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(inode_unlink_chunk_all)
 
 void

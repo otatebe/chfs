@@ -16,22 +16,11 @@ static struct env {
 	hg_id_t election_rpc, coordinator_rpc;
 } env;
 
-static void join(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(join)
-
-static void set_next(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(set_next)
-
-static void set_prev(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(set_prev)
-
-static void list(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(list)
-
-static void election(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(election)
-
-static void coordinator(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(coordinator)
 
 static hg_return_t

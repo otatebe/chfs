@@ -11,7 +11,6 @@ static struct env {
 	hg_id_t node_list_rpc;
 } env;
 
-static void node_list(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(node_list)
 
 static hg_return_t

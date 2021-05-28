@@ -14,27 +14,14 @@
 
 static char *self;
 
-static void inode_create(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(inode_create)
-
-static void inode_stat(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(inode_stat)
-
-static void inode_write(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(inode_write)
-
-static void inode_write(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(inode_write_rdma)
-
-static void inode_read(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(inode_read)
-
 #ifndef USE_ZERO_COPY_READ_RDMA
-static void inode_read_rdma(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(inode_read_rdma)
 #endif
-
-static void inode_remove(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(inode_remove)
 
 void
