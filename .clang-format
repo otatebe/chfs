@@ -4,3 +4,4 @@ UseTab: Always
 BreakBeforeBraces: Linux
 AllowShortIfStatementsOnASingleLine: false
 IndentCaseLabels: false
+AlwaysBreakAfterDefinitionReturnType: true
