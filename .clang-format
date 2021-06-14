@@ -5,3 +5,4 @@ BreakBeforeBraces: Linux
 AllowShortIfStatementsOnASingleLine: false
 IndentCaseLabels: false
 AlwaysBreakAfterDefinitionReturnType: true
+SortIncludes: false
