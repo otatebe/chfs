@@ -9,9 +9,13 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
        % git clone https://github.com/spack/spack.git
        % . spack/share/spack/setup-env.sh
 
+   For details, see https://spack.readthedocs.io/
+
 1. Install Mochi-margo
 
        % spack install mochi-margo
+
+   For details, see https://mochi.readthedocs.io/
 
 1. (Optional) Install pmemkv
 
@@ -59,7 +63,7 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
 - CHFS_NODE_LIST_CACHE_TIMEOUT - node list cache timeout in seconds
 - CHFS_LOG_PRIORITY - maximum log priority to report
 
-When you use pmemkv, the following environment variable is recommended to set to touch every page of the persistent memory pool.
+When you use pmemkv, the following environment variable is recommended to set to touch every page of the persistent memory pool, while the start up time of chfsd becomes slow.
 
 - PMEMOBJ_CONF="prefault.at_open=1;prefault.at_create=1"
 
