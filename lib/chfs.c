@@ -138,6 +138,39 @@ parse_servers(char *arg, char ***servers)
 
 #define IS_NULL_STRING(str) (str == NULL || str[0] == '\0')
 
+static char *
+get_server()
+{
+	static char *servs = NULL, **servers = NULL;
+	static int index = -1, init_index, nservs = -1, err = 0;
+
+	if (err)
+		return (NULL);
+
+	if (servs == NULL)
+		servs = getenv("CHFS_SERVER");
+	if (IS_NULL_STRING(servs))
+		goto err;
+
+	if (servers == NULL)
+		nservs = parse_servers(servs, &servers);
+	if (nservs <= 0)
+		goto err;
+
+	if (index == -1) {
+		srandom(getpid());
+		init_index = index = random() % nservs;
+	} else {
+		index = (index + 1) % nservs;
+		if (index == init_index)
+			goto err;
+	}
+	return (servers[index]);
+ err:
+	err = 1;
+	return (NULL);
+}
+
 int
 chfs_init(const char *server)
 {
@@ -145,8 +178,8 @@ chfs_init(const char *server)
 	size_t client_size = sizeof(chfs_client);
 	hg_addr_t client_addr;
 	char *chunk_size, *rdma_thresh, *timeout, *proto;
-	char *log_priority, *servs, **servers;
-	int max_log_level, nservs;
+	char *log_priority;
+	int max_log_level;
 	hg_return_t ret;
 
 	log_priority = getenv("CHFS_LOG_PRIORITY");
@@ -158,17 +191,8 @@ chfs_init(const char *server)
 			log_set_priority_max_level(max_log_level);
 	}
 
-	if (IS_NULL_STRING(server)) {
-		servs = getenv("CHFS_SERVER");
-		if (!IS_NULL_STRING(servs)) {
-			nservs = parse_servers(servs, &servers);
-			if (nservs > 0) {
-				srandom(getpid());
-				server = servers[random() % nservs];
-				free(servers);
-			}
-		}
-	}
+	if (IS_NULL_STRING(server))
+		server = get_server();
 	if (IS_NULL_STRING(server))
 		log_fatal("chfs_init: no server");
 	log_info("chfs_init: server %s", server);
@@ -189,9 +213,16 @@ chfs_init(const char *server)
 	if (!IS_NULL_STRING(timeout))
 		chfs_set_node_list_cache_timeout(atoi(timeout));
 
-	proto = margo_protocol(server);
-	if (proto == NULL)
-		log_fatal("%s: no protocol", server);
+	while (server != NULL) {
+		proto = margo_protocol(server);
+		if (proto != NULL)
+			break;
+		log_notice("%s: no protocol", server);
+		server = get_server();
+	}
+	if (server == NULL)
+		log_fatal("chfs_init: no protocol");
+
 	mid = margo_init(proto, MARGO_CLIENT_MODE, 1, 0);
 	free(proto);
 	if (mid == MARGO_INSTANCE_NULL)
@@ -208,9 +239,15 @@ chfs_init(const char *server)
 	chfs_uid = getuid();
 	chfs_gid = getgid();
 
-	ret = ring_list_rpc_node_list(server);
-	if (ret != HG_SUCCESS)
-		log_fatal("%s: %s", server, HG_Error_to_string(ret));
+	while (server != NULL) {
+		ret = ring_list_rpc_node_list(server);
+		if (ret == HG_SUCCESS)
+			break;
+		log_notice("%s: %s", server, HG_Error_to_string(ret));
+		server = get_server();
+	}
+	if (server == NULL)
+		log_fatal("chfs_init: no server");
 	node_list_cache_time = time(NULL);
 
 	return (0);
