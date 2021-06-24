@@ -22,6 +22,8 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
        # apt install libpmemkv-dev
        # apt install libpmemobj-cpp-dev libmemkind-dev libtbb-dev
 
+   For details, see https://pmem.io/pmemkv/
+
 1. Install Fuse
 
        # apt install libfuse-dev
