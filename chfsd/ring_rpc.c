@@ -615,7 +615,7 @@ coordinator(hg_handle_t h)
 		}
 		ring_release_next();
 	}
-	ring_list_update(&in.list, 0);
+	ring_list_update(&in.list);
 
 	for (i = 0; i < in.list.n; ++i)
 		if (strcmp(self, in.list.s[i].address) == 0)

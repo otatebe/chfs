@@ -227,7 +227,7 @@ chfs_init(const char *server)
 	free(proto);
 	if (mid == MARGO_INSTANCE_NULL)
 		log_fatal("margo_init failed, abort");
-	ring_list_init(NULL);
+	ring_list_init(NULL, NULL);
 	ring_list_rpc_init(mid, chfs_rpc_timeout_msec);
 	fs_client_init(mid, chfs_rpc_timeout_msec);
 

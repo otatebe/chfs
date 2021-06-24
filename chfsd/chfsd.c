@@ -8,6 +8,7 @@
 #include <libgen.h>
 #include <errno.h>
 #include <margo.h>
+#include "config.h"
 #include "ring.h"
 #include "ring_types.h"
 #include "ring_rpc.h"
@@ -122,12 +123,45 @@ skip_space(char *s)
 	return (s);
 }
 
+static char *
+address_name_dup(char *address, char *name)
+{
+	int addrlen, namelen;
+	char *r;
+
+	if (address == NULL)
+		return (NULL);
+	addrlen = strlen(address);
+	if (name != NULL)
+		namelen = strlen(name);
+	else
+		namelen = 0;
+#ifndef ENABLE_HASH_PORT
+	int s = addrlen - 1;
+	while (s >= 0 && address[s] != ':')
+		--s;
+	if (s >= 0 && address[s] == ':')
+		addrlen = s;
+#endif
+	r = malloc(addrlen + 1 + namelen + 1);
+	if (r == NULL)
+		return (r);
+	memcpy(r, address, addrlen);
+	r[addrlen++] = ':';
+	if (namelen > 0)
+		strcpy(r + addrlen, name);
+	else
+		r[addrlen] = '\0';
+	return (r);
+}
+
 void
 usage(char *prog_name)
 {
 	fprintf(stderr, "Usage: %s [-d] [-c db_dir] [-s db_size] "
-		"[-p protocol] [-n name]\n\t[-h host[:port]/device] "
-		"[-l log_file] [-S server_info_file]\n\t[-t rpc_timeout_msec] "
+		"[-p protocol] [-h host[:port]/device]\n\t"
+		"[-n vname] [-N virtual_name] [-l log_file] "
+		"[-S server_info_file]\n\t[-t rpc_timeout_msec] "
 		"[-T nthreads] [-I niothreads]\n\t[-H heartbeat_interval] "
 		"[-L log_priority] [server]\n", prog_name);
 	exit(EXIT_FAILURE);
@@ -144,14 +178,16 @@ main(int argc, char *argv[])
 	margo_instance_id mid;
 	char *db_dir = "/tmp", *hostname = NULL, *log_file = NULL;
 	char *protocol = "sockets", info_string[PATH_MAX];
-	char *server_info_file = NULL, *virtual_name = NULL;
+	char *server_info_file = NULL, *vname = NULL, *virtual_name = NULL;
+	char *addr_name = NULL;
 	int opt, debug = 0, rpc_timeout_msec = 0, nthreads = 5;
 	int heartbeat_interval = 10, log_priority = -1, niothreads = 2;
 	char *prog_name;
 
 	prog_name = basename(argv[0]);
 
-	while ((opt = getopt(argc, argv, "c:dh:H:I:l:L:n:p:s:S:t:T:")) != -1) {
+	while ((opt = getopt(argc, argv, "c:dh:H:I:l:L:n:N:p:s:S:t:T:"))
+			!= -1) {
 		switch (opt) {
 		case 'c':
 			db_dir = optarg;
@@ -179,6 +215,9 @@ main(int argc, char *argv[])
 				log_error("%s: invalid log priority", optarg);
 			break;
 		case 'n':
+			vname = optarg;
+			break;
+		case 'N':
 			virtual_name = optarg;
 			break;
 		case 'p':
@@ -245,9 +284,12 @@ main(int argc, char *argv[])
 	margo_addr_free(mid, my_address);
 	log_info("Server running at address %s", addr_str);
 
+	if (virtual_name == NULL)
+		virtual_name = addr_name = address_name_dup(addr_str, vname);
 	ring_init(addr_str, virtual_name);
+	ring_list_init(addr_str, virtual_name);
+	free(addr_name);
 	self = ring_get_self();
-	ring_list_init(addr_str);
 	ring_rpc_init(mid, rpc_timeout_msec);
 	ring_list_rpc_init(mid, rpc_timeout_msec);
 

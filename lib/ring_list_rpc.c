@@ -55,7 +55,7 @@ ring_list_rpc_node_list(const char *server)
 		log_error("%s (get_output): %s", diag, HG_Error_to_string(ret));
 		goto err;
 	}
-	ring_list_update(&out, 1);
+	ring_list_update(&out);
 	ret = margo_free_output(h, &out);
 err:
 	ret2 = margo_destroy(h);

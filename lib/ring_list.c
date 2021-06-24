@@ -41,40 +41,8 @@ static char *ring_list_self;
 static int ring_list_self_index;
 static ABT_mutex ring_list_mutex;
 
-static char *
-address_name_dup(char *address, char *name)
-{
-	int addrlen, namelen;
-	char *r;
-
-	if (address == NULL)
-		return (NULL);
-	addrlen = strlen(address);
-	if (name != NULL)
-		namelen = strlen(name);
-	else
-		namelen = 0;
-#ifndef ENABLE_HASH_PORT
-	int s = addrlen - 1;
-	while (s >= 0 && address[s] != ':')
-		--s;
-	if (s >= 0 && address[s] == ':')
-		addrlen = s;
-#endif
-	r = malloc(addrlen + 1 + namelen + 1);
-	if (r == NULL)
-		return (r);
-	memcpy(r, address, addrlen);
-	r[addrlen++] = ':';
-	if (namelen > 0)
-		strcpy(r + addrlen, name);
-	else
-		r[addrlen] = '\0';
-	return (r);
-}
-
 void
-ring_list_init(char *self)
+ring_list_init(char *self, char *name)
 {
 	node_list_t n;
 	static const char diag[] = "ring_list_init";
@@ -92,8 +60,8 @@ ring_list_init(char *self)
 	if (n.s == NULL)
 		log_fatal("%s: no memory", diag);
 	n.s[0].address = self;
-	n.s[0].name = NULL;
-	ring_list_update(&n, 0);
+	n.s[0].name = name;
+	ring_list_update(&n);
 	free(n.s);
 
 	ring_list_self = strdup(self);
@@ -203,11 +171,8 @@ ring_list_copy_free(node_list_t *list)
 	free(list->s);
 }
 
-/*
- * flag: 0 - server, 1 - client
- */
 void
-ring_list_update(node_list_t *src, int flag)
+ring_list_update(node_list_t *src)
 {
 	int i;
 
@@ -223,15 +188,7 @@ ring_list_update(node_list_t *src, int flag)
 	}
 	for (i = 0; i < src->n; ++i) {
 		ring_list.nodes[i].address = strdup(src->s[i].address);
-		if (flag == 0)
-			/* for server */
-			ring_list.nodes[i].name =
-				address_name_dup(src->s[i].address,
-					src->s[i].name);
-		else
-			/* for client */
-			ring_list.nodes[i].name =
-				strdup(src->s[i].name);
+		ring_list.nodes[i].name = strdup(src->s[i].name);
 		if (ring_list.nodes[i].address == NULL ||
 			ring_list.nodes[i].name == NULL)
 			log_fatal("ring_list_update: no memory");
