@@ -71,10 +71,10 @@ fs_inode_create_data(char *key, size_t key_size, int32_t uid, int32_t gid,
 
 int
 fs_inode_create(char *key, size_t key_size, int32_t uid, int32_t gid,
-	mode_t mode, size_t chunk_size)
+	mode_t mode, size_t chunk_size, const char *buf, size_t size)
 {
 	return (fs_inode_create_data(key, key_size, uid, gid, mode, chunk_size,
-			NULL, 0, 0));
+			buf, size, 0));
 }
 
 int

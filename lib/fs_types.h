@@ -19,6 +19,7 @@ MERCURY_GEN_STRUCT_PROC(fs_stat_t,
 
 MERCURY_GEN_PROC(fs_create_in_t,
 	((kv_byte_t)(key))\
+	((kv_byte_t)(value))\
 	((uint32_t)(mode))\
 	((uint32_t)(uid))((uint32_t)(gid))\
 	((uint64_t)(chunk_size)))

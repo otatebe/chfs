@@ -386,12 +386,12 @@ release_fd_table(struct chfs_fd_table *tab)
 }
 
 static hg_return_t
-chfs_rpc_inode_create(void *key, size_t key_size, mode_t mode, int chunk_size,
-	int *errp)
+chfs_rpc_inode_create_data(void *key, size_t key_size, mode_t mode,
+	int chunk_size, const void *buf, size_t size, int *errp)
 {
 	char *target;
 	hg_return_t ret;
-	static const char diag[] = "rpc_inode_create";
+	static const char diag[] = "rpc_inode_create_data";
 
 	while (1) {
 		target = ring_list_lookup(key, key_size);
@@ -400,7 +400,7 @@ chfs_rpc_inode_create(void *key, size_t key_size, mode_t mode, int chunk_size,
 			return (HG_PROTOCOL_ERROR);
 		}
 		ret = fs_rpc_inode_create(target, key, key_size, chfs_uid,
-			chfs_gid, mode, chunk_size, errp);
+			chfs_gid, mode, chunk_size, buf, size, errp);
 		if (ret == HG_SUCCESS)
 			break;
 
@@ -411,6 +411,14 @@ chfs_rpc_inode_create(void *key, size_t key_size, mode_t mode, int chunk_size,
 	}
 	free(target);
 	return (ret);
+}
+
+static hg_return_t
+chfs_rpc_inode_create(void *key, size_t key_size, mode_t mode, int chunk_size,
+	int *errp)
+{
+	return (chfs_rpc_inode_create_data(key, key_size, mode, chunk_size,
+			NULL, 0, errp));
 }
 
 static hg_return_t
@@ -789,6 +797,47 @@ chfs_rmdir(const char *path)
 	return (0);
 }
 
+int
+chfs_symlink(const char *target, const char *path)
+{
+	char *p;
+	mode_t mode;
+	hg_return_t ret;
+	int err, len;
+
+	if (target == NULL)
+		return (-1);
+	p = canonical_path(path);
+	if (p == NULL)
+		return (-1);
+	mode = 0777 | S_IFLNK;
+	len = strlen(target);
+	/* chunk_size is len but symlink(2) requires the last null byte */
+	ret = chfs_rpc_inode_create_data(p, strlen(p) + 1, mode, len, target,
+		len + 1, &err);
+	free(p);
+	if (ret != HG_SUCCESS || err != KV_SUCCESS)
+		return (-1);
+	return (0);
+}
+
+int
+chfs_readlink(const char *path, char *buf, size_t size)
+{
+	char *p = canonical_path(path);
+	size_t s = size;
+	hg_return_t ret;
+	int err;
+
+	if (p == NULL)
+		return (-1);
+	ret = chfs_rpc_inode_read(p, strlen(p) + 1, buf, &s, 0, &err);
+	free(p);
+	if (ret != HG_SUCCESS || err != KV_SUCCESS)
+		return (-1);
+	return (s);
+}
+
 static void
 root_stat(struct stat *st)
 {
@@ -825,7 +874,7 @@ chfs_stat(const char *path, struct stat *st)
 	st->st_mtim = sb.mtime;
 	st->st_ctim = sb.ctime;
 	st->st_nlink = 1;
-	if (S_ISDIR(sb.mode) || sb.size < sb.chunk_size) {
+	if (!S_ISREG(sb.mode) || sb.size < sb.chunk_size) {
 		free(p);
 		return (0);
 	}

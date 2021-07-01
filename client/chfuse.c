@@ -171,6 +171,31 @@ chfuse_utimens(const char *path, const struct timespec tv[2])
 	return (0);
 }
 
+static int
+chfuse_symlink(const char *target, const char *path)
+{
+	int ret;
+
+	printf("symlink: %s %s\n", target, path);
+	ret = chfs_symlink(target, path);
+	if (ret == -1)
+		return (-EIO);
+	return (ret);
+}
+
+static int
+chfuse_readlink(const char *path, char *buf, size_t size)
+{
+	int ret;
+
+	printf("readlink: %s\n", path);
+	ret = chfs_readlink(path, buf, size);
+	if (ret == -1)
+		return (-EIO);
+	buf[ret] = '\0';
+	return (0);
+}
+
 static const struct fuse_operations chfs_op = {
 	.init		= chfuse_init,
 	.getattr	= chfuse_getattr,
@@ -185,6 +210,8 @@ static const struct fuse_operations chfs_op = {
 	.rmdir		= chfuse_rmdir,
 	.readdir	= chfuse_readdir,
 	.utimens	= chfuse_utimens,
+	.symlink	= chfuse_symlink,
+	.readlink	= chfuse_readlink,
 };
 
 static struct options {

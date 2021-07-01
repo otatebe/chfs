@@ -80,12 +80,13 @@ inode_create(hg_handle_t h)
 	target = ring_list_lookup(in.key.v, in.key.s);
 	if (target && strcmp(self, target) != 0) {
 		ret = fs_rpc_inode_create(target, in.key.v, in.key.s, in.uid,
-			in.gid, in.mode, in.chunk_size, &err);
+			in.gid, in.mode, in.chunk_size, in.value.v, in.value.s,
+			&err);
 		if (ret != HG_SUCCESS)
 			err = KV_ERR_SERVER_DOWN;
 	} else
 		err = fs_inode_create(in.key.v, in.key.s, in.uid, in.gid,
-			in.mode, in.chunk_size);
+			in.mode, in.chunk_size, in.value.v, in.value.s);
 	free(target);
 
 	ret = margo_free_input(h, &in);

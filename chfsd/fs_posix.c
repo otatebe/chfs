@@ -247,7 +247,7 @@ fs_open(const char *path, int flags, mode_t mode, size_t *chunk_size)
 
 int
 fs_inode_create(char *key, size_t key_size, int32_t uid, int32_t gid,
-	mode_t mode, size_t chunk_size)
+	mode_t mode, size_t chunk_size, const char *buf, size_t size)
 {
 	char *p = key_to_path(key, key_size);
 	int r;
@@ -260,6 +260,10 @@ fs_inode_create(char *key, size_t key_size, int32_t uid, int32_t gid,
 			close(r);
 	} else if (S_ISDIR(mode)) {
 		r = mkdir_p(p, mode);
+		if (r == -1)
+			r = -errno;
+	} else if (S_ISLNK(mode)) {
+		r = symlink(buf, p);
 		if (r == -1)
 			r = -errno;
 	} else
@@ -279,7 +283,7 @@ fs_inode_stat(char *key, size_t key_size, struct fs_stat *st)
 	static const char diag[] = "fs_inode_stat";
 
 	log_debug("%s: %s", diag, p);
-	r = stat(p, &sb);
+	r = lstat(p, &sb);
 	if (r == -1) {
 		r = -errno;
 		goto err;
@@ -296,7 +300,8 @@ fs_inode_stat(char *key, size_t key_size, struct fs_stat *st)
 	st->gid = sb.st_gid;
 	st->size = sb.st_size;
 #ifndef USE_XATTR
-	st->size -= msize;
+	if (S_ISREG(sb.st_mode))
+		st->size -= msize;
 #endif
 	st->mtime = sb.st_mtim;
 	st->ctime = sb.st_ctim;
@@ -348,14 +353,23 @@ fs_inode_read(char *key, size_t key_size, void *buf, size_t *size,
 	off_t offset)
 {
 	char *p = key_to_path(key, key_size);
+	struct stat sb;
 	size_t ss, chunk_size;
 	int fd, r;
 	static const char diag[] = "fs_inode_read";
 
 	log_debug("%s: %s size %ld offset %ld", diag, p, *size, offset);
+	if (lstat(p, &sb) == 0 && S_ISLNK(sb.st_mode)) {
+		r = readlink(p, buf, *size);
+		if (r == -1)
+			r = -errno;
+		else
+			*size = r;
+		goto done;
+	}
 	fd = r = fs_open(p, O_RDONLY, 0644, &chunk_size);
 	if (r < 0)
-		goto err;
+		goto done;
 	log_debug("%s: chunk_size %ld", diag, chunk_size);
 
 	ss = *size;
@@ -373,9 +387,9 @@ fs_inode_read(char *key, size_t key_size, void *buf, size_t *size,
 	}
 	close(fd);
 	if (r < 0)
-		goto err;
+		goto done;
 	*size = r;
-err:
+done:
 	log_debug("%s: ret %d", diag, r);
 	return (fs_err(r));
 }
@@ -453,17 +467,13 @@ fs_inode_remove(char *key, size_t key_size)
 	int r;
 
 	log_debug("fs_inode_remove: %s", p);
-	if (stat(p, &sb) == -1)
+	if (lstat(p, &sb) == -1)
 		return (fs_err(-errno));
 
-	if (S_ISREG(sb.st_mode))
-		r = unlink(p);
-	else if (S_ISDIR(sb.st_mode))
+	if (S_ISDIR(sb.st_mode))
 		r = rmdir_r(p);
-	else {
-		r = -1;
-		errno = ENOTSUP;
-	}
+	else
+		r = unlink(p);
 	if (r == -1)
 		r = -errno;
 	return (fs_err(r));
