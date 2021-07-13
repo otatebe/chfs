@@ -52,6 +52,12 @@ join_ring(margo_instance_id mid, const char *server)
 }
 
 static void
+move_all_data()
+{
+	inode_copy_all();
+}
+
+static void
 leave()
 {
 	char *next, *prev;
@@ -63,19 +69,38 @@ leave()
 	if (strcmp(self, next) == 0)
 		goto leave;
 	prev = ring_get_prev();
+	if (strcmp(self, prev) == 0)
+		goto leave_prev;
 	ret = ring_rpc_set_next(prev, next);
 	if (ret != HG_SUCCESS) {
 		prev = ring_get_prev_prev();
-		ring_rpc_set_next(prev, next);
 		prev_prev = 1;
+		if (strcmp(self, prev) == 0)
+			goto leave_prev;
+		ret = ring_rpc_set_next(prev, next);
+		if (ret != HG_SUCCESS)
+			log_error("leave (set_next): %s",
+					HG_Error_to_string(ret));
 	}
 	ret = ring_rpc_set_prev(next, prev);
 	if (ret != HG_SUCCESS) {
 		next = ring_get_next_next();
-		ring_rpc_set_prev(next, prev);
-		ring_rpc_set_next(prev, next);
+		if (strcmp(self, next)) {
+			ret = ring_rpc_set_prev(next, prev);
+			if (ret != HG_SUCCESS)
+				log_error("leave (set_prev): %s",
+						HG_Error_to_string(ret));
+			ret = ring_rpc_set_next(prev, next);
+			if (ret != HG_SUCCESS)
+				log_error("leave (set_next): %s",
+						HG_Error_to_string(ret));
+		}
 		ring_release_next_next();
 	}
+	ring_list_remove(self);
+	if (ret == HG_SUCCESS)
+		move_all_data();
+leave_prev:
 	ring_release_prev();
 	if (prev_prev == 1)
 		ring_release_prev_prev();

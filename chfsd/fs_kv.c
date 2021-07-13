@@ -9,11 +9,11 @@
 #include "fs_kv.h"
 
 static struct inode *
-create_inode(uint32_t uid, uint32_t gid, uint32_t mode, size_t chunk_size,
+create_inode_all(uint32_t uid, uint32_t gid, uint32_t mode, size_t chunk_size,
+	struct timespec *mtime, struct timespec *ctime,
 	const void *buf, size_t size, off_t offset)
 {
 	struct inode *inode;
-	struct timespec ts;
 
 	if (offset > chunk_size)
 		return (NULL);
@@ -35,8 +35,8 @@ create_inode(uint32_t uid, uint32_t gid, uint32_t mode, size_t chunk_size,
 	inode->msize = fs_msize;
 	inode->size = offset + size;
 	inode->chunk_size = chunk_size;
-	clock_gettime(CLOCK_REALTIME_COARSE, &ts);
-	inode->mtime = inode->ctime = ts;
+	inode->mtime = *mtime;
+	inode->ctime = *ctime;
 	if (buf) {
 		void *base = (void *)inode + fs_msize;
 
@@ -47,8 +47,43 @@ create_inode(uint32_t uid, uint32_t gid, uint32_t mode, size_t chunk_size,
 			memset(base + offset + size, 0,
 				chunk_size - offset - size);
 	}
-
 	return (inode);
+}
+
+static struct inode *
+create_inode(uint32_t uid, uint32_t gid, uint32_t mode, size_t chunk_size,
+	const void *buf, size_t size, off_t offset)
+{
+	struct timespec ts;
+
+	clock_gettime(CLOCK_REALTIME_COARSE, &ts);
+	return (create_inode_all(uid, gid, mode, chunk_size, &ts, &ts,
+			buf, size, offset));
+}
+
+static struct inode *
+create_inode_stat(struct fs_stat *st, const void *buf, size_t size)
+{
+	return (create_inode_all(st->uid, st->gid, st->mode, st->chunk_size,
+			&st->mtime, &st->ctime, buf, size, 0));
+}
+
+int
+fs_inode_create_stat(char *key, size_t key_size, struct fs_stat *st,
+	const void *buf, size_t size)
+{
+	struct inode *inode;
+	int r;
+	static const char diag[] = "fs_inode_create_stat";
+
+	inode = create_inode_stat(st, buf, size);
+	if (inode == NULL)
+		return (KV_ERR_NO_MEMORY);
+	r = kv_put(key, key_size, inode, fs_msize + st->chunk_size);
+	free(inode);
+	if (r != KV_SUCCESS)
+		log_error("%s: %s", diag, kv_err_string(r));
+	return (r);
 }
 
 static int
@@ -71,7 +106,7 @@ fs_inode_create_data(char *key, size_t key_size, int32_t uid, int32_t gid,
 
 int
 fs_inode_create(char *key, size_t key_size, int32_t uid, int32_t gid,
-	mode_t mode, size_t chunk_size, const char *buf, size_t size)
+	mode_t mode, size_t chunk_size, const void *buf, size_t size)
 {
 	return (fs_inode_create_data(key, key_size, uid, gid, mode, chunk_size,
 			buf, size, 0));

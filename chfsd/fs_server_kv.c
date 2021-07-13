@@ -280,7 +280,7 @@ free_input:
 }
 DEFINE_MARGO_RPC_HANDLER(inode_readdir)
 
-struct fs_unlink_arg {
+struct fs_name_arg {
 	char *path;
 	int n, size;
 	struct {
@@ -290,7 +290,7 @@ struct fs_unlink_arg {
 };
 
 static void
-free_fs_unlink_arg(struct fs_unlink_arg *a)
+free_fs_name_arg(struct fs_name_arg *a)
 {
 	int i;
 
@@ -300,7 +300,7 @@ free_fs_unlink_arg(struct fs_unlink_arg *a)
 }
 
 static void
-fs_add_name(const char *key, size_t ksize, struct fs_unlink_arg *a)
+fs_add_name(const char *key, size_t ksize, struct fs_name_arg *a)
 {
 	void *tli;
 	static const char diag[] = "fs_add_name";
@@ -324,11 +324,11 @@ fs_add_name(const char *key, size_t ksize, struct fs_unlink_arg *a)
 	++a->n;
 }
 
-int
+static int
 fs_unlink_chunk_all_cb(const char *key, size_t key_size, const char *value,
 	size_t value_size, void *arg)
 {
-	struct fs_unlink_arg *a = arg;
+	struct fs_name_arg *a = arg;
 
 	if (strcmp(a->path, key) == 0)
 		fs_add_name(key, key_size, a);
@@ -338,7 +338,7 @@ fs_unlink_chunk_all_cb(const char *key, size_t key_size, const char *value,
 static void
 inode_unlink_chunk_all(hg_handle_t h)
 {
-	struct fs_unlink_arg a;
+	struct fs_name_arg a;
 	hg_return_t ret;
 	int i, err;
 	static const char diag[] = "inode_unlink_chunk_all RPC";
@@ -364,7 +364,7 @@ free_input:
 	ret = margo_free_input(h, &a.path);
 	if (ret != HG_SUCCESS)
 		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
-	free_fs_unlink_arg(&a);
+	free_fs_name_arg(&a);
 
 	err = 0;
 	ret = margo_respond(h, &err);
@@ -376,3 +376,39 @@ free_input:
 		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
 }
 DEFINE_MARGO_RPC_HANDLER(inode_unlink_chunk_all)
+
+#ifdef USE_ZERO_COPY_READ_RDMA
+static int
+copy_all_cb(const char *key, size_t key_size, const char *value,
+	size_t value_size, void *arg)
+{
+	char *target, *v = (char *)value;
+	struct fs_stat sb;
+	int ret, err;
+
+	err = fs_inode_stat((void *)key, key_size, &sb);
+	if (err == KV_SUCCESS) {
+		target = ring_list_lookup(key, key_size);
+		ret = fs_rpc_inode_copy_rdma(target, (void *)key, key_size,
+			self, &sb, v + fs_msize, sb.size, &err);
+		if (ret != HG_SUCCESS) {
+			log_error("copy_all_cb (copy_rdma): %s",
+					HG_Error_to_string(ret));
+			err = KV_ERR_SERVER_DOWN;
+		}
+		free(target);
+	}
+	if (err == KV_SUCCESS)
+		log_debug("copy_all_cb: %s (%ld)", key, key_size);
+	else
+		log_error("copy_all_cb: %s (%ld): %s", key, key_size,
+				kv_err_string(err));
+	return (0);
+}
+
+void
+inode_copy_all(void)
+{
+	kv_get_all_cb(copy_all_cb, NULL);
+}
+#endif

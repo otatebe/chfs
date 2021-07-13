@@ -27,6 +27,8 @@ struct metadata {
 };
 
 static int msize = sizeof(struct metadata);
+#else
+static int msize = 0;
 #endif
 
 #ifdef USE_ABT_IO
@@ -247,17 +249,26 @@ fs_open(const char *path, int flags, mode_t mode, size_t *chunk_size)
 
 int
 fs_inode_create(char *key, size_t key_size, int32_t uid, int32_t gid,
-	mode_t mode, size_t chunk_size, const char *buf, size_t size)
+	mode_t mode, size_t chunk_size, const void *buf, size_t size)
 {
 	char *p = key_to_path(key, key_size);
-	int r;
+	int r, fd;
 	static const char diag[] = "fs_inode_create";
 
 	log_debug("%s: %s mode %o chunk_size %ld", diag, p, mode, chunk_size);
 	if (S_ISREG(mode)) {
-		r = fs_open(p, O_CREAT|O_WRONLY|O_TRUNC, mode, &chunk_size);
-		if (r >= 0)
-			close(r);
+		fd = r = fs_open(p, O_CREAT|O_WRONLY|O_TRUNC, mode,
+			&chunk_size);
+		if (fd >= 0) {
+			if (buf && size > 0) {
+				if (size > chunk_size)
+					size = chunk_size;
+				r = pwrite(fd, buf, size, msize);
+				if (r == -1)
+					r = -errno;
+			}
+			close(fd);
+		}
 	} else if (S_ISDIR(mode)) {
 		r = mkdir_p(p, mode);
 		if (r == -1)
@@ -272,6 +283,23 @@ fs_inode_create(char *key, size_t key_size, int32_t uid, int32_t gid,
 		log_error("%s: %s", diag, strerror(-r));
 
 	return (fs_err(r));
+}
+
+int
+fs_inode_create_stat(char *key, size_t key_size, struct fs_stat *st,
+	const void *buf, size_t size)
+{
+	char *p = key_to_path(key, key_size);
+	struct timespec times[2];
+	int r;
+
+	r = fs_inode_create(key, key_size, st->uid, st->gid, st->mode,
+		st->chunk_size, buf, size);
+	if (r == KV_SUCCESS) {
+		times[0] = times[1] = st->mtime;
+		utimensat(AT_FDCWD, p, times, AT_SYMLINK_NOFOLLOW);
+	}
+	return (r);
 }
 
 int
@@ -299,10 +327,8 @@ fs_inode_stat(char *key, size_t key_size, struct fs_stat *st)
 	st->uid = sb.st_uid;
 	st->gid = sb.st_gid;
 	st->size = sb.st_size;
-#ifndef USE_XATTR
 	if (S_ISREG(sb.st_mode))
 		st->size -= msize;
-#endif
 	st->mtime = sb.st_mtim;
 	st->ctime = sb.st_ctim;
 err:
@@ -329,10 +355,7 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 	}
 	fd = r = fs_open(p, O_WRONLY, mode, &chunk_size);
 	if (fd >= 0) {
-#ifndef USE_XATTR
-		offset += msize;
-#endif
-		r = pwrite(fd, buf, ss, offset);
+		r = pwrite(fd, buf, ss, offset + msize);
 		if (r == -1)
 			r = -errno;
 		close(fd);
@@ -375,13 +398,10 @@ fs_inode_read(char *key, size_t key_size, void *buf, size_t *size,
 	ss = *size;
 	if (ss + offset > chunk_size)
 		ss = chunk_size - offset;
-#ifndef USE_XATTR
-	offset += msize;
-#endif
 	if (ss <= 0)
 		r = 0;
 	else {
-		r = pread(fd, buf, ss, offset);
+		r = pread(fd, buf, ss, offset + msize);
 		if (r == -1)
 			r = -errno;
 	}

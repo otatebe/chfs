@@ -22,13 +22,14 @@ DECLARE_MARGO_RPC_HANDLER(inode_read)
 #ifndef USE_ZERO_COPY_READ_RDMA
 DECLARE_MARGO_RPC_HANDLER(inode_read_rdma)
 #endif
+DECLARE_MARGO_RPC_HANDLER(inode_copy_rdma)
 DECLARE_MARGO_RPC_HANDLER(inode_remove)
 
 void
 fs_server_init(margo_instance_id mid, char *db_dir, size_t db_size, int timeout,
 	int niothreads)
 {
-	hg_id_t create_rpc, stat_rpc, remove_rpc;
+	hg_id_t create_rpc, stat_rpc, remove_rpc, copy_rdma_rpc;
 	hg_id_t write_rpc, write_rdma_rpc, read_rpc, read_rdma_rpc = -1;
 
 	create_rpc = MARGO_REGISTER(mid, "inode_create", fs_create_in_t,
@@ -45,11 +46,14 @@ fs_server_init(margo_instance_id mid, char *db_dir, size_t db_size, int timeout,
 	read_rdma_rpc = MARGO_REGISTER(mid, "inode_read_rdma", kv_put_rdma_in_t,
 		kv_get_rdma_out_t, inode_read_rdma);
 #endif
+	copy_rdma_rpc = MARGO_REGISTER(mid, "inode_copy_rdma",
+		fs_copy_rdma_in_t, int32_t, inode_copy_rdma);
 	remove_rpc = MARGO_REGISTER(mid, "inode_remove", kv_byte_t, int32_t,
 		inode_remove);
 
 	fs_client_init_internal(mid, timeout, create_rpc, stat_rpc, write_rpc,
-		write_rdma_rpc, read_rpc, read_rdma_rpc, remove_rpc);
+		write_rdma_rpc, read_rpc, read_rdma_rpc, copy_rdma_rpc,
+		remove_rpc);
 	fs_server_init_more(mid, db_dir, db_size, niothreads);
 
 	self = ring_get_self();
@@ -455,6 +459,100 @@ DEFINE_MARGO_RPC_HANDLER(inode_read_rdma)
 #endif
 
 static void
+inode_copy_rdma(hg_handle_t h)
+{
+	hg_return_t ret;
+	fs_copy_rdma_in_t in;
+	int32_t out = KV_SUCCESS;
+	char *target;
+	margo_instance_id mid = margo_hg_handle_get_instance(h);
+	hg_addr_t client_addr;
+	hg_bulk_t bulk;
+	void *buf;
+	static const char diag[] = "inode_copy_rdma RPC";
+
+	ret = margo_get_input(h, &in);
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		return;
+	}
+	log_debug("%s: key=%s", diag, (char *)in.key.v);
+
+	ret = margo_addr_lookup(mid, in.client, &client_addr);
+	if (ret != HG_SUCCESS) {
+		log_error("%s (lookup): %s", diag, HG_Error_to_string(ret));
+		out = KV_ERR_LOOKUP;
+		goto free_input;
+	}
+
+	if (in.flag == 0) {
+		/* may fowared RPC */
+		target = ring_list_lookup(in.key.v, in.key.s);
+		if (target && strcmp(self, target) != 0) {
+			ret = fs_rpc_inode_copy_rdma_bulk(target,
+				in.key.v, in.key.s, in.client, &in.stat,
+				in.value, in.value_size, &out);
+			if (ret != HG_SUCCESS) {
+				log_error("%s (rpc_copy_rdma_bulk): %s", diag,
+					HG_Error_to_string(ret));
+				out = KV_ERR_SERVER_DOWN;
+			}
+			free(target);
+			goto free_addr;
+		}
+		free(target);
+	}
+
+	buf = malloc(in.value_size);
+	if (buf == NULL) {
+		log_error("%s: no memory", diag);
+		out = KV_ERR_NO_MEMORY;
+		goto free_addr;
+	}
+	ret = margo_bulk_create(mid, 1, &buf, &in.value_size,
+		HG_BULK_WRITE_ONLY, &bulk);
+	if (ret != HG_SUCCESS) {
+		log_error("%s (bulk_create): %s", diag,
+			HG_Error_to_string(ret));
+		out = KV_ERR_BULK_CREATE;
+		goto free_buf;
+	}
+	ret = margo_bulk_transfer(mid, HG_BULK_PULL, client_addr,
+		in.value, 0, bulk, 0, in.value_size);
+	if (ret != HG_SUCCESS) {
+		log_error("%s (bulk_transfer): %s", diag,
+			HG_Error_to_string(ret));
+		out = KV_ERR_BULK_TRANSFER;
+	}
+	ret = margo_bulk_free(bulk);
+	if (ret != HG_SUCCESS)
+		log_error("%s (bulk_free): %s", diag, HG_Error_to_string(ret));
+	if (out == KV_SUCCESS)
+		out = fs_inode_create_stat(in.key.v, in.key.s, &in.stat,
+			buf, in.value_size);
+free_buf:
+	free(buf);
+
+free_addr:
+	margo_addr_free(mid, client_addr);
+free_input:
+	ret = margo_free_input(h, &in);
+	if (ret != HG_SUCCESS)
+		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
+
+	ret = margo_respond(h, &out);
+	if (ret != HG_SUCCESS)
+		log_error("%s (respond) %s", diag, HG_Error_to_string(ret));
+	ret = margo_destroy(h);
+	if (ret != HG_SUCCESS)
+		log_error("%s (destroy) %s", diag, HG_Error_to_string(ret));
+
+	if (out == KV_ERR_SERVER_DOWN)
+		ring_start_election();
+}
+DEFINE_MARGO_RPC_HANDLER(inode_copy_rdma)
+
+static void
 inode_remove(hg_handle_t h)
 {
 	hg_return_t ret;
@@ -494,3 +592,10 @@ inode_remove(hg_handle_t h)
 		ring_start_election();
 }
 DEFINE_MARGO_RPC_HANDLER(inode_remove)
+
+#ifndef USE_ZERO_COPY_READ_RDMA
+void
+inode_copy_all(void)
+{
+}
+#endif
