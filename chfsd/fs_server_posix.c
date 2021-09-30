@@ -1,4 +1,5 @@
 #include <dirent.h>
+#include <stdlib.h>
 #include <margo.h>
 #include "config.h"
 #include "ring.h"

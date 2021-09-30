@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <margo.h>
 #include "ring_types.h"
 #include "ring_list.h"

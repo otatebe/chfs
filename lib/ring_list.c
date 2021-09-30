@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <margo.h>
 #include <openssl/md5.h>
 #include "config.h"

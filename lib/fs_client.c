@@ -1,4 +1,5 @@
 #include <sys/stat.h>
+#include <stdlib.h>
 #include <margo.h>
 #include "ring_types.h"
 #include "kv_types.h"
