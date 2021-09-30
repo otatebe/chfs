@@ -40,9 +40,7 @@ while [ $# -gt 0 ]; do
 	    -A) NO_SERVER=false ;;
 	    -c) shift; DBDIR=$1 ;;
 	    -C) shift; CPUSOCKET=$1 ;;
-	    -D) DEVDAX=true
-		[ -w / ] || SUDO=sudo
-		;;
+	    -D) DEVDAX=true ;;
 	    -h) shift; HOSTFILE=$1 ;;
 	    -I) shift; IFACE=$1 ;;
 	    -L) shift; LOG_DIR=$1 ;;
@@ -66,6 +64,9 @@ done
 [ -d "$LOG_DIR" ] || err $LOG_DIR: no such directory
 
 [ "$mode" = kill ] && PKILL_FLAG=-9 || PKILL_FLAG=
+if $DEVDAX; then
+	[ -w $DBDIR ] || SUDO=sudo
+fi
 [ "X$HOSTFILE" = X ] && HOSTS=localhost ||
 	HOSTS="$(sed -e 's/#.*//' -e '/^[ 	]*$/d' $HOSTFILE | awk '{ print $1 }')"
 [ "X$CPUSOCKET" = X ] && NUMACTL= || NUMACTL="numactl -N $CPUSOCKET"
