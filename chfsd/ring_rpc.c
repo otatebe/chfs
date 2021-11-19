@@ -579,7 +579,7 @@ void
 ring_wait_coordinator_rpc()
 {
 	while (!coordinator_rpc_done)
-		sleep(1);
+		margo_thread_sleep(env.mid, 1000.0);
 }
 
 static void

@@ -344,7 +344,7 @@ main(int argc, char *argv[])
 			ring_heartbeat();
 		} else if (ring_heartbeat_is_timeout())
 			ring_start_election();
-		sleep(heartbeat_interval);
+		margo_thread_sleep(mid, 1000.0 * heartbeat_interval);
 	}
 	margo_wait_for_finalize(mid);
 
