@@ -51,6 +51,11 @@ static __thread int __r;
 #define pread(fd, buf, count, off) \
 	((__r = abt_io_pread(abtio, fd, buf, count, off)) < 0 ? \
 	 (errno = -__r), -1 : __r)
+#ifdef HAVE_ABT_IO_TRUNCATE
+#define truncate(path, len) \
+	((__r = abt_io_truncate(abtio, path, len)) < 0 ? \
+	 (errno = -__r), -1 : __r)
+#endif
 #define unlink(path) \
 	((__r = abt_io_unlink(abtio, path)) < 0 ? (errno = -__r), -1 : __r)
 #endif
@@ -477,6 +482,19 @@ rmdir_r(const char *dir)
 	if (r == 0)
 		r = rmdir(dir);
 	return (r);
+}
+
+int
+fs_inode_truncate(char *key, size_t key_size, off_t len)
+{
+	char *p = key_to_path(key, key_size);
+	int r;
+
+	log_debug("fs_inode_truncate: %s len %ld", p, len);
+	r = truncate(p, len + msize);
+	if (r == -1)
+		r = -errno;
+	return (fs_err(r));
 }
 
 int

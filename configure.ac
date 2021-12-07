@@ -74,6 +74,7 @@ AM_CONDITIONAL([USE_ABT_IO], [test x$with_abt_io != xno])
 if test x$with_abt_io != xno; then
   AC_DEFINE([USE_ABT_IO], [1], [Use abt-io])
   PKG_CHECK_MODULES([ABT_IO], [abt-io])
+  AC_CHECK_FUNCS([abt_io_truncate])
 fi
 
 AC_MSG_CHECKING([digest-murmur3])

@@ -488,6 +488,32 @@ chfs_rpc_inode_read(void *key, size_t key_size, void *buf, size_t *size,
 }
 
 static hg_return_t
+chfs_rpc_truncate(void *key, size_t key_size, off_t len, int *errp)
+{
+	char *target;
+	hg_return_t ret;
+	static const char diag[] = "rpc_inode_truncate";
+
+	while (1) {
+		target = ring_list_lookup(key, key_size);
+		if (target == NULL) {
+			log_error("%s: no server", diag);
+			return (HG_PROTOCOL_ERROR);
+		}
+		ret = fs_rpc_inode_truncate(target, key, key_size, len, errp);
+		if (ret == HG_SUCCESS)
+			break;
+
+		log_notice("%s: remove %s due to %s", diag, target,
+			HG_Error_to_string(ret));
+		ring_list_remove(target);
+		free(target);
+	}
+	free(target);
+	return (ret);
+}
+
+static hg_return_t
 chfs_rpc_remove(void *key, size_t key_size, int *errp)
 {
 	char *target;
@@ -901,6 +927,46 @@ chfs_stat(const char *path, struct stat *st)
 			break;
 		}
 		i *= 2;
+	}
+	free(p);
+	return (0);
+}
+
+int
+chfs_truncate(const char *path, off_t len)
+{
+	char *p = canonical_path(path);
+	struct fs_stat sb;
+	size_t psize, index, local_len;
+	void *pi;
+	hg_return_t ret;
+	int err, i;
+
+	if (p == NULL)
+		return (-1);
+	ret = chfs_rpc_inode_stat(p, strlen(p) + 1, &sb, &err);
+	if (ret != HG_SUCCESS || err != KV_SUCCESS || !S_ISREG(sb.mode)) {
+		free(p);
+		return (-1);
+	}
+	index = len / sb.chunk_size;
+	local_len = len % sb.chunk_size;
+
+	pi = path_index(p, index, &psize);
+	ret = chfs_rpc_truncate(pi, psize, local_len, &err);
+	free(pi);
+	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
+		free(p);
+		return (-1);
+	}
+	for (i = index + 1;; ++i) {
+		pi = path_index(p, i, &psize);
+		if (pi == NULL)
+			break;
+		ret = chfs_rpc_remove(pi, psize, &err);
+		free(pi);
+		if (ret != HG_SUCCESS || err != KV_SUCCESS)
+			break;
 	}
 	free(p);
 	return (0);

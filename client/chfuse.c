@@ -79,6 +79,18 @@ chfuse_release(const char *path, struct fuse_file_info *fi)
 }
 
 static int
+chfuse_truncate(const char *path, off_t size)
+{
+	int ret;
+
+	printf("truncate: path %s size %ld\n", path, size);
+	ret = chfs_truncate(path, size);
+	if (ret == -1)
+		return (-EIO);
+	return (ret);
+}
+
+static int
 chfuse_write(const char *path, const char *buf, size_t size,
        off_t offset, struct fuse_file_info *fi)
 {
@@ -202,6 +214,7 @@ static const struct fuse_operations chfs_op = {
 	.create		= chfuse_create,
 	.open		= chfuse_open,
 	.release	= chfuse_release,
+	.truncate	= chfuse_truncate,
 	.write		= chfuse_write,
 	.read		= chfuse_read,
 	.fsync		= chfuse_fsync,

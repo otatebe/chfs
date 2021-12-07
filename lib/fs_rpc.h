@@ -49,6 +49,10 @@ fs_rpc_inode_copy_rdma(const char *server, void *key, size_t key_size,
 	char *client, struct fs_stat *st, void *buf, hg_size_t size, int *errp);
 
 hg_return_t
+fs_rpc_inode_truncate(const char *server, void *key, size_t key_size,
+	off_t len, int *errp);
+
+hg_return_t
 fs_rpc_inode_remove(const char *server, void *key, size_t key_size, int *errp);
 
 hg_return_t
@@ -67,7 +71,7 @@ void
 fs_client_init_internal(margo_instance_id mid, int timeout,
 	hg_id_t create_rpc, hg_id_t stat_rpc, hg_id_t write_rpc,
 	hg_id_t write_rdma_rpc, hg_id_t read_rpc, hg_id_t read_rdma_rpc,
-	hg_id_t copy_rpc, hg_id_t remove_rpc);
+	hg_id_t copy_rpc, hg_id_t truncate_rpc, hg_id_t remove_rpc);
 
 void
 fs_client_init_more_internal(hg_id_t read_rdma_rpc, hg_id_t readdir_rpc,

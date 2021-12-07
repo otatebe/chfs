@@ -188,6 +188,34 @@ fs_inode_read(char *key, size_t key_size, void *buf, size_t *size,
 }
 
 int
+fs_inode_truncate(char *key, size_t key_size, off_t len)
+{
+	struct inode inode;
+	size_t s = fs_msize, ss;
+	int r;
+	static const char diag[] = "fs_inode_truncate";
+
+	r = kv_pget(key, key_size, 0, &inode, &s);
+	if (r != KV_SUCCESS) {
+		log_error("%s: %s", diag, kv_err_string(r));
+		return (r);
+	}
+	if (inode.chunk_size < len || len < 0) {
+		r = KV_ERR_OUT_OF_RANGE;
+		log_error("%s: %s", diag, kv_err_string(r));
+		return (r);
+	}
+	s = len;
+	ss = sizeof(s);
+	if (inode.size != s)
+		r = kv_update(key, key_size,
+			offsetof(struct inode, size), &s, &ss);
+	if (r != KV_SUCCESS)
+		log_error("%s: %s", diag, kv_err_string(r));
+	return (r);
+}
+
+int
 fs_inode_remove(char *key, size_t key_size)
 {
 	return (kv_remove(key, key_size));

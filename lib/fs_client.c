@@ -14,7 +14,7 @@ static struct env {
 	hg_id_t create_rpc, stat_rpc;
 	hg_id_t write_rpc, read_rpc, write_rdma_rpc, read_rdma_rpc;
 	hg_id_t copy_rdma_rpc;
-	hg_id_t remove_rpc, readdir_rpc, unlink_all_rpc;
+	hg_id_t truncate_rpc, remove_rpc, readdir_rpc, unlink_all_rpc;
 } env;
 
 static hg_return_t
@@ -411,6 +411,42 @@ fs_rpc_inode_copy_rdma(const char *server, void *key, size_t key_size,
 }
 
 hg_return_t
+fs_rpc_inode_truncate(const char *server, void *key, size_t key_size,
+	off_t len, int *errp)
+{
+	hg_handle_t h;
+	hg_return_t ret, ret2;
+	fs_truncate_in_t in;
+	int32_t err;
+	static const char diag[] = "fs_rpc_inode_truncate";
+
+	ret = create_rpc_handle(server, env.truncate_rpc, &h, diag);
+	if (ret != HG_SUCCESS)
+		return (ret);
+
+	in.key.v = key;
+	in.key.s = key_size;
+	in.len = len;
+	ret = margo_forward_timed(h, &in, fs_rpc_timeout_msec);
+	if (ret != HG_SUCCESS) {
+		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
+		goto err;
+	}
+	ret = margo_get_output(h, &err);
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_output): %s", diag, HG_Error_to_string(ret));
+		goto err;
+	}
+	*errp = err;
+	ret = margo_free_output(h, &err);
+err:
+	ret2 = margo_destroy(h);
+	if (ret == HG_SUCCESS)
+		ret = ret2;
+	return (ret);
+}
+
+hg_return_t
 fs_rpc_inode_remove(const char *server, void *key, size_t key_size, int *errp)
 {
 	hg_handle_t h;
@@ -533,7 +569,7 @@ void
 fs_client_init_internal(margo_instance_id mid, int timeout,
 	hg_id_t create_rpc, hg_id_t stat_rpc, hg_id_t write_rpc,
 	hg_id_t write_rdma_rpc, hg_id_t read_rpc, hg_id_t read_rdma_rpc,
-	hg_id_t copy_rdma_rpc, hg_id_t remove_rpc)
+	hg_id_t copy_rdma_rpc, hg_id_t truncate_rpc, hg_id_t remove_rpc)
 {
 	env.mid = mid;
 	fs_rpc_timeout_msec = timeout;
@@ -544,6 +580,7 @@ fs_client_init_internal(margo_instance_id mid, int timeout,
 	env.read_rpc = read_rpc;
 	env.read_rdma_rpc = read_rdma_rpc;
 	env.copy_rdma_rpc = copy_rdma_rpc;
+	env.truncate_rpc = truncate_rpc;
 	env.remove_rpc = remove_rpc;
 }
 
@@ -576,6 +613,8 @@ fs_client_init(margo_instance_id mid, int timeout)
 		kv_put_rdma_in_t, kv_get_rdma_out_t, NULL);
 	env.copy_rdma_rpc = MARGO_REGISTER(mid, "inode_copy_rdma",
 		fs_copy_rdma_in_t, int32_t, NULL);
+	env.truncate_rpc = MARGO_REGISTER(mid, "inode_truncate",
+		fs_truncate_in_t, int32_t, NULL);
 	env.remove_rpc = MARGO_REGISTER(mid, "inode_remove", kv_byte_t,
 		int32_t, NULL);
 	env.readdir_rpc = MARGO_REGISTER(mid, "inode_readdir", hg_string_t,

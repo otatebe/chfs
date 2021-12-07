@@ -54,6 +54,10 @@ MERCURY_GEN_PROC(fs_copy_rdma_in_t,
 	((hg_size_t)(value_size))\
 	((int32_t)(flag)))
 
+MERCURY_GEN_PROC(fs_truncate_in_t,
+	((kv_byte_t)(key))\
+	((hg_size_t)(len)))
+
 MERCURY_GEN_PROC(fs_file_info_t, ((hg_string_t)(name))((fs_stat_t)(sb)))
 
 typedef struct {

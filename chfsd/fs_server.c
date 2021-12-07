@@ -24,6 +24,7 @@ DECLARE_MARGO_RPC_HANDLER(inode_read)
 DECLARE_MARGO_RPC_HANDLER(inode_read_rdma)
 #endif
 DECLARE_MARGO_RPC_HANDLER(inode_copy_rdma)
+DECLARE_MARGO_RPC_HANDLER(inode_truncate)
 DECLARE_MARGO_RPC_HANDLER(inode_remove)
 
 void
@@ -32,6 +33,7 @@ fs_server_init(margo_instance_id mid, char *db_dir, size_t db_size, int timeout,
 {
 	hg_id_t create_rpc, stat_rpc, remove_rpc, copy_rdma_rpc;
 	hg_id_t write_rpc, write_rdma_rpc, read_rpc, read_rdma_rpc = -1;
+	hg_id_t truncate_rpc;
 
 	create_rpc = MARGO_REGISTER(mid, "inode_create", fs_create_in_t,
 		int32_t, inode_create);
@@ -49,12 +51,14 @@ fs_server_init(margo_instance_id mid, char *db_dir, size_t db_size, int timeout,
 #endif
 	copy_rdma_rpc = MARGO_REGISTER(mid, "inode_copy_rdma",
 		fs_copy_rdma_in_t, int32_t, inode_copy_rdma);
+	truncate_rpc = MARGO_REGISTER(mid, "inode_truncate", fs_truncate_in_t,
+		int32_t, inode_truncate);
 	remove_rpc = MARGO_REGISTER(mid, "inode_remove", kv_byte_t, int32_t,
 		inode_remove);
 
 	fs_client_init_internal(mid, timeout, create_rpc, stat_rpc, write_rpc,
 		write_rdma_rpc, read_rpc, read_rdma_rpc, copy_rdma_rpc,
-		remove_rpc);
+		truncate_rpc, remove_rpc);
 	fs_server_init_more(mid, db_dir, db_size, niothreads);
 
 	self = ring_get_self();
@@ -552,6 +556,48 @@ free_input:
 		ring_start_election();
 }
 DEFINE_MARGO_RPC_HANDLER(inode_copy_rdma)
+
+static void
+inode_truncate(hg_handle_t h)
+{
+	hg_return_t ret;
+	fs_truncate_in_t in;
+	int32_t err;
+	char *target;
+	static const char diag[] = "inode_truncate RPC";
+
+	ret = margo_get_input(h, &in);
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		return;
+	}
+	log_debug("%s: key=%s, len=%ld", diag, (char *)in.key.v, in.len);
+
+	target = ring_list_lookup(in.key.v, in.key.s);
+	if (target && strcmp(self, target) != 0) {
+		ret = fs_rpc_inode_truncate(target, in.key.v, in.key.s, in.len,
+			&err);
+		if (ret != HG_SUCCESS)
+			err = KV_ERR_SERVER_DOWN;
+	} else
+		err = fs_inode_truncate(in.key.v, in.key.s, in.len);
+	free(target);
+
+	ret = margo_free_input(h, &in);
+	if (ret != HG_SUCCESS)
+		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
+
+	ret = margo_respond(h, &err);
+	if (ret != HG_SUCCESS)
+		log_error("%s (respond): %s", diag, HG_Error_to_string(ret));
+	ret = margo_destroy(h);
+	if (ret != HG_SUCCESS)
+		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
+
+	if (err == KV_ERR_SERVER_DOWN)
+		ring_start_election();
+}
+DEFINE_MARGO_RPC_HANDLER(inode_truncate)
 
 static void
 inode_remove(hg_handle_t h)
