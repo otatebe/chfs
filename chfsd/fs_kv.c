@@ -124,6 +124,8 @@ fs_inode_stat(char *key, size_t key_size, struct fs_stat *stat)
 	r = kv_pget(key, key_size, 0, &inode, &s);
 	if (r != KV_SUCCESS)
 		return (r);
+	if (fs_msize != inode.msize)
+		return (KV_ERR_METADATA_SIZE_MISMATCH);
 	stat->mode = inode.mode;
 	stat->uid = inode.uid;
 	stat->gid = inode.gid;
