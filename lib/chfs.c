@@ -22,14 +22,14 @@ static int chfs_rdma_thresh = 2048;
 static int chfs_rpc_timeout_msec = 0;		/* no timeout */
 static int chfs_node_list_cache_timeout = 120;	/* 120 seconds */
 
-static ABT_mutex chfs_fd_mutex;
-static int chfs_fd_table_size;
-struct chfs_fd_table {
+static ABT_mutex fd_mutex;
+static int fd_table_size;
+static struct fd_table {
 	char *path;
 	mode_t mode;
 	int chunk_size, pos;
 	int ref, closed;
-} *chfs_fd_table;
+} *fd_table;
 
 void
 chfs_set_chunk_size(int chunk_size)
@@ -64,14 +64,14 @@ fd_table_init()
 {
 	int i;
 
-	chfs_fd_table_size = 100;
-	chfs_fd_table = malloc(sizeof(*chfs_fd_table) * chfs_fd_table_size);
-	if (chfs_fd_table == NULL)
+	fd_table_size = 100;
+	fd_table = malloc(sizeof(*fd_table) * fd_table_size);
+	if (fd_table == NULL)
 		log_fatal("fd_table_init: no memory");
 
-	for (i = 0; i < chfs_fd_table_size; ++i)
-		chfs_fd_table[i].path = NULL;
-	ABT_mutex_create(&chfs_fd_mutex);
+	for (i = 0; i < fd_table_size; ++i)
+		fd_table[i].path = NULL;
+	ABT_mutex_create(&fd_mutex);
 }
 
 static void
@@ -79,15 +79,15 @@ fd_table_term()
 {
 	int i;
 
-	for (i = 0; i < chfs_fd_table_size; ++i) {
-		free(chfs_fd_table[i].path);
-		chfs_fd_table[i].path = NULL;
+	for (i = 0; i < fd_table_size; ++i) {
+		free(fd_table[i].path);
+		fd_table[i].path = NULL;
 	}
-	chfs_fd_table_size = 0;
-	free(chfs_fd_table);
-	chfs_fd_table = NULL;
+	fd_table_size = 0;
+	free(fd_table);
+	fd_table = NULL;
 
-	ABT_mutex_free(&chfs_fd_mutex);
+	ABT_mutex_free(&fd_mutex);
 }
 
 static char *
@@ -267,32 +267,32 @@ chfs_term()
 static int
 create_fd_unlocked(const char *path, mode_t mode, int chunk_size)
 {
-	struct chfs_fd_table *tmp;
+	struct fd_table *tmp;
 	int fd, i;
 
-	for (fd = 0; fd < chfs_fd_table_size; ++fd)
-		if (chfs_fd_table[fd].path == NULL)
+	for (fd = 0; fd < fd_table_size; ++fd)
+		if (fd_table[fd].path == NULL)
 			break;
-	if (fd == chfs_fd_table_size) {
-		tmp = realloc(chfs_fd_table,
-			sizeof(*chfs_fd_table) * chfs_fd_table_size * 2);
+	if (fd == fd_table_size) {
+		tmp = realloc(fd_table,
+			sizeof(*fd_table) * fd_table_size * 2);
 		if (tmp == NULL)
 			return (-1);
-		chfs_fd_table = tmp;
-		chfs_fd_table_size *= 2;
-		for (i = fd; i < chfs_fd_table_size; ++i)
-			chfs_fd_table[i].path = NULL;
+		fd_table = tmp;
+		fd_table_size *= 2;
+		for (i = fd; i < fd_table_size; ++i)
+			fd_table[i].path = NULL;
 	}
-	chfs_fd_table[fd].path = strdup(path);
-	if (chfs_fd_table[fd].path == NULL) {
+	fd_table[fd].path = strdup(path);
+	if (fd_table[fd].path == NULL) {
 		log_error("create_fd: %s, no memory", path);
 		return (-1);
 	}
-	chfs_fd_table[fd].mode = mode;
-	chfs_fd_table[fd].chunk_size = chunk_size;
-	chfs_fd_table[fd].pos = 0;
-	chfs_fd_table[fd].ref = 0;
-	chfs_fd_table[fd].closed = 0;
+	fd_table[fd].mode = mode;
+	fd_table[fd].chunk_size = chunk_size;
+	fd_table[fd].pos = 0;
+	fd_table[fd].ref = 0;
+	fd_table[fd].closed = 0;
 	return (fd);
 }
 
@@ -301,14 +301,14 @@ create_fd(const char *path, mode_t mode, int chunk_size)
 {
 	int fd;
 
-	ABT_mutex_lock(chfs_fd_mutex);
+	ABT_mutex_lock(fd_mutex);
 	fd = create_fd_unlocked(path, mode, chunk_size);
-	ABT_mutex_unlock(chfs_fd_mutex);
+	ABT_mutex_unlock(fd_mutex);
 	return (fd);
 }
 
 static void
-clear_fd_table_unlocked(struct chfs_fd_table *tab)
+clear_fd_table_unlocked(struct fd_table *tab)
 {
 	free(tab->path);
 	tab->path = NULL;
@@ -317,9 +317,9 @@ clear_fd_table_unlocked(struct chfs_fd_table *tab)
 static int
 check_fd_unlocked(int fd)
 {
-	if (fd < 0 || fd >= chfs_fd_table_size)
+	if (fd < 0 || fd >= fd_table_size)
 		return (-1);
-	if (chfs_fd_table[fd].path == NULL)
+	if (fd_table[fd].path == NULL)
 		return (-1);
 	return (0);
 }
@@ -329,10 +329,10 @@ clear_fd_unlocked(int fd)
 {
 	if (check_fd_unlocked(fd))
 		return (-1);
-	if (chfs_fd_table[fd].ref > 0)
-		chfs_fd_table[fd].closed = 1;
+	if (fd_table[fd].ref > 0)
+		fd_table[fd].closed = 1;
 	else
-		clear_fd_table_unlocked(&chfs_fd_table[fd]);
+		clear_fd_table_unlocked(&fd_table[fd]);
 	return (0);
 }
 
@@ -341,36 +341,36 @@ clear_fd(int fd)
 {
 	int r;
 
-	ABT_mutex_lock(chfs_fd_mutex);
+	ABT_mutex_lock(fd_mutex);
 	r = clear_fd_unlocked(fd);
-	ABT_mutex_unlock(chfs_fd_mutex);
+	ABT_mutex_unlock(fd_mutex);
 	return (r);
 }
 
-static struct chfs_fd_table *
+static struct fd_table *
 get_fd_table_unlocked(int fd)
 {
 	if (check_fd_unlocked(fd))
 		return (NULL);
-	if (chfs_fd_table[fd].closed)
+	if (fd_table[fd].closed)
 		return (NULL);
-	++chfs_fd_table[fd].ref;
-	return (&chfs_fd_table[fd]);
+	++fd_table[fd].ref;
+	return (&fd_table[fd]);
 }
 
-static struct chfs_fd_table *
+static struct fd_table *
 get_fd_table(int fd)
 {
-	struct chfs_fd_table *tab;
+	struct fd_table *tab;
 
-	ABT_mutex_lock(chfs_fd_mutex);
+	ABT_mutex_lock(fd_mutex);
 	tab = get_fd_table_unlocked(fd);
-	ABT_mutex_unlock(chfs_fd_mutex);
+	ABT_mutex_unlock(fd_mutex);
 	return (tab);
 }
 
 static void
-release_fd_table_unlocked(struct chfs_fd_table *tab)
+release_fd_table_unlocked(struct fd_table *tab)
 {
 	--tab->ref;
 	if (tab->closed == 0 || tab->ref > 0)
@@ -379,11 +379,11 @@ release_fd_table_unlocked(struct chfs_fd_table *tab)
 }
 
 static void
-release_fd_table(struct chfs_fd_table *tab)
+release_fd_table(struct fd_table *tab)
 {
-	ABT_mutex_lock(chfs_fd_mutex);
+	ABT_mutex_lock(fd_mutex);
 	release_fd_table_unlocked(tab);
-	ABT_mutex_unlock(chfs_fd_mutex);
+	ABT_mutex_unlock(fd_mutex);
 }
 
 static hg_return_t
@@ -657,7 +657,7 @@ chfs_close(int fd)
 ssize_t
 chfs_pwrite(int fd, const void *buf, size_t size, off_t offset)
 {
-	struct chfs_fd_table *tab = get_fd_table(fd);
+	struct fd_table *tab = get_fd_table(fd);
 	void *path;
 	int index, local_pos, chunk_size, err;
 	mode_t mode;
@@ -696,7 +696,7 @@ chfs_pwrite(int fd, const void *buf, size_t size, off_t offset)
 ssize_t
 chfs_write(int fd, const void *buf, size_t size)
 {
-	struct chfs_fd_table *tab = get_fd_table(fd);
+	struct fd_table *tab = get_fd_table(fd);
 	ssize_t s;
 
 	s = chfs_pwrite(fd, buf, size, tab->pos);
@@ -709,7 +709,7 @@ chfs_write(int fd, const void *buf, size_t size)
 ssize_t
 chfs_pread(int fd, void *buf, size_t size, off_t offset)
 {
-	struct chfs_fd_table *tab = get_fd_table(fd);
+	struct fd_table *tab = get_fd_table(fd);
 	void *path;
 	int index, local_pos, chunk_size, ret, err;
 	size_t s = size, ss = 0, psize;
@@ -745,7 +745,7 @@ chfs_pread(int fd, void *buf, size_t size, off_t offset)
 ssize_t
 chfs_read(int fd, void *buf, size_t size)
 {
-	struct chfs_fd_table *tab = get_fd_table(fd);
+	struct fd_table *tab = get_fd_table(fd);
 	ssize_t s;
 
 	s = chfs_pread(fd, buf, size, tab->pos);
