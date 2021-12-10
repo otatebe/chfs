@@ -62,31 +62,6 @@ create_inode(uint32_t uid, uint32_t gid, uint32_t mode, size_t chunk_size,
 			buf, size, offset));
 }
 
-static struct inode *
-create_inode_stat(struct fs_stat *st, const void *buf, size_t size)
-{
-	return (create_inode_all(st->uid, st->gid, st->mode, st->chunk_size,
-			&st->mtime, &st->ctime, buf, size, 0));
-}
-
-int
-fs_inode_create_stat(char *key, size_t key_size, struct fs_stat *st,
-	const void *buf, size_t size)
-{
-	struct inode *inode;
-	int r;
-	static const char diag[] = "fs_inode_create_stat";
-
-	inode = create_inode_stat(st, buf, size);
-	if (inode == NULL)
-		return (KV_ERR_NO_MEMORY);
-	r = kv_put(key, key_size, inode, fs_msize + st->chunk_size);
-	free(inode);
-	if (r != KV_SUCCESS)
-		log_error("%s: %s", diag, kv_err_string(r));
-	return (r);
-}
-
 static int
 fs_inode_create_data(char *key, size_t key_size, int32_t uid, int32_t gid,
 	mode_t mode, size_t chunk_size, const void *buf, size_t size, off_t off)
@@ -114,6 +89,19 @@ fs_inode_create(char *key, size_t key_size, int32_t uid, int32_t gid,
 }
 
 int
+fs_inode_create_stat(char *key, size_t key_size, struct fs_stat *st,
+	const void *buf, size_t size)
+{
+	int r;
+	static const char diag[] = "fs_inode_create_stat";
+
+	r = kv_put(key, key_size, (void *)buf, size);
+	if (r != KV_SUCCESS)
+		log_error("%s: %s", diag, kv_err_string(r));
+	return (r);
+}
+
+int
 fs_inode_stat(char *key, size_t key_size, struct fs_stat *stat)
 {
 	struct inode inode;
@@ -136,12 +124,26 @@ fs_inode_stat(char *key, size_t key_size, struct fs_stat *stat)
 	return (KV_SUCCESS);
 }
 
+static int
+fs_inode_update_size(char *key, size_t key_size, size_t size)
+{
+	size_t ss;
+	int r;
+	static const char diag[] = "fs_inode_update_size";
+
+	ss = sizeof(size);
+	r = kv_update(key, key_size, offsetof(struct inode, size), &size, &ss);
+	if (r != KV_SUCCESS)
+		log_error("%s: %s", diag, kv_err_string(r));
+	return (r);
+}
+
 int
 fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 	off_t offset, mode_t mode, size_t chunk_size)
 {
 	struct inode inode;
-	size_t s = fs_msize, ss;
+	size_t s = fs_msize;
 	int r;
 	static const char diag[] = "fs_inode_write";
 
@@ -156,10 +158,8 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 	r = kv_update(key, key_size, fs_msize + offset, (void *)buf, size);
 	if (r == KV_SUCCESS) {
 		s = offset + *size;
-		ss = sizeof(s);
 		if (inode.size < s)
-			r = kv_update(key, key_size,
-				offsetof(struct inode, size), &s, &ss);
+			r = fs_inode_update_size(key, key_size, s);
 	}
 	if (r != KV_SUCCESS)
 		log_error("%s: %s", diag, kv_err_string(r));
@@ -193,7 +193,7 @@ int
 fs_inode_truncate(char *key, size_t key_size, off_t len)
 {
 	struct inode inode;
-	size_t s = fs_msize, ss;
+	size_t s = fs_msize;
 	int r;
 	static const char diag[] = "fs_inode_truncate";
 
@@ -208,10 +208,8 @@ fs_inode_truncate(char *key, size_t key_size, off_t len)
 		return (r);
 	}
 	s = len;
-	ss = sizeof(s);
-	if (inode.size != s)
-		r = kv_update(key, key_size,
-			offsetof(struct inode, size), &s, &ss);
+	if (inode.size != len)
+		r = fs_inode_update_size(key, key_size, len);
 	if (r != KV_SUCCESS)
 		log_error("%s: %s", diag, kv_err_string(r));
 	return (r);

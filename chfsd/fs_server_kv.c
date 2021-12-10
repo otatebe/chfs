@@ -383,22 +383,20 @@ static int
 copy_all_cb(const char *key, size_t key_size, const char *value,
 	size_t value_size, void *arg)
 {
-	char *target, *v = (char *)value;
+	char *target;
 	struct fs_stat sb;
 	int ret, err;
 
-	err = fs_inode_stat((void *)key, key_size, &sb);
-	if (err == KV_SUCCESS) {
-		target = ring_list_lookup(key, key_size);
-		ret = fs_rpc_inode_copy_rdma(target, (void *)key, key_size,
-			self, &sb, v + fs_msize, sb.size, &err);
-		if (ret != HG_SUCCESS) {
-			log_error("copy_all_cb (copy_rdma): %s",
-					HG_Error_to_string(ret));
-			err = KV_ERR_SERVER_DOWN;
-		}
-		free(target);
+	memset(&sb, 0, sizeof(sb));
+	target = ring_list_lookup(key, key_size);
+	ret = fs_rpc_inode_copy_rdma(target, (void *)key, key_size,
+		self, &sb, (void *)value, value_size, &err);
+	if (ret != HG_SUCCESS) {
+		log_error("copy_all_cb (copy_rdma): %s",
+				HG_Error_to_string(ret));
+		err = KV_ERR_SERVER_DOWN;
 	}
+	free(target);
 	if (err == KV_SUCCESS)
 		log_debug("copy_all_cb: %s (%ld)", key, key_size);
 	else

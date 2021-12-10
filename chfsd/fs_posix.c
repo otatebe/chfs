@@ -296,10 +296,27 @@ fs_inode_create_stat(char *key, size_t key_size, struct fs_stat *st,
 {
 	char *p = key_to_path(key, key_size);
 	struct timespec times[2];
-	int r;
+	int r, fd;
+	static const char diag[] = "fs_inode_create_stat";
 
-	r = fs_inode_create(key, key_size, st->uid, st->gid, st->mode,
-		st->chunk_size, buf, size);
+	log_debug("%s: %s mode %o chunk_size %ld", diag, p, st->mode,
+		st->chunk_size);
+	if (S_ISREG(st->mode)) {
+		fd = r = fs_open(p, O_CREAT|O_WRONLY|O_TRUNC, st->mode,
+			&st->chunk_size);
+		if (fd >= 0) {
+			if (buf && size > 0) {
+				if (size > st->chunk_size + msize)
+					size = st->chunk_size + msize;
+				r = pwrite(fd, buf, size, 0);
+				if (r == -1)
+					r = -errno;
+			}
+			close(fd);
+		}
+	} else
+		r = fs_inode_create(key, key_size, st->uid, st->gid, st->mode,
+			st->chunk_size, buf, size);
 	if (r == KV_SUCCESS) {
 		times[0] = times[1] = st->mtime;
 		utimensat(AT_FDCWD, p, times, AT_SYMLINK_NOFOLLOW);
