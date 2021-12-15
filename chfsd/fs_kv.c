@@ -207,7 +207,6 @@ fs_inode_truncate(char *key, size_t key_size, off_t len)
 		log_error("%s: %s", diag, kv_err_string(r));
 		return (r);
 	}
-	s = len;
 	if (inode.size != len)
 		r = fs_inode_update_size(key, key_size, len);
 	if (r != KV_SUCCESS)
