@@ -30,10 +30,11 @@ create_inode_all(uint32_t uid, uint32_t gid, uint32_t mode, size_t chunk_size,
 	if (inode == NULL)
 		return (NULL);
 
-	inode->mode = mode;
+	inode->mode = MODE_MASK(mode);
 	inode->uid = uid;
 	inode->gid = gid;
 	inode->msize = fs_msize;
+	inode->flags = FLAGS_FROM_MODE(mode);
 	inode->size = offset + size;
 	inode->chunk_size = chunk_size;
 	inode->mtime = *mtime;
@@ -64,7 +65,8 @@ create_inode(uint32_t uid, uint32_t gid, uint32_t mode, size_t chunk_size,
 
 static int
 fs_inode_create_data(char *key, size_t key_size, uint32_t uid, uint32_t gid,
-	mode_t mode, size_t chunk_size, const void *buf, size_t size, off_t off)
+	uint32_t mode, size_t chunk_size, const void *buf, size_t size,
+	off_t off)
 {
 	struct inode *inode;
 	int r;
@@ -82,7 +84,7 @@ fs_inode_create_data(char *key, size_t key_size, uint32_t uid, uint32_t gid,
 
 int
 fs_inode_create(char *key, size_t key_size, uint32_t uid, uint32_t gid,
-	mode_t mode, size_t chunk_size, const void *buf, size_t size)
+	uint32_t mode, size_t chunk_size, const void *buf, size_t size)
 {
 	return (fs_inode_create_data(key, key_size, uid, gid, mode, chunk_size,
 			buf, size, 0));
@@ -114,7 +116,7 @@ fs_inode_stat(char *key, size_t key_size, struct fs_stat *stat)
 		return (r);
 	if (fs_msize != inode.msize)
 		return (KV_ERR_METADATA_SIZE_MISMATCH);
-	stat->mode = inode.mode;
+	stat->mode = MODE_FLAGS(inode.mode, inode.flags);
 	stat->uid = inode.uid;
 	stat->gid = inode.gid;
 	stat->size = inode.size;
@@ -138,9 +140,30 @@ fs_inode_update_size(char *key, size_t key_size, size_t size)
 	return (r);
 }
 
+static int
+fs_inode_dirty(char *key, size_t key_size, uint16_t flags)
+{
+	size_t ss;
+	int r;
+	static const char diag[] = "fs_inode_dirty";
+
+	if (flags & CHFS_FS_DIRTY)
+		return (KV_SUCCESS);
+
+	flags |= CHFS_FS_DIRTY;
+	ss = sizeof(flags);
+	r = kv_update(key, key_size, offsetof(struct inode, flags),
+		&flags, &ss);
+	if (r != KV_SUCCESS)
+		log_error("%s: %s", diag, kv_err_string(r));
+	return (r);
+}
+
+#define IS_MODE_DIRTY(mode)	(FLAGS_FROM_MODE(mode) & CHFS_FS_DIRTY)
+
 int
 fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
-	off_t offset, mode_t mode, size_t chunk_size)
+	off_t offset, uint32_t mode, size_t chunk_size)
 {
 	struct inode inode;
 	size_t s = fs_msize;
@@ -156,11 +179,15 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 		return (r);
 	}
 	r = kv_update(key, key_size, fs_msize + offset, (void *)buf, size);
-	if (r == KV_SUCCESS) {
-		s = offset + *size;
-		if (inode.size < s)
-			r = fs_inode_update_size(key, key_size, s);
+	if (r == KV_SUCCESS && IS_MODE_DIRTY(mode))
+		r = fs_inode_dirty(key, key_size, inode.flags);
+	if (r != KV_SUCCESS) {
+		log_error("%s: %s", diag, kv_err_string(r));
+		return (r);
 	}
+	s = offset + *size;
+	if (inode.size < s)
+		r = fs_inode_update_size(key, key_size, s);
 	if (r != KV_SUCCESS)
 		log_error("%s: %s", diag, kv_err_string(r));
 	return (r);
@@ -207,10 +234,13 @@ fs_inode_truncate(char *key, size_t key_size, off_t len)
 		log_error("%s: %s", diag, kv_err_string(r));
 		return (r);
 	}
-	if (inode.size != len)
+	if (inode.size != len) {
 		r = fs_inode_update_size(key, key_size, len);
-	if (r != KV_SUCCESS)
-		log_error("%s: %s", diag, kv_err_string(r));
+		if (r == KV_SUCCESS)
+			r = fs_inode_dirty(key, key_size, inode.flags);
+		if (r != KV_SUCCESS)
+			log_error("%s: %s", diag, kv_err_string(r));
+	}
 	return (r);
 }
 

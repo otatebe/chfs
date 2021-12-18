@@ -10,6 +10,9 @@ void chfs_set_node_list_cache_timeout(int timeout);
 int chfs_create(const char *path, int32_t flags, mode_t mode);
 int chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,
 	int chunk_size);
+int chfs_create_clean(const char *path, int32_t flags, mode_t mode);
+int chfs_create_clean_chunk_size(const char *path, int32_t flags, mode_t mode,
+	int chunk_size);
 int chfs_open(const char *path, int32_t flags);
 int chfs_close(int fd);
 ssize_t chfs_pwrite(int fd, const void *buf, size_t size, off_t offset);

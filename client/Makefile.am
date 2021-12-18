@@ -1,4 +1,4 @@
-bin_PROGRAMS = chlist chfuse chmkdir chrmdir
+bin_PROGRAMS = chlist chfuse chmkdir chrmdir chstagein
 nodist_bin_SCRIPTS = chfsctl
 
 chfuse_LDADD = @FUSE_LIBS@

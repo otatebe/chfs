@@ -3,7 +3,8 @@
 struct inode {
 	uint32_t mode;
 	uint32_t uid, gid;
-	uint32_t msize;
+	uint16_t msize;
+	uint16_t flags;
 	uint64_t size;
 	uint64_t chunk_size;
 	struct timespec mtime, ctime;

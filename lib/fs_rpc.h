@@ -3,7 +3,7 @@ struct fs_stat;
 
 hg_return_t
 fs_rpc_inode_create(const char *server, void *key, size_t key_size,
-	uint32_t uid, uint32_t gid, mode_t mode, size_t chunk_size,
+	uint32_t uid, uint32_t gid, uint32_t mode, size_t chunk_size,
 	const void *buf, size_t size, int *errp);
 
 hg_return_t
@@ -12,7 +12,7 @@ fs_rpc_inode_stat(const char *server, void *key, size_t key_size,
 
 hg_return_t
 fs_rpc_inode_write(const char *server, void *key, size_t key_size,
-	const void *buf, size_t *size, size_t offset, mode_t mode,
+	const void *buf, size_t *size, size_t offset, uint32_t mode,
 	size_t chunk_size, int *errp);
 
 hg_return_t
@@ -22,12 +22,12 @@ fs_rpc_inode_read(const char *server, void *key, size_t key_size, void *buf,
 hg_return_t
 fs_rpc_inode_write_rdma_bulk(const char *server, void *key, size_t key_size,
 	char *client, hg_bulk_t buf, hg_size_t *size, size_t offset,
-	mode_t mode, size_t chunk_size, int *errp);
+	uint32_t mode, size_t chunk_size, int *errp);
 
 hg_return_t
 fs_rpc_inode_write_rdma(const char *server, void *key, size_t key_size,
 	char *client, const void *buf, hg_size_t *size, size_t offset,
-	mode_t mode, size_t chunk_size, int *errp);
+	uint32_t mode, size_t chunk_size, int *errp);
 
 hg_return_t
 fs_rpc_inode_read_rdma_bulk(const char *server, void *key, size_t key_size,

@@ -24,12 +24,16 @@
 #ifndef USE_XATTR
 struct metadata {
 	size_t chunk_size;
+	uint16_t msize;
+	uint16_t flags;
 };
-
-static int msize = sizeof(struct metadata);
 #else
-static int msize = 0;
+struct metadata {
+	uint16_t msize;
+	uint16_t flags;
+};
 #endif
+static int msize = sizeof(struct metadata);
 
 #ifdef USE_ABT_IO
 static abt_io_instance_id abtio;
@@ -145,89 +149,98 @@ fs_dirname(const char *path)
 #define FS_XATTR_CHUNK_SIZE "user.chunk_size"
 
 static int
-set_chunk_size(const char *path, size_t size)
+set_metadata(const char *path, size_t size, int16_t flags)
 {
-	int r;
-	static const char diag[] = "set_chunk_size";
-#ifndef USE_XATTR
-	int fd;
+	static const char diag[] = "set_metadata";
 	struct metadata mdata;
-#endif
+	int fd, r;
 
+	fd = open(path, O_WRONLY, 0);
+	if (fd == -1) {
+		r = -errno;
+		log_error("%s: %s", diag, strerror(errno));
+		return (r);
+	}
 #ifdef USE_XATTR
 	r = setxattr(path, FS_XATTR_CHUNK_SIZE, &size, sizeof(size), 0);
 	if (r == -1) {
 		r = -errno;
 		log_error("%s: %s", diag, strerror(errno));
+		goto close_fd;
 	}
 #else
-	fd = open(path, O_WRONLY, 0);
-	if (fd == -1) {
-		r = -errno;
-		log_error("%s: %s", diag, strerror(errno));
-	} else {
-		mdata.chunk_size = size;
-		r = write(fd, &mdata, msize);
-		if (r == -1) {
-			r = -errno;
-			log_error("%s (write): %s", diag, strerror(errno));
-		} else if (r != msize) {
-			log_error("%s (write): %d of %d bytes written", diag,
-				r, msize);
-			r = -ENOSPC;
-		}
-		close(fd);
-	}
+	mdata.chunk_size = size;
 #endif
+	mdata.msize = msize;
+	mdata.flags = flags;
+	r = write(fd, &mdata, msize);
+	if (r == -1) {
+		r = -errno;
+		log_error("%s (write): %s", diag, strerror(errno));
+	} else if (r != msize) {
+		log_error("%s (write): %d of %d bytes written", diag,
+			r, msize);
+		r = -ENOSPC;
+	}
+#ifdef USE_XATTR
+close_fd:
+#endif
+	close(fd);
 	return (r);
 }
 
 static int
-get_chunk_size(const char *path, size_t *size)
+get_metadata(const char *path, size_t *size, int16_t *flags)
 {
-	int r;
-	static const char diag[] = "get_chunk_size";
-#ifndef USE_XATTR
-	int fd;
+	static const char diag[] = "get_metadata";
 	struct metadata mdata;
-#endif
+	int fd, r;
 
-#ifdef USE_XATTR
-	r = getxattr(path, FS_XATTR_CHUNK_SIZE, size, sizeof(*size));
-	if (r == -1) {
-		r = -errno;
-		log_info("%s: %s", diag, strerror(errno));
-	}
-#else
 	fd = open(path, O_RDONLY, 0);
 	if (fd == -1) {
 		r = -errno;
 		log_info("%s: %s", diag, strerror(errno));
+		return (r);
+	}
+	r = read(fd, &mdata, msize);
+	if (r == -1) {
+		r = -errno;
+		log_error("%s (read): %s", diag, strerror(errno));
+	} else if (r != msize) {
+		log_error("%s (read): %d of %d bytes read", diag, r, msize);
+		r = -EIO;
+	} else if (mdata.msize != msize) {
+		log_error("%s: metadata size mismatch", diag);
+		r = -EIO;
 	} else {
-		r = read(fd, &mdata, msize);
+#ifdef USE_XATTR
+		r = getxattr(path, FS_XATTR_CHUNK_SIZE, size, sizeof(*size));
 		if (r == -1) {
 			r = -errno;
-			log_error("%s (read): %s", diag, strerror(errno));
-		} else if (r != msize) {
-			log_error("%s (read): %d of %d bytes read", diag, r,
-				msize);
-			r = -EIO;
-		} else
-			*size = mdata.chunk_size;
-		close(fd);
-	}
+			log_info("%s: %s", diag, strerror(errno));
+			goto close_fd;
+		}
+#else
+		*size = mdata.chunk_size;
 #endif
+		*flags = mdata.flags;
+	}
+#ifdef USE_XATTR
+close_fd:
+#endif
+	close(fd);
 	return (r);
 }
 
 static int
-fs_open(const char *path, int flags, mode_t mode, size_t *chunk_size)
+fs_open(const char *path, int flags, mode_t mode, size_t *chunk_size,
+	int16_t *cache_flags)
 {
 	int fd, r = 0;
 	char *d;
 
 	if ((flags & O_ACCMODE) == O_RDONLY) {
-		r = get_chunk_size(path, chunk_size);
+		r = get_metadata(path, chunk_size, cache_flags);
 		if (r < 0)
 			return (r);
 	}
@@ -245,7 +258,7 @@ fs_open(const char *path, int flags, mode_t mode, size_t *chunk_size)
 	if (fd == -1)
 		return (-errno);
 	if (flags & O_CREAT) {
-		r = set_chunk_size(path, *chunk_size);
+		r = set_metadata(path, *chunk_size, *cache_flags);
 		if (r < 0)
 			close(fd);
 	}
@@ -254,16 +267,18 @@ fs_open(const char *path, int flags, mode_t mode, size_t *chunk_size)
 
 int
 fs_inode_create(char *key, size_t key_size, uint32_t uid, uint32_t gid,
-	mode_t mode, size_t chunk_size, const void *buf, size_t size)
+	uint32_t emode, size_t chunk_size, const void *buf, size_t size)
 {
 	char *p = key_to_path(key, key_size);
+	mode_t mode = MODE_MASK(emode);
+	int16_t flags = FLAGS_FROM_MODE(emode);
 	int r, fd;
 	static const char diag[] = "fs_inode_create";
 
 	log_debug("%s: %s mode %o chunk_size %ld", diag, p, mode, chunk_size);
 	if (S_ISREG(mode)) {
-		fd = r = fs_open(p, O_CREAT|O_WRONLY|O_TRUNC, mode,
-			&chunk_size);
+		fd = r = fs_open(p, O_CREAT|O_WRONLY|O_TRUNC, mode, &chunk_size,
+			&flags);
 		if (fd >= 0) {
 			if (buf && size > 0) {
 				if (size > chunk_size)
@@ -296,14 +311,16 @@ fs_inode_create_stat(char *key, size_t key_size, struct fs_stat *st,
 {
 	char *p = key_to_path(key, key_size);
 	struct timespec times[2];
+	mode_t mode = MODE_MASK(st->mode);
+	int16_t flags = 0;
 	int r, fd;
 	static const char diag[] = "fs_inode_create_stat";
 
-	log_debug("%s: %s mode %o chunk_size %ld", diag, p, st->mode,
+	log_debug("%s: %s mode %o chunk_size %ld", diag, p, mode,
 		st->chunk_size);
-	if (S_ISREG(st->mode)) {
-		fd = r = fs_open(p, O_CREAT|O_WRONLY|O_TRUNC, st->mode,
-			&st->chunk_size);
+	if (S_ISREG(mode)) {
+		fd = r = fs_open(p, O_CREAT|O_WRONLY|O_TRUNC, mode,
+			&st->chunk_size, &flags);
 		if (fd >= 0) {
 			if (buf && size > 0) {
 				if (size > st->chunk_size + msize)
@@ -330,6 +347,7 @@ fs_inode_stat(char *key, size_t key_size, struct fs_stat *st)
 	char *p = key_to_path(key, key_size);
 	struct stat sb;
 	int r;
+	int16_t flags;
 	static const char diag[] = "fs_inode_stat";
 
 	log_debug("%s: %s", diag, p);
@@ -339,13 +357,13 @@ fs_inode_stat(char *key, size_t key_size, struct fs_stat *st)
 		goto err;
 	}
 	if (S_ISREG(sb.st_mode)) {
-		r = get_chunk_size(p, &st->chunk_size);
+		r = get_metadata(p, &st->chunk_size, &flags);
 		if (r < 0)
 			goto err;
 	} else
 		st->chunk_size = 0;
 
-	st->mode = sb.st_mode;
+	st->mode = MODE_FLAGS(sb.st_mode, flags);
 	st->uid = sb.st_uid;
 	st->gid = sb.st_gid;
 	st->size = sb.st_size;
@@ -360,9 +378,11 @@ err:
 
 int
 fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
-	off_t offset, mode_t mode, size_t chunk_size)
+	off_t offset, uint32_t emode, size_t chunk_size)
 {
 	char *p = key_to_path(key, key_size);
+	mode_t mode = MODE_MASK(emode);
+	int16_t flags = FLAGS_FROM_MODE(emode);
 	size_t ss;
 	int fd, r = 0;
 	static const char diag[] = "fs_inode_write";
@@ -375,7 +395,7 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 		*size = 0;
 		goto err;
 	}
-	fd = r = fs_open(p, O_WRONLY, mode, &chunk_size);
+	fd = r = fs_open(p, O_WRONLY, mode, &chunk_size, &flags);
 	if (fd >= 0) {
 		r = pwrite(fd, buf, ss, offset + msize);
 		if (r == -1)
@@ -400,6 +420,7 @@ fs_inode_read(char *key, size_t key_size, void *buf, size_t *size,
 	char *p = key_to_path(key, key_size);
 	struct stat sb;
 	size_t ss, chunk_size;
+	int16_t flags = 0;
 	int fd, r;
 	static const char diag[] = "fs_inode_read";
 
@@ -412,7 +433,7 @@ fs_inode_read(char *key, size_t key_size, void *buf, size_t *size,
 			*size = r;
 		goto done;
 	}
-	fd = r = fs_open(p, O_RDONLY, 0644, &chunk_size);
+	fd = r = fs_open(p, O_RDONLY, 0644, &chunk_size, &flags);
 	if (r < 0)
 		goto done;
 	log_debug("%s: chunk_size %ld", diag, chunk_size);
