@@ -2,9 +2,9 @@ struct stat;
 struct fs_stat;
 
 hg_return_t
-fs_rpc_inode_create(const char *server, void *key, size_t key_size, int32_t uid,
-	int32_t gid, mode_t mode, size_t chunk_size, const void *buf,
-	size_t size, int *errp);
+fs_rpc_inode_create(const char *server, void *key, size_t key_size,
+	uint32_t uid, uint32_t gid, mode_t mode, size_t chunk_size,
+	const void *buf, size_t size, int *errp);
 
 hg_return_t
 fs_rpc_inode_stat(const char *server, void *key, size_t key_size,

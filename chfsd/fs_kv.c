@@ -63,7 +63,7 @@ create_inode(uint32_t uid, uint32_t gid, uint32_t mode, size_t chunk_size,
 }
 
 static int
-fs_inode_create_data(char *key, size_t key_size, int32_t uid, int32_t gid,
+fs_inode_create_data(char *key, size_t key_size, uint32_t uid, uint32_t gid,
 	mode_t mode, size_t chunk_size, const void *buf, size_t size, off_t off)
 {
 	struct inode *inode;
@@ -81,7 +81,7 @@ fs_inode_create_data(char *key, size_t key_size, int32_t uid, int32_t gid,
 }
 
 int
-fs_inode_create(char *key, size_t key_size, int32_t uid, int32_t gid,
+fs_inode_create(char *key, size_t key_size, uint32_t uid, uint32_t gid,
 	mode_t mode, size_t chunk_size, const void *buf, size_t size)
 {
 	return (fs_inode_create_data(key, key_size, uid, gid, mode, chunk_size,
