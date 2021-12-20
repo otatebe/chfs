@@ -107,6 +107,7 @@ The following APIs are supported.
     ssize_t chfs_pread(int fd, void *buf, size_t size, off_t offset);
     ssize_t chfs_read(int fd, void *buf, size_t size);
     int chfs_fsync(int fd);
+    int chfs_truncate(const char *path, off_t len);
     int chfs_unlink(const char *path);
     int chfs_mkdir(const char *path, mode_t mode);
     int chfs_rmdir(const char *path);
