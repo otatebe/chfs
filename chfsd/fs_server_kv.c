@@ -12,10 +12,9 @@
 #include "fs_rpc.h"
 #include "fs.h"
 #include "log.h"
-
-#ifdef USE_ZERO_COPY_READ_RDMA
 #include "fs_kv.h"
 
+#ifdef USE_ZERO_COPY_READ_RDMA
 DECLARE_MARGO_RPC_HANDLER(inode_read_rdma)
 #endif
 DECLARE_MARGO_RPC_HANDLER(inode_readdir)
@@ -180,7 +179,7 @@ free_fs_readdir_arg(struct fs_readdir_arg *a)
 }
 
 static void
-fs_add_entry(const char *name, struct fs_stat *st, struct fs_readdir_arg *a)
+fs_add_entry(const char *name, struct inode *ino, struct fs_readdir_arg *a)
 {
 	fs_file_info_t *tfi;
 	const char *s = name;
@@ -190,6 +189,9 @@ fs_add_entry(const char *name, struct fs_stat *st, struct fs_readdir_arg *a)
 		++s;
 	if (*s == '/')
 		return;
+
+	if (ino->msize != fs_msize)
+		return;		/* metadata size mismatch */
 
 	if (a->n >= a->size) {
 		tfi = realloc(a->fi, sizeof(a->fi[0]) * a->size * 2);
@@ -205,7 +207,12 @@ fs_add_entry(const char *name, struct fs_stat *st, struct fs_readdir_arg *a)
 		log_error("%s: no memory", diag);
 		return;
 	}
-	a->fi[a->n].sb = *st;
+	memset(&a->fi[a->n].sb, 0, sizeof(a->fi[a->n].sb));
+	a->fi[a->n].sb.uid = ino->uid;
+	a->fi[a->n].sb.gid = ino->gid;
+	a->fi[a->n].sb.mode = ino->mode;
+	a->fi[a->n].sb.mtime = ino->mtime;
+	a->fi[a->n].sb.ctime = ino->ctime;
 	++a->n;
 }
 
@@ -215,12 +222,12 @@ fs_readdir_cb(const char *key, size_t key_size, const char *value,
 {
 	struct fs_readdir_arg *a = arg;
 	int ksize = strlen(key);
-	struct fs_stat *st = (struct fs_stat *)value;
+	struct inode *ino = (struct inode *)value;
 
 	if (ksize + 1 == key_size && a->pathlen < ksize &&
 		strncmp(a->path, key, a->pathlen) == 0 &&
 		ring_list_is_in_charge(key, key_size))
-		fs_add_entry(key + a->pathlen, st, a);
+		fs_add_entry(key + a->pathlen, ino, a);
 	return (0);
 }
 
