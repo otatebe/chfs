@@ -146,15 +146,9 @@ inode_stat(hg_handle_t h)
 		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
 
 	log_debug("inode_stat: %s", kv_err_string(out.err));
-	if (out.err == KV_SUCCESS) {
-		out.st.mode = sb.mode;
-		out.st.uid = sb.uid;
-		out.st.gid = sb.gid;
-		out.st.size = sb.size;
-		out.st.chunk_size = sb.chunk_size;
-		out.st.mtime = sb.ctime;
-		out.st.ctime = sb.ctime;
-	}
+	if (out.err == KV_SUCCESS)
+		out.st = sb;
+
 	ret = margo_respond(h, &out);
 	if (ret != HG_SUCCESS)
 		log_error("%s (respond): %s", diag, HG_Error_to_string(ret));

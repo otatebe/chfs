@@ -103,15 +103,9 @@ fs_rpc_inode_stat(const char *server, void *key, size_t key_size,
 		goto err;
 	}
 	*errp = out.err;
-	if (out.err == 0) {
-		st->mode = out.st.mode;
-		st->uid = out.st.uid;
-		st->gid = out.st.gid;
-		st->size = out.st.size;
-		st->chunk_size = out.st.chunk_size;
-		st->mtime = out.st.mtime;
-		st->ctime = out.st.ctime;
-	}
+	if (out.err == 0)
+		*st = out.st;
+
 	ret = margo_free_output(h, &out);
 err:
 	ret2 = margo_destroy(h);
