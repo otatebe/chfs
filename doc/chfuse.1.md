@@ -19,6 +19,9 @@ chfuse - mount CHFS
 CHFS_SERVER
 : server addresses separated by ','
 
+CHFS_BACKEND_PATH
+: backend path
+
 CHFS_CHUNK_SIZE
 : chunk size.  Default is 4 KiB.
 

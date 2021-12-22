@@ -233,6 +233,38 @@ close_fd:
 }
 
 static int
+fs_inode_dirty(int fd)
+{
+	static const char diag[] = "fs_inode_dirty";
+	struct metadata mdata;
+	int r;
+
+	r = pread(fd, &mdata, msize, 0);
+	if (r == -1) {
+		r = -errno;
+		log_error("%s (read): %s", diag, strerror(errno));
+	} else if (r != msize) {
+		log_error("%s (read): %d of %d bytes read", diag, r, msize);
+		r = -EIO;
+	} else if (mdata.msize != msize) {
+		log_error("%s: metadata size mismatch", diag);
+		r = -EIO;
+	} else if ((mdata.flags & CHFS_FS_DIRTY) == 0) {
+		mdata.flags |= CHFS_FS_DIRTY;
+		r = pwrite(fd, &mdata, msize, 0);
+		if (r == -1) {
+			r = -errno;
+			log_error("%s (write): %s", diag, strerror(errno));
+		} else if (r != msize) {
+			log_error("%s (write): %d of %d bytes written", diag,
+				r, msize);
+			r = -ENOSPC;
+		}
+	}
+	return (r);
+}
+
+static int
 fs_open(const char *path, int flags, mode_t mode, size_t *chunk_size,
 	int16_t *cache_flags)
 {
@@ -395,11 +427,13 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 		*size = 0;
 		goto err;
 	}
-	fd = r = fs_open(p, O_WRONLY, mode, &chunk_size, &flags);
+	fd = r = fs_open(p, O_RDWR, mode, &chunk_size, &flags);
 	if (fd >= 0) {
 		r = pwrite(fd, buf, ss, offset + msize);
 		if (r == -1)
 			r = -errno;
+		else if (flags & CHFS_FS_NEW)
+			r = fs_inode_dirty(fd);
 		close(fd);
 	}
 	if (r < 0)
@@ -526,12 +560,20 @@ int
 fs_inode_truncate(char *key, size_t key_size, off_t len)
 {
 	char *p = key_to_path(key, key_size);
-	int r;
+	int r, fd;
 
 	log_debug("fs_inode_truncate: %s len %ld", p, len);
 	r = truncate(p, len + msize);
 	if (r == -1)
 		r = -errno;
+	else {
+		fd = r = open(p, O_RDWR);
+		if (fd >= 0) {
+			r = fs_inode_dirty(fd);
+			close(fd);
+		} else
+			r = -errno;
+	}
 	return (fs_err(r));
 }
 

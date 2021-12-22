@@ -159,7 +159,7 @@ fs_inode_dirty(char *key, size_t key_size, uint16_t flags)
 	return (r);
 }
 
-#define IS_MODE_DIRTY(mode)	(FLAGS_FROM_MODE(mode) & CHFS_FS_DIRTY)
+#define IS_MODE_NEW(mode)	(FLAGS_FROM_MODE(mode) & CHFS_FS_NEW)
 
 int
 fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
@@ -172,6 +172,8 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 
 	r = kv_pget(key, key_size, 0, &inode, &s);
 	if (r != KV_SUCCESS) {
+		if (IS_MODE_NEW(mode))
+			mode = MODE_FLAGS(mode, CHFS_FS_DIRTY);
 		r = fs_inode_create_data(key, key_size, 0, 0, mode, chunk_size,
 			buf, *size, offset);
 		if (r != KV_SUCCESS)
@@ -179,7 +181,7 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 		return (r);
 	}
 	r = kv_update(key, key_size, fs_msize + offset, (void *)buf, size);
-	if (r == KV_SUCCESS && IS_MODE_DIRTY(mode))
+	if (r == KV_SUCCESS && IS_MODE_NEW(mode))
 		r = fs_inode_dirty(key, key_size, inode.flags);
 	if (r != KV_SUCCESS) {
 		log_error("%s: %s", diag, kv_err_string(r));

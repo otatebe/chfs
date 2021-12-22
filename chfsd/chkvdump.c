@@ -29,8 +29,9 @@ print_time(struct timespec *ts)
 static void
 print_stat(struct fs_stat *st)
 {
-	printf("  Mode: (%o) Uid: (%d) Gid: (%d) Size: %ld Chunk size: %ld\n",
-		st->mode, st->uid, st->gid, st->size, st->chunk_size);
+	printf("  Mode: (%o) Uid: (%d) Gid: (%d) Size: %ld Chunk size: %ld "
+		"flag: %d\n", MODE_MASK(st->mode), st->uid, st->gid, st->size,
+		st->chunk_size, FLAGS_FROM_MODE(st->mode));
 	printf("Modify: ");
 	print_time(&st->mtime);
 	printf("\nChange: ");
