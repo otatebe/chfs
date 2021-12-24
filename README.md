@@ -59,6 +59,7 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
 ## Environment variable
 
 - CHFS_SERVER - server addresses separated by ','
+- CHFS_BACKEND_PATH - backend path
 - CHFS_CHUNK_SIZE - chunk size
 - CHFS_RDMA_THRESH - RDMA transfer is used when the size is larger than or equal to CHFS_RDMA_THRESH
 - CHFS_RPC_TIMEOUT_MSEC - RPC timeout in milliseconds
@@ -99,6 +100,9 @@ The following APIs are supported.
 
     int chfs_create(const char *path, int32_t flags, mode_t mode);
     int chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,
+            int chunk_size);
+    int chfs_create_clean(const char *path, int32_t flags, mode_t mode);
+    int chfs_create_clean_chunk_size(const char *path, int32_t flags, mode_t mode,
             int chunk_size);
     int chfs_open(const char *path, int32_t flags);
     int chfs_close(int fd);
