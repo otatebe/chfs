@@ -65,7 +65,7 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
 - CHFS_NODE_LIST_CACHE_TIMEOUT - node list cache timeout in seconds
 - CHFS_LOG_PRIORITY - maximum log priority to report
 
-When you use pmemkv, the following environment variable is recommended to set to touch every page of the persistent memory pool, while the start up time of chfsd becomes slow.
+When you use pmemkv, devdax is desirable.  When you use fsdax, the following environment variable is recommended to touch every page of the persistent memory pool, while the start up time of chfsd becomes slow.
 
 - PMEMOBJ_CONF="prefault.at_open=1;prefault.at_create=1"
 
