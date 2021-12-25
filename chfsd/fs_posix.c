@@ -76,6 +76,7 @@ fs_err(int err)
 	case ENOTSUP:
 		return (KV_ERR_NOT_SUPPORTED);
 	default:
+		log_notice("fs_err: %s", strerror(-err));
 		return (KV_ERR_UNKNOWN);
 	}
 }
