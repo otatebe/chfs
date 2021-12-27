@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <margo.h>
 #include "config.h"
+#include "path.h"
 #include "ring.h"
 #include "ring_types.h"
 #include "ring_rpc.h"
@@ -184,11 +185,11 @@ void
 usage(char *prog_name)
 {
 	fprintf(stderr, "Usage: %s [-d] [-c db_dir] [-s db_size] "
-		"[-p protocol] [-h host[:port]/device]\n\t"
-		"[-n vname] [-N virtual_name] [-l log_file] "
-		"[-S server_info_file]\n\t[-t rpc_timeout_msec] "
-		"[-T nthreads] [-I niothreads]\n\t[-H heartbeat_interval] "
-		"[-L log_priority] [server]\n", prog_name);
+		"[-b backend_dir] [-B subdir]\n\t[-p protocol] "
+		"[-h host[:port]/device] [-n vname] [-N virtual_name]\n\t"
+		"[-l log_file] [-S server_info_file] [-t rpc_timeout_msec]\n\t"
+		"[-T nthreads] [-I niothreads] [-H heartbeat_interval] "
+		"[-L log_priority]\n\t[server]\n", prog_name);
 	exit(EXIT_FAILURE);
 }
 
@@ -204,16 +205,22 @@ main(int argc, char *argv[])
 	char *db_dir = "/tmp", *hostname = NULL, *log_file = NULL;
 	char *protocol = "sockets", info_string[PATH_MAX];
 	char *server_info_file = NULL, *vname = NULL, *virtual_name = NULL;
-	char *addr_name = NULL;
+	char *addr_name = NULL, *backend_dir = NULL, *subdir = NULL;
 	int opt, debug = 0, rpc_timeout_msec = 0, nthreads = 5;
 	int heartbeat_interval = 10, log_priority = -1, niothreads = 2;
 	char *prog_name;
 
 	prog_name = basename(argv[0]);
 
-	while ((opt = getopt(argc, argv, "c:dh:H:I:l:L:n:N:p:s:S:t:T:"))
+	while ((opt = getopt(argc, argv, "b:B:c:dh:H:I:l:L:n:N:p:s:S:t:T:"))
 			!= -1) {
 		switch (opt) {
+		case 'b':
+			backend_dir = optarg;
+			break;
+		case 'B':
+			subdir = optarg;
+			break;
 		case 'c':
 			db_dir = optarg;
 			break;
@@ -270,6 +277,13 @@ main(int argc, char *argv[])
 	argv += optind;
 
 	check_directory(db_dir);
+	if (backend_dir) {
+		check_directory(backend_dir);
+		path_set_backend_path(backend_dir);
+	}
+	if (subdir)
+		path_set_subdir_path(subdir);
+
 	if (!debug) {
 		if (log_file) {
 			if (log_file_open(log_file) == -1)

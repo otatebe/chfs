@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <margo.h>
+#include "path.h"
 #include "ring_types.h"
 #include "kv_types.h"
 #include "kv.h"
@@ -171,6 +172,12 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 	static const char diag[] = "fs_inode_write";
 
 	r = kv_pget(key, key_size, 0, &inode, &s);
+#if 0
+	while (r == KV_SUCCESS && inode.flags & CHFS_FS_FLUSH) {
+		ABT_thread_yield();
+		r = kv_pget(key, key_size, 0, &inode, &s);
+	}
+#endif
 	if (r != KV_SUCCESS) {
 		if (IS_MODE_NEW(mode))
 			mode = MODE_FLAGS(mode, CHFS_FS_DIRTY);
@@ -178,6 +185,8 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 			buf, *size, offset);
 		if (r != KV_SUCCESS)
 			log_error("%s: %s", diag, kv_err_string(r));
+		else if (FLAGS_FROM_MODE(mode) & CHFS_FS_DIRTY)
+			fs_inode_flush(key, key_size);
 		return (r);
 	}
 	r = kv_update(key, key_size, fs_msize + offset, (void *)buf, size);
@@ -192,6 +201,8 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 		r = fs_inode_update_size(key, key_size, s);
 	if (r != KV_SUCCESS)
 		log_error("%s: %s", diag, kv_err_string(r));
+	else if (IS_MODE_NEW(mode))
+		fs_inode_flush(key, key_size);
 	return (r);
 }
 
@@ -251,4 +262,119 @@ int
 fs_inode_remove(char *key, size_t key_size)
 {
 	return (kv_remove(key, key_size));
+}
+
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
+
+static int
+fs_err(int err)
+{
+	if (err >= 0)
+		return (KV_SUCCESS);
+
+	switch (-err) {
+	case EEXIST:
+		return (KV_ERR_EXIST);
+	case ENOENT:
+		return (KV_ERR_NO_ENTRY);
+	case ENOMEM:
+		return (KV_ERR_NO_MEMORY);
+	case ENOTSUP:
+		return (KV_ERR_NOT_SUPPORTED);
+	default:
+		log_notice("fs_err: %s", strerror(-err));
+		return (KV_ERR_UNKNOWN);
+	}
+}
+
+struct flush_cb_arg {
+	char *dst;
+	int index;
+};
+
+void
+flush_cb(const char *value, size_t value_size, void *arg)
+{
+	struct flush_cb_arg *a = arg;
+	struct inode *inode = (void *)value;
+	int r, fd, flags;
+	static const char diag[] = "flush_cb";
+
+	log_debug("%s: dst=%s flags=%d size=%ld", diag, a->dst, inode->flags,
+		inode->size);
+	if (!(inode->flags & CHFS_FS_DIRTY)) {
+		log_debug("%s: clean", diag);
+		return;
+	}
+	inode->flags |= CHFS_FS_FLUSH;
+	/* persist */
+
+	flags = O_WRONLY;
+	if (inode->flags & CHFS_FS_NEW)
+		flags |= O_CREAT;
+
+	if ((fd = open(a->dst, flags, MODE_MASK(inode->mode))) == -1)
+		r = KV_ERR_NO_ENTRY;
+	else {
+		r = pwrite(fd, value + fs_msize, inode->size,
+			a->index * inode->chunk_size);
+		if (r == -1)
+			r = fs_err(-errno);
+		else if (r != inode->size) {
+			log_error("%s: %d of %ld bytes written", diag, r,
+				inode->size);
+			r = KV_ERR_PARTIAL_WRITE;
+		} else if (inode->size < inode->chunk_size) {
+			r = ftruncate(fd, a->index * inode->chunk_size
+				+ inode->size);
+			if (r == -1)
+				r = fs_err(-errno);
+		} else
+			r = KV_SUCCESS;
+		close(fd);
+	}
+	if (r != KV_SUCCESS)
+		log_error("%s: %s", diag, kv_err_string(r));
+	else
+		inode->flags &= ~(CHFS_FS_FLUSH|CHFS_FS_NEW|CHFS_FS_DIRTY);
+		/* persist */
+}
+
+int
+fs_inode_flush(void *key, size_t key_size)
+{
+	struct flush_cb_arg *arg;
+	int index, keylen, r = KV_SUCCESS;
+	char *dst;
+	static const char diag[] = "flush";
+
+	keylen = strlen(key) + 1;
+	if (keylen == key_size)
+		index = 0;
+	else
+		index = atoi(key + keylen);
+	log_debug("%s: key=%s, index=%d", diag, (char *)key, index);
+
+	dst = path_backend(key);
+	if (dst == NULL) {
+		r = KV_ERR_NO_BACKEND_PATH;
+		log_debug("%s: %s", diag, kv_err_string(r));
+		return (r);
+	}
+
+	arg = malloc(sizeof(*arg));
+	if (arg == NULL)
+		r = KV_ERR_NO_MEMORY;
+	else {
+		arg->dst = dst;
+		arg->index = index;
+		r = kv_get_cb(key, key_size, flush_cb, arg);
+		free(arg);
+	}
+	free(dst);
+	if (r != KV_SUCCESS)
+		log_error("%s: %s", diag, kv_err_string(r));
+	return (r);
 }

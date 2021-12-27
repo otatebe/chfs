@@ -92,6 +92,7 @@ hg_proc_fs_readdir_out_t(hg_proc_t proc, void *data)
 
 #define CHFS_FS_DIRTY		0x1
 #define CHFS_FS_NEW		0x2
+#define CHFS_FS_FLUSH		0x4
 
 #define FLAGS_SHIFT		16
 #define MODE_MASK(m)		((m) & ((1 << FLAGS_SHIFT) - 1))

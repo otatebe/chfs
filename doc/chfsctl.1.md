@@ -24,6 +24,9 @@ chfsctl - manage CHFS servers
 -m mount_directory
 : specifies a mount directory.  When chfsctl start is executed multiple times with -A option, -m option should be specified at the last execution of chfsctl start.
 
+-b backend_directory
+: specifies a backend directory to cache.
+
 -p protocol
 : specifies a protocol like sm, sockets, tcp, and verbs.  Default is sockets.
 

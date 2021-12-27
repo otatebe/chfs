@@ -6,6 +6,7 @@ PATH=@bindir@:@sbindir@:$PATH
 export PATH
 
 PROTO=sockets
+BEDIR=
 DBDIR=/tmp/$USER
 DBSIZE=$((256 * 1024 * 1024))
 LOG_DIR=$HOME
@@ -27,10 +28,10 @@ err() {
 usage() {
 	[ "X$*" = X ] || echo >&2 $program: $*
 	echo >&2 "usage: $program [-h hostfile] [-c scratch_dir] [-D] [-m mount_point]"
-	echo >&2 "		[-p proto] [-s db_size] [-N vname] [-I interface]"
-	echo >&2 "		[-C socket#] [-L log_dir] [-A] [-O options]"
-	echo >&2 "		[-n #servers for CHFS_SERVER]"
-	echo >&2 "		start | stop | status | kill | clean"
+	echo >&2 "	[-b backend_dir] [-p proto] [-s db_size] [-N vname]"
+	echo >&2 "	[-I interface] [-C socket#] [-L log_dir] [-A] [-O options]"
+	echo >&2 "	[-n #servers for CHFS_SERVER]"
+	echo >&2 "	start | stop | status | kill | clean"
 	exit 1
 }
 
@@ -38,6 +39,7 @@ while [ $# -gt 0 ]; do
 	case $1 in
 	    start|stop|status|kill|clean) mode=$1 ;;
 	    -A) NO_SERVER=false ;;
+	    -b) shift; BEDIR=$1 ;;
 	    -c) shift; DBDIR=$1 ;;
 	    -C) shift; CPUSOCKET=$1 ;;
 	    -D) DEVDAX=true ;;
@@ -74,7 +76,16 @@ if ! $NO_SERVER; then
 	[ X"$CHFS_SERVER" = X ] && err CHFS_SERVER not specified
 fi
 
-CHFS_OPTIONS="-p $PROTO -s $DBSIZE $OPTIONS"
+CHFS_OPTIONS=
+if [ "X$BEDIR" != X ]; then
+	CHFS_OPTIONS="-b $BEDIR"
+	export CHFS_BACKEND_PATH="$BEDIR"
+	if [ "X$MDIR" != X ]; then
+		CHFS_OPTIONS="$CHFS_OPTIONS -B $MDIR"
+		export CHFS_SUBDIR_PATH="$MDIR"
+	fi
+fi
+CHFS_OPTIONS="$CHFS_OPTIONS -p $PROTO -s $DBSIZE $OPTIONS"
 SERVER_INFO_FILE=/tmp/server-info-file-$USER
 
 MAX_JOBS=8

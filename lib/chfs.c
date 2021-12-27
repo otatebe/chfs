@@ -22,7 +22,6 @@ static int chfs_chunk_size = 4096;
 static int chfs_rdma_thresh = 2048;
 static int chfs_rpc_timeout_msec = 0;		/* no timeout */
 static int chfs_node_list_cache_timeout = 120;	/* 120 seconds */
-static char *chfs_backend_path = NULL;
 
 static ABT_mutex fd_mutex;
 static int fd_table_size;
@@ -62,12 +61,6 @@ chfs_set_node_list_cache_timeout(int timeout)
 	chfs_node_list_cache_timeout = timeout;
 }
 
-void
-chfs_set_backend_path(char *path)
-{
-	log_info("chfs_set_backend_path: %s", path);
-	chfs_backend_path = path;
-}
 
 static void
 fd_table_init()
@@ -224,9 +217,13 @@ chfs_init(const char *server)
 	if (!IS_NULL_STRING(timeout))
 		chfs_set_node_list_cache_timeout(atoi(timeout));
 
+	bpath = getenv("CHFS_SUBDIR_PATH");
+	if (!IS_NULL_STRING(bpath))
+		path_set_subdir_path(bpath);
+
 	bpath = getenv("CHFS_BACKEND_PATH");
 	if (!IS_NULL_STRING(bpath))
-		chfs_set_backend_path(bpath);
+		path_set_backend_path(bpath);
 
 	while (server != NULL) {
 		proto = margo_protocol(server);
@@ -636,27 +633,6 @@ chfs_create_clean(const char *path, int32_t flags, mode_t mode)
 }
 
 static char *
-backend_path(const char *path)
-{
-	static int bpath_len = -1;
-	char *s;
-
-	if (chfs_backend_path == NULL || path == NULL)
-		return (NULL);
-
-	if (bpath_len == -1)
-		bpath_len = strlen(chfs_backend_path) + 1;
-	s = malloc(bpath_len + strlen(path) + 1);
-	if (s == NULL)
-		return (NULL);
-	strcpy(s, chfs_backend_path);
-	strcat(s, "/");
-	strcat(s, path);
-
-	return (s);
-}
-
-static char *
 backend_data(const char *path, off_t offset, int chunk_size, mode_t *modep,
 	size_t *size)
 {
@@ -666,7 +642,7 @@ backend_data(const char *path, off_t offset, int chunk_size, mode_t *modep,
 
 	if (buf == NULL)
 		return (NULL);
-	if ((bp = backend_path(path)) == NULL)
+	if ((bp = path_backend(path)) == NULL)
 		goto err_free_buf;
 	if (stat(bp, &sb) || (s = open(bp, O_RDONLY)) == -1) {
 		free(bp);
@@ -847,8 +823,8 @@ chfs_pread(int fd, void *buf, size_t size, off_t offset)
 			goto free_path;
 		}
 		if (cs > local_pos) {
-			if (local_pos + s > chunk_size)
-				s = chunk_size - local_pos;
+			if (local_pos + s > cs)
+				s = cs - local_pos;
 			memcpy(buf, bdata + local_pos, s);
 		} else
 			s = 0;
@@ -990,7 +966,7 @@ chfs_readlink(const char *path, char *buf, size_t size)
 		return (-1);
 	ret = chfs_rpc_inode_read(p, strlen(p) + 1, buf, &s, 0, &err);
 	if (ret == HG_SUCCESS && err == KV_ERR_NO_ENTRY) {
-		if ((bp = backend_path(p)) != NULL) {
+		if ((bp = path_backend(p)) != NULL) {
 			s = readlink(bp, buf, size);
 			free(bp);
 			free(p);
@@ -1029,7 +1005,7 @@ chfs_stat(const char *path, struct stat *st)
 	}
 	ret = chfs_rpc_inode_stat(p, strlen(p) + 1, &sb, &err);
 	if (ret == HG_SUCCESS && err == KV_ERR_NO_ENTRY) {
-		if ((bp = backend_path(p)) == NULL)
+		if ((bp = path_backend(p)) == NULL)
 			return (-1);
 		r = lstat(bp, st);
 		free(bp);
@@ -1186,7 +1162,7 @@ chfs_readdir(const char *path, void *buf,
 	if (p == NULL)
 		return (-1);
 
-	bp = backend_path(p);
+	bp = path_backend(p);
 	if (bp != NULL) {
 		backend_readdir(bp, buf, filler);
 		free(bp);

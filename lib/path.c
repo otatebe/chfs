@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include "log.h"
 
 #define IS_SLASH_OR_NULL(c) (c == '/' || c == '\0')
 
@@ -73,4 +74,67 @@ canonical_path(const char *path)
 	}
 	pp[l] = '\0';
 	return (pp);
+}
+
+static char *backend_path = NULL;
+static int backend_pathlen;
+static char *subdir_path = NULL;
+static int subdir_pathlen;
+
+void
+path_set_subdir_path(const char *path)
+{
+	const char *p = skip_slash(path);
+
+	if (p == NULL)
+		return;
+	log_debug("path_set_subdir_path: %s", p);
+	subdir_path = strdup(p);
+	subdir_pathlen = strlen(p);
+}
+
+void
+path_set_backend_path(const char *path)
+{
+	if (path == NULL)
+		return;
+	log_debug("path_set_backend_path: %s", path);
+	backend_path = strdup(path);
+	backend_pathlen = strlen(path);
+}
+
+static const char *
+skip_subdir(const char *path)
+{
+	const char *p = path;
+
+	if (subdir_path == NULL)
+		return (p);
+
+	if (strncmp(subdir_path, p, subdir_pathlen) == 0)
+		return (skip_slash(p + subdir_pathlen));
+
+	return (p);
+}
+
+char *
+path_backend(const char *path)
+{
+	const char *p;
+	char *s;
+
+	if (backend_path == NULL || path == NULL)
+		return (NULL);
+
+	p = skip_subdir(path);
+	if (p == NULL)
+		return (NULL);
+	s = malloc(backend_pathlen + 1 + strlen(p) + 1);
+	if (s == NULL)
+		return (NULL);
+	strcpy(s, backend_path);
+	strcat(s, "/");
+	strcat(s, p);
+
+	return (s);
 }

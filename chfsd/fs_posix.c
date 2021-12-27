@@ -12,6 +12,7 @@
 #include <abt-io.h>
 #endif
 
+#include "path.h"
 #include "ring_types.h"
 #include "kv_types.h"
 #include "kv.h"
@@ -415,13 +416,19 @@ int
 fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 	off_t offset, uint32_t emode, size_t chunk_size)
 {
-	char *p = key_to_path(key, key_size);
+	char *p, *key_save;
 	mode_t mode = MODE_MASK(emode);
 	int16_t flags = FLAGS_FROM_MODE(emode);
 	size_t ss;
 	int fd, r = 0, does_create;
 	static const char diag[] = "fs_inode_write";
 
+	key_save = malloc(key_size);
+	if (key_save == NULL)
+		return (KV_ERR_NO_MEMORY);
+	memcpy(key_save, key, key_size);
+
+	p = key_to_path(key, key_size);
 	log_debug("%s: %s size %ld offset %ld", diag, p, *size, offset);
 	ss = *size;
 	if (ss + offset > chunk_size) {
@@ -434,12 +441,20 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 	if (flags & CHFS_FS_NEW)
 		flags |= CHFS_FS_DIRTY;
 	fd = r = fs_open(p, O_RDWR, mode, &chunk_size, &flags, &does_create);
+#if 0
+	while (fd >= 0 && flags & CHFS_FS_FLUSH) {
+		ABT_thread_yield();
+		fd = r = fs_open(p, O_RDWR, mode, &chunk_size, &flags,
+			&does_create);
+	}
+#endif
 	if (fd >= 0) {
 		r = pwrite(fd, buf, ss, offset + msize);
 		if (r == -1)
 			r = -errno;
 		else if (!does_create && flags & CHFS_FS_NEW)
 			r = fs_inode_dirty(fd);
+		fs_inode_flush(key_save, key_size);
 		close(fd);
 	}
 	if (r >= 0)
@@ -449,6 +464,7 @@ err:
 		log_error("%s: %s", diag, strerror(-r));
 	else
 		log_debug("%s: ret %d", diag, r);
+	free(key_save);
 	return (fs_err(r));
 }
 
@@ -576,7 +592,7 @@ fs_inode_truncate(char *key, size_t key_size, off_t len)
 	if (r == -1)
 		r = -errno;
 	else {
-		fd = r = open(p, O_RDWR);
+		fd = r = open(p, O_RDWR, 0);
 		if (fd >= 0) {
 			r = fs_inode_dirty(fd);
 			close(fd);
@@ -689,4 +705,96 @@ fs_inode_unlink_chunk_all(char *path)
 	closedir(dp);
 	free(d);
 	return (0);
+}
+
+int
+fs_inode_flush(void *key, size_t key_size)
+{
+	int index, keylen, r = KV_SUCCESS, src_fd, dst_fd, flags;
+	size_t chunk_size;
+	int16_t cache_flags;
+	char *dst, *p, *buf;
+	struct stat sb;
+	static const char diag[] = "flush";
+
+	keylen = strlen(key) + 1;
+	if (keylen == key_size)
+		index = 0;
+	else
+		index = atoi(key + keylen);
+	log_debug("%s: key=%s, index=%d", diag, (char *)key, index);
+
+	dst = path_backend(key);
+	if (dst == NULL) {
+		r = KV_ERR_NO_BACKEND_PATH;
+		log_debug("%s: %s", diag, kv_err_string(r));
+		return (r);
+	}
+
+	p = key_to_path(key, key_size);
+	if (lstat(p, &sb) == -1) {
+		r = fs_err(-errno);
+		goto free_dst;
+	}
+	src_fd = r = fs_open(p, O_RDONLY, sb.st_mode, &chunk_size,
+		&cache_flags, NULL);
+	if (r < 0) {
+		r = fs_err(r);
+		goto free_dst;
+	}
+	if (!(cache_flags & CHFS_FS_DIRTY)) {
+		log_debug("%s: clean", diag);
+		r = KV_SUCCESS;
+		goto close_src_fd;
+	}
+
+	buf = malloc(sb.st_size - msize);
+	if (buf == NULL) {
+		r = KV_ERR_NO_MEMORY;
+		goto close_src_fd;
+	}
+
+	flags = O_WRONLY;
+	if (cache_flags & CHFS_FS_NEW)
+		flags |= O_CREAT;
+
+	if ((dst_fd = open(dst, flags, sb.st_mode)) == -1)
+		r = fs_err(-errno);
+	else {
+		r = pread(src_fd, buf, sb.st_size - msize, msize);
+		if (r == -1)
+			r = fs_err(-errno);
+		else if (r != sb.st_size - msize) {
+			log_error("%s: %d of %ld bytes read", diag, r,
+				sb.st_size - msize);
+			r = KV_ERR_PARTIAL_READ;
+		} else {
+			r = pwrite(dst_fd, buf, r, index * chunk_size);
+			if (r == -1)
+				r = fs_err(-errno);
+			else if (r != sb.st_size - msize) {
+				log_error("%s: %d of %ld bytes written", diag,
+					r, sb.st_size - msize);
+				r = KV_ERR_PARTIAL_WRITE;
+			} else if (r < chunk_size) {
+				r = ftruncate(dst_fd, index * chunk_size + r);
+				if (r == -1)
+					r = fs_err(-errno);
+			} else
+				r = KV_SUCCESS;
+		}
+		close(dst_fd);
+	}
+close_src_fd:
+	close(src_fd);
+free_dst:
+	free(dst);
+	if (r == KV_SUCCESS) {
+		r = set_metadata(p, chunk_size,
+		    cache_flags & ~(CHFS_FS_FLUSH|CHFS_FS_NEW|CHFS_FS_DIRTY));
+		r = fs_err(r);
+	}
+	if (r != KV_SUCCESS)
+		log_error("%s: %s", diag, kv_err_string(r));
+	return (r);
 }

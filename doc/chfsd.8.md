@@ -27,6 +27,12 @@ chfsd - CHFS server
 -h host
 : specify hostname, IP address or interface name and the port number.  Before the port number, ':' is required.
 
+-b backend_dir
+: specify a backend directory to flush.
+
+-B subdir
+: specify a subdir that is considered to be a root directory in CHFS for the backend directory.
+
 -l log_file
 : specifies a log file.
 
