@@ -766,7 +766,8 @@ chfs_pwrite(int fd, const void *buf, size_t size, off_t offset)
 	void *path;
 	int index, local_pos, chunk_size, err;
 	uint32_t emode;
-	size_t s = size, ss = 0, psize;
+	size_t s = size, psize;
+	ssize_t ss = 0;
 	hg_return_t ret;
 
 	if (tab == NULL)
@@ -818,7 +819,8 @@ chfs_pread(int fd, void *buf, size_t size, off_t offset)
 	void *path, *bdata;
 	hg_return_t ret, ret2;
 	int index, local_pos, chunk_size, err, err2;
-	size_t s = size, ss = 0, psize, cs;
+	size_t s = size, psize, cs;
+	ssize_t ss = 0;
 	mode_t mode;
 
 	if (tab == NULL)
@@ -857,7 +859,7 @@ free_path:
 	free(path);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS)
 		return (-1);
-	if (s <= 0)
+	if (s == 0)
 		return (0);
 
 	if (local_pos + s < chunk_size)
