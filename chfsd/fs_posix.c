@@ -370,11 +370,12 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 
 	log_debug("%s: %s size %ld offset %ld", diag, p, *size, offset);
 	ss = *size;
-	if (ss + offset > chunk_size)
+	if (ss + offset > chunk_size) {
+		if (offset >= chunk_size) {
+			*size = 0;
+			goto err;
+		}
 		ss = chunk_size - offset;
-	if (ss <= 0) {
-		*size = 0;
-		goto err;
 	}
 	fd = r = fs_open(p, O_WRONLY, mode, &chunk_size);
 	if (fd >= 0) {
@@ -383,9 +384,8 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 			r = -errno;
 		close(fd);
 	}
-	if (r < 0)
-		goto err;
-	*size = r;
+	if (r >= 0)
+		*size = r;
 err:
 	if (r < 0)
 		log_error("%s: %s", diag, strerror(-r));
@@ -419,9 +419,13 @@ fs_inode_read(char *key, size_t key_size, void *buf, size_t *size,
 	log_debug("%s: chunk_size %ld", diag, chunk_size);
 
 	ss = *size;
-	if (ss + offset > chunk_size)
-		ss = chunk_size - offset;
-	if (ss <= 0)
+	if (ss + offset > chunk_size) {
+		if (offset >= chunk_size)
+			ss = 0;
+		else
+			ss = chunk_size - offset;
+	}
+	if (ss == 0)
 		r = 0;
 	else {
 		r = pread(fd, buf, ss, offset + msize);

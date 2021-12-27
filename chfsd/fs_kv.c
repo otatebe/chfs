@@ -177,11 +177,12 @@ fs_inode_read(char *key, size_t key_size, void *buf, size_t *size,
 	r = kv_pget(key, key_size, 0, &inode, &s);
 	if (r != KV_SUCCESS)
 		return (r);
-	if (offset + *size > inode.size)
+	if (offset + *size > inode.size) {
+		if (offset >= inode.size) {
+			*size = 0;
+			return (KV_SUCCESS);
+		}
 		ss = inode.size - offset;
-	if (ss <= 0) {
-		*size = 0;
-		return (KV_SUCCESS);
 	}
 	r = kv_pget(key, key_size, fs_msize + offset, buf, &ss);
 	if (r == KV_SUCCESS)
