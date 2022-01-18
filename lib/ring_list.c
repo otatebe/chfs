@@ -1,12 +1,13 @@
 #include <stdlib.h>
 #include <margo.h>
-#include <openssl/md5.h>
 #include "config.h"
 #include "ring_types.h"
 #include "ring_list.h"
 #include "log.h"
 
-#ifndef USE_DIGEST_MURMUR3
+#ifdef USE_DIGEST_MD5
+#include <openssl/md5.h>
+
 typedef uint8_t HASH_T[MD5_DIGEST_LENGTH];
 #define HASH(data, len, hash) MD5(data, len, hash)
 #define HASH_CMP(a, b) memcmp(a, b, MD5_DIGEST_LENGTH)
@@ -18,7 +19,7 @@ void display_hash(HASH_T hash)
 	for (i = 0; i < MD5_DIGEST_LENGTH; ++i)
 		printf("%02X", hash[i]);
 }
-#else /* USE_DIGEST_MURMUR3 */
+#else
 #include "murmur3.h"
 
 typedef uint32_t HASH_T[1];
