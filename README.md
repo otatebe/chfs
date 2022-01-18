@@ -4,6 +4,11 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
 
 ## Quick installation steps
 
+1. Install development kits
+
+       # apt install build-essential
+       # apt install cmake libtool pkg-config
+
 1. Install Spack
 
        % git clone https://github.com/spack/spack.git

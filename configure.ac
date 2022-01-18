@@ -49,7 +49,6 @@ fi
 
 # Checks for libraries.
 PKG_CHECK_MODULES([MARGO], [margo])
-PKG_CHECK_MODULES([OPENSSL], [openssl])
 PKG_CHECK_MODULES([FUSE], [fuse])
 
 AC_MSG_CHECKING([pmemkv])
@@ -77,14 +76,15 @@ if test x$with_abt_io != xno; then
   AC_CHECK_FUNCS([abt_io_truncate])
 fi
 
-AC_MSG_CHECKING([digest-murmur3])
-AC_ARG_WITH([digest-murmur3],
-  [AS_HELP_STRING([--with-digest-murmur3],
-    [use murmur3 digest @<:@default=no@:>@])],
-  [], [with_digest_murmur3=no])
-AC_MSG_RESULT([$with_digest_murmur3])
-if test x$with_digest_murmur3 != xno; then
-  AC_DEFINE([USE_DIGEST_MURMUR3], [1], [Use murmur3 digest])
+AC_MSG_CHECKING([digest-md5])
+AC_ARG_WITH([digest-md5],
+  [AS_HELP_STRING([--with-digest-md5],
+    [use md5 digest @<:@default=no@:>@])],
+  [], [with_digest_md5=no])
+AC_MSG_RESULT([$with_digest_md5])
+if test x$with_digest_md5 != xno; then
+  AC_DEFINE([USE_DIGEST_MD5], [1], [Use md5 digest])
+  PKG_CHECK_MODULES([OPENSSL], [openssl])
 fi
 
 # Checks for header files.
