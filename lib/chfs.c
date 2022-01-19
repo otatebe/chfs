@@ -186,6 +186,9 @@ chfs_init(const char *server)
 	int max_log_level;
 	hg_return_t ret;
 
+	if (FLAGS_FROM_MODE(CHFS_O_CLEAN) != CHFS_FS_CLEAN)
+		log_fatal("chfs_init: configuration error, flags mismatch");
+
 	log_priority = getenv("CHFS_LOG_PRIORITY");
 	if (!IS_NULL_STRING(log_priority)) {
 		max_log_level = log_priority_from_name(log_priority);
@@ -578,11 +581,12 @@ chfs_rpc_inode_stat(void *key, size_t key_size, struct fs_stat *st, int *errp)
 }
 
 int
-chfs_create_chunk_size_internal(const char *path, int32_t flags, mode_t mode,
-	int chunk_size, int16_t cache_flags)
+chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,
+	int chunk_size)
 {
 	char *p = canonical_path(path);
 	hg_return_t ret;
+	int16_t cache_flags = FLAGS_FROM_MODE(flags);
 	uint32_t emode = MODE_FLAGS(mode, cache_flags);
 	int fd, err;
 
@@ -604,32 +608,9 @@ chfs_create_chunk_size_internal(const char *path, int32_t flags, mode_t mode,
 }
 
 int
-chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,
-	int chunk_size)
-{
-	return (chfs_create_chunk_size_internal(path, flags, mode, chunk_size,
-			CHFS_FS_NEW));
-}
-
-int
 chfs_create(const char *path, int32_t flags, mode_t mode)
 {
 	return (chfs_create_chunk_size(path, flags, mode, chfs_chunk_size));
-}
-
-int
-chfs_create_clean_chunk_size(const char *path, int32_t flags, mode_t mode,
-	int chunk_size)
-{
-	return (chfs_create_chunk_size_internal(path, flags, mode, chunk_size,
-			0));
-}
-
-int
-chfs_create_clean(const char *path, int32_t flags, mode_t mode)
-{
-	return (chfs_create_clean_chunk_size(path, flags, mode,
-			chfs_chunk_size));
 }
 
 static char *
@@ -684,16 +665,14 @@ chfs_open(const char *path, int32_t flags)
 		buf = backend_data(p, 0, st.chunk_size, &st.mode, &size);
 		if (buf == NULL)
 			goto free_p;
-		ret2 = chfs_rpc_inode_write(p, psize, buf, &size, 0, st.mode,
-			st.chunk_size, &err2);
+		ret2 = chfs_rpc_inode_write(p, psize, buf, &size, 0,
+			st.mode | CHFS_O_CLEAN, st.chunk_size, &err2);
 		free(buf);
 		if (ret2 == HG_SUCCESS && err2 == KV_SUCCESS)
 			err = KV_SUCCESS;
 	}
-	if (ret == HG_SUCCESS && err == KV_SUCCESS) {
-		st.mode = MODE_FLAGS(st.mode, CHFS_FS_NEW);
+	if (ret == HG_SUCCESS && err == KV_SUCCESS)
 		fd = create_fd(p, st.mode, st.chunk_size);
-	}
 free_p:
 	free(p);
 	return (fd);
@@ -816,8 +795,8 @@ chfs_pread(int fd, void *buf, size_t size, off_t offset)
 			&mode, &cs);
 		if (bdata == NULL)
 			goto free_path;
-		ret2 = chfs_rpc_inode_write(path, psize, bdata, &cs, 0, mode,
-			chunk_size, &err2);
+		ret2 = chfs_rpc_inode_write(path, psize, bdata, &cs, 0,
+			mode | CHFS_O_CLEAN, chunk_size, &err2);
 		if (ret2 != HG_SUCCESS || err2 != KV_SUCCESS) {
 			free(bdata);
 			goto free_path;
@@ -1004,7 +983,8 @@ chfs_stat(const char *path, struct stat *st)
 		return (0);
 	}
 	ret = chfs_rpc_inode_stat(p, strlen(p) + 1, &sb, &err);
-	if (ret == HG_SUCCESS && err == KV_ERR_NO_ENTRY) {
+	if (ret == HG_SUCCESS && (err == KV_ERR_NO_ENTRY || /* XXX */
+			(err == KV_SUCCESS && sb.mode & CHFS_O_CLEAN))) {
 		if ((bp = path_backend(p)) == NULL)
 			return (-1);
 		r = lstat(bp, st);

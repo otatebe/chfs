@@ -90,11 +90,10 @@ hg_proc_fs_readdir_out_t(hg_proc_t proc, void *data)
 	return (ret);
 }
 
-#define CHFS_FS_DIRTY		0x1
-#define CHFS_FS_NEW		0x2
-#define CHFS_FS_FLUSH		0x4
+#define CHFS_FS_CLEAN		0x1
+#define CHFS_FS_DIRTY		0x2
 
-#define FLAGS_SHIFT		16
+#define FLAGS_SHIFT		28
 #define MODE_MASK(m)		((m) & ((1 << FLAGS_SHIFT) - 1))
 #define MODE_FLAGS(m, f)	((m) | (f) << FLAGS_SHIFT)
 #define FLAGS_FROM_MODE(m)	((m) >> FLAGS_SHIFT)

@@ -161,14 +161,14 @@ set_metadata(const char *path, size_t size, int16_t flags)
 	fd = open(path, O_WRONLY, 0);
 	if (fd == -1) {
 		r = -errno;
-		log_error("%s: %s", diag, strerror(errno));
+		log_error("%s (%s): %s", diag, path, strerror(errno));
 		return (r);
 	}
 #ifdef USE_XATTR
 	r = setxattr(path, FS_XATTR_CHUNK_SIZE, &size, sizeof(size), 0);
 	if (r == -1) {
 		r = -errno;
-		log_error("%s: %s", diag, strerror(errno));
+		log_error("%s (%s): %s", diag, path, strerror(errno));
 		goto close_fd;
 	}
 #else
@@ -179,9 +179,9 @@ set_metadata(const char *path, size_t size, int16_t flags)
 	r = write(fd, &mdata, msize);
 	if (r == -1) {
 		r = -errno;
-		log_error("%s (write): %s", diag, strerror(errno));
+		log_error("%s (%s): %s", diag, path, strerror(errno));
 	} else if (r != msize) {
-		log_error("%s (write): %d of %d bytes written", diag,
+		log_error("%s (%s): %d of %d bytes written", diag, path,
 			r, msize);
 		r = -ENOSPC;
 	}
@@ -202,25 +202,25 @@ get_metadata(const char *path, size_t *size, int16_t *flags)
 	fd = open(path, O_RDONLY, 0);
 	if (fd == -1) {
 		r = -errno;
-		log_info("%s: %s", diag, strerror(errno));
+		log_info("%s (%s): %s", diag, path, strerror(errno));
 		return (r);
 	}
 	r = read(fd, &mdata, msize);
 	if (r == -1) {
 		r = -errno;
-		log_error("%s (read): %s", diag, strerror(errno));
+		log_error("%s (%s): %s", diag, path, strerror(errno));
 	} else if (r != msize) {
-		log_error("%s (read): %d of %d bytes read", diag, r, msize);
+		log_error("%s (%s): %d of %d bytes read", diag, path, r, msize);
 		r = -EIO;
 	} else if (mdata.msize != msize) {
-		log_error("%s: metadata size mismatch", diag);
+		log_error("%s (%s): metadata size mismatch", diag, path);
 		r = -EIO;
 	} else {
 #ifdef USE_XATTR
 		r = getxattr(path, FS_XATTR_CHUNK_SIZE, size, sizeof(*size));
 		if (r == -1) {
 			r = -errno;
-			log_info("%s: %s", diag, strerror(errno));
+			log_info("%s (%s): %s", diag, path, strerror(errno));
 			goto close_fd;
 		}
 #else
@@ -439,21 +439,15 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 		}
 		ss = chunk_size - offset;
 	}
-	if (flags & CHFS_FS_NEW)
+	if (!(flags & CHFS_FS_CLEAN))
 		flags |= CHFS_FS_DIRTY;
+	/* lock chunk */
 	fd = r = fs_open(p, O_RDWR, mode, &chunk_size, &flags, &does_create);
-#if 0
-	while (fd >= 0 && flags & CHFS_FS_FLUSH) {
-		ABT_thread_yield();
-		fd = r = fs_open(p, O_RDWR, mode, &chunk_size, &flags,
-			&does_create);
-	}
-#endif
 	if (fd >= 0) {
 		r = pwrite(fd, buf, ss, offset + msize);
 		if (r == -1)
 			r = -errno;
-		else if (!does_create && flags & CHFS_FS_NEW)
+		else if (!does_create && !(flags & CHFS_FS_CLEAN))
 			r = fs_inode_dirty(fd);
 		fs_inode_flush(key_save, key_size);
 		close(fd);
@@ -642,7 +636,7 @@ fs_inode_readdir(char *path, void (*cb)(struct dirent *, void *),
 			if (strchr(dent->d_name, ':'))
 				continue;
 			r2 = get_metadata(dent->d_name, &size, &flags);
-			if (r2 < 0 || !(flags & CHFS_FS_NEW))
+			if (r2 < 0 || flags & CHFS_FS_CLEAN)
 				continue;
 			cb(dent, arg);
 		}
@@ -756,7 +750,7 @@ fs_inode_flush(void *key, size_t key_size)
 	}
 
 	flags = O_WRONLY;
-	if (cache_flags & CHFS_FS_NEW)
+	if (!(cache_flags & CHFS_FS_CLEAN))
 		flags |= O_CREAT;
 
 	if ((dst_fd = open(dst, flags, sb.st_mode)) == -1)
@@ -792,7 +786,7 @@ free_dst:
 	free(dst);
 	if (r == KV_SUCCESS) {
 		r = set_metadata(p, chunk_size,
-		    cache_flags & ~(CHFS_FS_FLUSH|CHFS_FS_NEW|CHFS_FS_DIRTY));
+		    (cache_flags & ~CHFS_FS_DIRTY) | CHFS_FS_CLEAN);
 		r = fs_err(r);
 	}
 	if (r != KV_SUCCESS)

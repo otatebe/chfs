@@ -10,9 +10,6 @@ void chfs_set_node_list_cache_timeout(int timeout);
 int chfs_create(const char *path, int32_t flags, mode_t mode);
 int chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,
 	int chunk_size);
-int chfs_create_clean(const char *path, int32_t flags, mode_t mode);
-int chfs_create_clean_chunk_size(const char *path, int32_t flags, mode_t mode,
-	int chunk_size);
 int chfs_open(const char *path, int32_t flags);
 int chfs_close(int fd);
 ssize_t chfs_pwrite(int fd, const void *buf, size_t size, off_t offset);
@@ -29,3 +26,5 @@ int chfs_readdir(const char *path, void *buf,
 	int (*filler)(void *, const char *, const struct stat *, off_t));
 int chfs_symlink(const char *target, const char *path);
 int chfs_readlink(const char *path, char *buf, size_t size);
+
+#define CHFS_O_CLEAN	(1 << 28)

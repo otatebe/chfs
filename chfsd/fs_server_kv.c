@@ -226,7 +226,7 @@ fs_readdir_cb(const char *key, size_t key_size, const char *value,
 
 	if (ksize + 1 == key_size && a->pathlen < ksize &&
 		strncmp(a->path, key, a->pathlen) == 0 &&
-		ino->flags & CHFS_FS_NEW &&
+		!(ino->flags & CHFS_FS_CLEAN) &&
 		ring_list_is_in_charge(key, key_size))
 		fs_add_entry(key + a->pathlen, ino, a);
 	return (0);

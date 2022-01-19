@@ -25,7 +25,7 @@ stagein(char *src, char *dst)
 		perror(src);
 		goto free_buf;
 	}
-	d = chfs_create_clean(dst, O_WRONLY, sb.st_mode);
+	d = chfs_create(dst, O_WRONLY|CHFS_O_CLEAN, sb.st_mode);
 	if (d < 0) {
 		log_error("%s: cannot create", dst);
 		goto close_s;

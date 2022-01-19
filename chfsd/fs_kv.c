@@ -160,7 +160,7 @@ fs_inode_dirty(char *key, size_t key_size, uint16_t flags)
 	return (r);
 }
 
-#define IS_MODE_NEW(mode)	(FLAGS_FROM_MODE(mode) & CHFS_FS_NEW)
+#define IS_MODE_CLEAN(mode)	(FLAGS_FROM_MODE(mode) & CHFS_FS_CLEAN)
 
 int
 fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
@@ -171,15 +171,10 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 	int r;
 	static const char diag[] = "fs_inode_write";
 
+	/* lock chunk */
 	r = kv_pget(key, key_size, 0, &inode, &s);
-#if 0
-	while (r == KV_SUCCESS && inode.flags & CHFS_FS_FLUSH) {
-		ABT_thread_yield();
-		r = kv_pget(key, key_size, 0, &inode, &s);
-	}
-#endif
 	if (r != KV_SUCCESS) {
-		if (IS_MODE_NEW(mode))
+		if (!IS_MODE_CLEAN(mode))
 			mode = MODE_FLAGS(mode, CHFS_FS_DIRTY);
 		r = fs_inode_create_data(key, key_size, 0, 0, mode, chunk_size,
 			buf, *size, offset);
@@ -190,7 +185,7 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 		return (r);
 	}
 	r = kv_update(key, key_size, fs_msize + offset, (void *)buf, size);
-	if (r == KV_SUCCESS && IS_MODE_NEW(mode))
+	if (r == KV_SUCCESS && !IS_MODE_CLEAN(mode))
 		r = fs_inode_dirty(key, key_size, inode.flags);
 	if (r != KV_SUCCESS) {
 		log_error("%s: %s", diag, kv_err_string(r));
@@ -201,7 +196,7 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 		r = fs_inode_update_size(key, key_size, s);
 	if (r != KV_SUCCESS)
 		log_error("%s: %s", diag, kv_err_string(r));
-	else if (IS_MODE_NEW(mode))
+	else if (!IS_MODE_CLEAN(mode))
 		fs_inode_flush(key, key_size);
 	return (r);
 }
@@ -308,11 +303,10 @@ flush_cb(const char *value, size_t value_size, void *arg)
 		log_debug("%s: clean", diag);
 		return;
 	}
-	inode->flags |= CHFS_FS_FLUSH;
-	/* persist */
+	/* lock chunk */
 
 	flags = O_WRONLY;
-	if (inode->flags & CHFS_FS_NEW)
+	if (!(inode->flags & CHFS_FS_CLEAN))
 		flags |= O_CREAT;
 
 	if ((fd = open(a->dst, flags, MODE_MASK(inode->mode))) == -1)
@@ -338,7 +332,7 @@ flush_cb(const char *value, size_t value_size, void *arg)
 	if (r != KV_SUCCESS)
 		log_error("%s: %s", diag, kv_err_string(r));
 	else
-		inode->flags &= ~(CHFS_FS_FLUSH|CHFS_FS_NEW|CHFS_FS_DIRTY);
+		inode->flags = (inode->flags & ~CHFS_FS_DIRTY) | CHFS_FS_CLEAN;
 		/* persist */
 }
 
