@@ -1,4 +1,4 @@
-bin_PROGRAMS = chlist chfuse chmkdir chrmdir
+bin_PROGRAMS = chlist chfuse chmkdir chrmdir murmur3sum
 nodist_bin_SCRIPTS = chfsctl
 
 chfuse_LDADD = @FUSE_LIBS@
