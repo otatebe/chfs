@@ -21,7 +21,7 @@ stagein(char *src, char *dst)
 		log_error("no memory");
 		return (-1);
 	}
-	if (stat(src, &sb) == 0 && (s = open(src, O_RDONLY)) == -1) {
+	if (stat(src, &sb) == -1 || (s = open(src, O_RDONLY)) == -1) {
 		perror(src);
 		goto free_buf;
 	}
