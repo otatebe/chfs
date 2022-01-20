@@ -94,7 +94,7 @@ fs_inode_init(char *dir, int niothreads)
 
 	r = chdir(dir);
 	if (r == -1 && errno == ENOENT) {
-		r = mkdir_p(dir, 0755);
+		r = fs_mkdir_p(dir, 0755);
 		if (r == 0)
 			r = chdir(dir);
 	}
@@ -125,28 +125,6 @@ key_to_path(char *key, size_t key_size)
 		key = ".";
 	log_debug("%s: path %s", diag, key);
 	return (key);
-}
-
-static char *
-fs_dirname(const char *path)
-{
-	size_t p = strlen(path) - 1;
-	char *r;
-
-	while (p > 0 && path[p] != '/')
-		--p;
-	if (p == 0)
-		return (NULL);
-
-	r = malloc(p + 1);
-	if (r == NULL) {
-		log_error("fs_dirname: no memory");
-		return (NULL);
-	}
-	strncpy(r, path, p);
-	r[p] = '\0';
-	log_debug("fs_dirname: path %s dirname %s", path, r);
-	return (r);
 }
 
 #define FS_XATTR_CHUNK_SIZE "user.chunk_size"
@@ -282,7 +260,6 @@ fs_open(const char *path, int flags, mode_t mode, size_t *chunk_size,
 	int16_t *cache_flags, int *set_metadata_p)
 {
 	int fd, r = 0;
-	char *d;
 
 	if ((flags & O_ACCMODE) == O_RDONLY) {
 		r = get_metadata(path, chunk_size, cache_flags);
@@ -291,12 +268,7 @@ fs_open(const char *path, int flags, mode_t mode, size_t *chunk_size,
 	}
 	fd = open(path, flags, mode);
 	if (fd == -1 && ((flags & O_ACCMODE) != O_RDONLY)) {
-		d = fs_dirname(path);
-		if (d != NULL) {
-			/* mkdir_p() may fail due to race condition */
-			mkdir_p(d, 0755);
-			free(d);
-		}
+		fs_mkdir_parent(path);
 		flags |= O_CREAT;
 		fd = open(path, flags, mode);
 	}
@@ -316,12 +288,18 @@ int
 fs_inode_create(char *key, size_t key_size, uint32_t uid, uint32_t gid,
 	uint32_t emode, size_t chunk_size, const void *buf, size_t size)
 {
-	char *p = key_to_path(key, key_size);
+	char *p, *key_save;
 	mode_t mode = MODE_MASK(emode);
 	int16_t flags = FLAGS_FROM_MODE(emode);
 	int r, fd;
 	static const char diag[] = "fs_inode_create";
 
+	key_save = malloc(key_size);
+	if (key_save == NULL)
+		return (KV_ERR_NO_MEMORY);
+	memcpy(key_save, key, key_size);
+
+	p = key_to_path(key, key_size);
 	log_debug("%s: %s mode %o chunk_size %ld", diag, p, mode, chunk_size);
 	if (S_ISREG(mode)) {
 		if (!(flags & CHFS_FS_CACHE))
@@ -339,7 +317,7 @@ fs_inode_create(char *key, size_t key_size, uint32_t uid, uint32_t gid,
 			close(fd);
 		}
 	} else if (S_ISDIR(mode)) {
-		r = mkdir_p(p, mode);
+		r = fs_mkdir_p(p, mode);
 		if (r == -1)
 			r = -errno;
 	} else if (S_ISLNK(mode)) {
@@ -350,7 +328,9 @@ fs_inode_create(char *key, size_t key_size, uint32_t uid, uint32_t gid,
 		r = -ENOTSUP;
 	if (r < 0)
 		log_error("%s: %s", diag, strerror(-r));
-
+	else if (!(flags & CHFS_FS_CACHE))
+		fs_inode_flush_enq(key_save, key_size);
+	free(key_save);
 	return (fs_err(r));
 }
 
@@ -442,7 +422,8 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 	memcpy(key_save, key, key_size);
 
 	p = key_to_path(key, key_size);
-	log_debug("%s: %s size %ld offset %ld flags %o", diag, p, *size, offset, flags);
+	log_debug("%s: %s size %ld offset %ld flags %o", diag, p, *size,
+		offset, flags);
 	ss = *size;
 	if (ss + offset > chunk_size) {
 		if (offset >= chunk_size) {
@@ -461,7 +442,8 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 			r = -errno;
 		else if (!does_create && !(flags & CHFS_FS_CACHE))
 			r = fs_inode_dirty(fd);
-		fs_inode_flush_enq(key_save, key_size);
+		if (!(flags & CHFS_FS_CACHE))
+			fs_inode_flush_enq(key_save, key_size);
 		close(fd);
 	}
 	if (r >= 0)
@@ -732,7 +714,7 @@ fs_inode_flush(void *key, size_t key_size)
 	int index, keylen, r = KV_SUCCESS, src_fd, dst_fd, flags;
 	size_t chunk_size;
 	int16_t cache_flags;
-	char *dst, *p, *buf;
+	char *dst, *p, *buf, sym_buf[PATH_MAX];
 	struct stat sb;
 	static const char diag[] = "flush";
 
@@ -755,6 +737,32 @@ fs_inode_flush(void *key, size_t key_size)
 		r = fs_err(-errno);
 		goto free_dst;
 	}
+	if (S_ISREG(sb.st_mode))
+		goto regular_file;
+
+	if (S_ISDIR(sb.st_mode)) {
+		r = fs_mkdir_p(dst, sb.st_mode);
+	} else if (S_ISLNK(sb.st_mode)) {
+		r = readlink(p, sym_buf, sizeof sym_buf);
+		if (r > 0) {
+			sym_buf[r] = '\0';
+			r = symlink(sym_buf, dst);
+			if (r == -1) {
+				fs_mkdir_parent(dst);
+				r = symlink(sym_buf, dst);
+			}
+		}
+	} else {
+		r = KV_ERR_NOT_SUPPORTED;
+		goto free_dst;
+	}
+	if (r == -1)
+		r = fs_err(-errno);
+	else
+		r = KV_SUCCESS;
+	goto free_dst;
+
+regular_file:
 	src_fd = r = fs_open(p, O_RDONLY, sb.st_mode, &chunk_size,
 		&cache_flags, NULL);
 	if (r < 0) {
@@ -808,7 +816,7 @@ close_src_fd:
 	close(src_fd);
 free_dst:
 	free(dst);
-	if (r == KV_SUCCESS) {
+	if (r == KV_SUCCESS && S_ISREG(sb.st_mode)) {
 		r = set_metadata(p, chunk_size,
 		    (cache_flags & ~CHFS_FS_DIRTY) | CHFS_FS_CACHE);
 		r = fs_err(r);

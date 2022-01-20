@@ -924,9 +924,8 @@ chfs_symlink(const char *target, const char *path)
 		return (-1);
 	mode = 0777 | S_IFLNK;
 	len = strlen(target);
-	/* chunk_size is len but symlink(2) requires the last null byte */
-	ret = chfs_rpc_inode_create_data(p, strlen(p) + 1, mode, len, target,
-		len + 1, &err);
+	ret = chfs_rpc_inode_create_data(p, strlen(p) + 1, mode, len + 1,
+		target, len + 1, &err);
 	free(p);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS)
 		return (-1);
@@ -955,6 +954,8 @@ chfs_readlink(const char *path, char *buf, size_t size)
 	free(p);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS)
 		return (-1);
+	if (s > 1 && buf[s - 1] == '\0')
+		--s;
 	return (s);
 }
 
@@ -985,7 +986,7 @@ chfs_stat(const char *path, struct stat *st)
 	ret = chfs_rpc_inode_stat(p, strlen(p) + 1, &sb, &err);
 	if (ret == HG_SUCCESS && (err == KV_ERR_NO_ENTRY ||
 		(err == KV_SUCCESS && S_ISREG(MODE_MASK(sb.mode))
-		 && sb.mode & CHFS_O_CACHE) /* XXX */ )) {
+		 && sb.mode & CHFS_O_CACHE) /* XXX */)) {
 		if ((bp = path_backend(p)) == NULL)
 			return (-1);
 		r = lstat(bp, st);

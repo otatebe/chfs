@@ -133,7 +133,7 @@ check_directory(char *dir)
 	if (r == -1) {
 		if (errno != ENOENT)
 			log_fatal("%s: %s", dir, strerror(errno));
-		r = mkdir_p(dir, 0755);
+		r = fs_mkdir_p(dir, 0755);
 		if (r == -1)
 			log_fatal("%s: %s", dir, strerror(errno));
 		log_info("%s: created", dir);

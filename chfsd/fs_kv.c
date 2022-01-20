@@ -7,6 +7,7 @@
 #include "kv_err.h"
 #include "fs_types.h"
 #include "fs.h"
+#include "file.h"
 #include "log.h"
 #include "fs_kv.h"
 
@@ -66,6 +67,8 @@ create_inode(uint32_t uid, uint32_t gid, uint32_t mode, size_t chunk_size,
 			buf, size, offset));
 }
 
+#define IS_MODE_CACHE(mode)	(FLAGS_FROM_MODE(mode) & CHFS_FS_CACHE)
+
 static int
 fs_inode_create_data(char *key, size_t key_size, uint32_t uid, uint32_t gid,
 	uint32_t mode, size_t chunk_size, const void *buf, size_t size,
@@ -82,6 +85,8 @@ fs_inode_create_data(char *key, size_t key_size, uint32_t uid, uint32_t gid,
 	free(inode);
 	if (r != KV_SUCCESS)
 		log_error("%s: %s", diag, kv_err_string(r));
+	else if (!IS_MODE_CACHE(mode))
+		fs_inode_flush_enq(key, key_size);
 	return (r);
 }
 
@@ -162,8 +167,6 @@ fs_inode_dirty(char *key, size_t key_size, uint16_t flags)
 	return (r);
 }
 
-#define IS_MODE_CACHE(mode)	(FLAGS_FROM_MODE(mode) & CHFS_FS_CACHE)
-
 int
 fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 	off_t offset, uint32_t mode, size_t chunk_size)
@@ -176,14 +179,10 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 	/* lock chunk */
 	r = kv_pget(key, key_size, 0, &inode, &s);
 	if (r != KV_SUCCESS) {
-		if (!IS_MODE_CACHE(mode))
-			mode = MODE_FLAGS(mode, CHFS_FS_DIRTY);
 		r = fs_inode_create_data(key, key_size, 0, 0, mode, chunk_size,
 			buf, *size, offset);
 		if (r != KV_SUCCESS)
 			log_error("%s: %s", diag, kv_err_string(r));
-		else if (FLAGS_FROM_MODE(mode) & CHFS_FS_DIRTY)
-			fs_inode_flush_enq(key, key_size);
 		return (r);
 	}
 	r = kv_update(key, key_size, fs_msize + offset, (void *)buf, size);
@@ -293,11 +292,14 @@ struct flush_cb_arg {
 	int index;
 };
 
+#include <sys/stat.h>
+
 void
 flush_cb(const char *value, size_t value_size, void *arg)
 {
 	struct flush_cb_arg *a = arg;
 	struct inode *inode = (void *)value;
+	mode_t mode = MODE_MASK(inode->mode);
 	int r, fd, flags;
 	static const char diag[] = "flush_cb";
 
@@ -309,11 +311,38 @@ flush_cb(const char *value, size_t value_size, void *arg)
 	}
 	/* lock chunk */
 
+	if (S_ISREG(mode))
+		goto regular_file;
+
+	if (S_ISDIR(mode))
+		r = fs_mkdir_p(a->dst, mode);
+	else if (S_ISLNK(mode)) {
+		r = symlink(value + fs_msize, a->dst);
+		if (r == -1) {
+			fs_mkdir_parent(a->dst);
+			r = symlink(value + fs_msize, a->dst);
+		}
+	} else {
+		r = KV_ERR_NOT_SUPPORTED;
+		goto done;
+	}
+	if (r == -1)
+		r = fs_err(-errno);
+	else
+		r = KV_SUCCESS;
+	goto done;
+
+regular_file:
 	flags = O_WRONLY;
 	if (!(inode->flags & CHFS_FS_CACHE))
 		flags |= O_CREAT;
 
-	if ((fd = open(a->dst, flags, MODE_MASK(inode->mode))) == -1)
+	fd = open(a->dst, flags, mode);
+	if (fd == -1) {
+		fs_mkdir_parent(a->dst);
+		fd = open(a->dst, flags, mode);
+	}
+	if (fd == -1)
 		r = KV_ERR_NO_ENTRY;
 	else {
 		r = pwrite(fd, value + fs_msize, inode->size,
@@ -333,6 +362,7 @@ flush_cb(const char *value, size_t value_size, void *arg)
 			r = KV_SUCCESS;
 		close(fd);
 	}
+done:
 	if (r != KV_SUCCESS)
 		log_error("%s: %s", diag, kv_err_string(r));
 	else
