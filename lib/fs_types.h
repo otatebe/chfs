@@ -90,7 +90,7 @@ hg_proc_fs_readdir_out_t(hg_proc_t proc, void *data)
 	return (ret);
 }
 
-#define CHFS_FS_CLEAN		0x1
+#define CHFS_FS_CACHE		0x1
 #define CHFS_FS_DIRTY		0x2
 
 #define FLAGS_SHIFT		28

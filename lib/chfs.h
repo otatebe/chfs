@@ -27,4 +27,4 @@ int chfs_readdir(const char *path, void *buf,
 int chfs_symlink(const char *target, const char *path);
 int chfs_readlink(const char *path, char *buf, size_t size);
 
-#define CHFS_O_CLEAN	(1 << 28)
+#define CHFS_O_CACHE	(1 << 28)

@@ -36,6 +36,8 @@ create_inode_all(uint32_t uid, uint32_t gid, uint32_t mode, size_t chunk_size,
 	inode->gid = gid;
 	inode->msize = fs_msize;
 	inode->flags = FLAGS_FROM_MODE(mode);
+	if (!(inode->flags & CHFS_FS_CACHE))
+		inode->flags |= CHFS_FS_DIRTY;
 	inode->size = offset + size;
 	inode->chunk_size = chunk_size;
 	inode->mtime = *mtime;
@@ -160,7 +162,7 @@ fs_inode_dirty(char *key, size_t key_size, uint16_t flags)
 	return (r);
 }
 
-#define IS_MODE_CLEAN(mode)	(FLAGS_FROM_MODE(mode) & CHFS_FS_CLEAN)
+#define IS_MODE_CACHE(mode)	(FLAGS_FROM_MODE(mode) & CHFS_FS_CACHE)
 
 int
 fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
@@ -174,18 +176,18 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 	/* lock chunk */
 	r = kv_pget(key, key_size, 0, &inode, &s);
 	if (r != KV_SUCCESS) {
-		if (!IS_MODE_CLEAN(mode))
+		if (!IS_MODE_CACHE(mode))
 			mode = MODE_FLAGS(mode, CHFS_FS_DIRTY);
 		r = fs_inode_create_data(key, key_size, 0, 0, mode, chunk_size,
 			buf, *size, offset);
 		if (r != KV_SUCCESS)
 			log_error("%s: %s", diag, kv_err_string(r));
 		else if (FLAGS_FROM_MODE(mode) & CHFS_FS_DIRTY)
-			fs_inode_flush(key, key_size);
+			fs_inode_flush_enq(key, key_size);
 		return (r);
 	}
 	r = kv_update(key, key_size, fs_msize + offset, (void *)buf, size);
-	if (r == KV_SUCCESS && !IS_MODE_CLEAN(mode))
+	if (r == KV_SUCCESS && !IS_MODE_CACHE(mode))
 		r = fs_inode_dirty(key, key_size, inode.flags);
 	if (r != KV_SUCCESS) {
 		log_error("%s: %s", diag, kv_err_string(r));
@@ -196,8 +198,8 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 		r = fs_inode_update_size(key, key_size, s);
 	if (r != KV_SUCCESS)
 		log_error("%s: %s", diag, kv_err_string(r));
-	else if (!IS_MODE_CLEAN(mode))
-		fs_inode_flush(key, key_size);
+	else if (!IS_MODE_CACHE(mode))
+		fs_inode_flush_enq(key, key_size);
 	return (r);
 }
 
@@ -249,6 +251,8 @@ fs_inode_truncate(char *key, size_t key_size, off_t len)
 			r = fs_inode_dirty(key, key_size, inode.flags);
 		if (r != KV_SUCCESS)
 			log_error("%s: %s", diag, kv_err_string(r));
+		else
+			fs_inode_flush_enq(key, key_size);
 	}
 	return (r);
 }
@@ -306,7 +310,7 @@ flush_cb(const char *value, size_t value_size, void *arg)
 	/* lock chunk */
 
 	flags = O_WRONLY;
-	if (!(inode->flags & CHFS_FS_CLEAN))
+	if (!(inode->flags & CHFS_FS_CACHE))
 		flags |= O_CREAT;
 
 	if ((fd = open(a->dst, flags, MODE_MASK(inode->mode))) == -1)
@@ -332,7 +336,7 @@ flush_cb(const char *value, size_t value_size, void *arg)
 	if (r != KV_SUCCESS)
 		log_error("%s: %s", diag, kv_err_string(r));
 	else
-		inode->flags = (inode->flags & ~CHFS_FS_DIRTY) | CHFS_FS_CLEAN;
+		inode->flags = (inode->flags & ~CHFS_FS_DIRTY) | CHFS_FS_CACHE;
 		/* persist */
 }
 

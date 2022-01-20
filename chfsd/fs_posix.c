@@ -197,8 +197,18 @@ get_metadata(const char *path, size_t *size, int16_t *flags)
 {
 	static const char diag[] = "get_metadata";
 	struct metadata mdata;
+	struct stat sb;
 	int fd, r;
 
+	r = lstat(path, &sb);
+	if (r == -1) {
+		r = -errno;
+		log_info("%s (%s): %s", diag, path, strerror(errno));
+		return (r);
+	} else if (!S_ISREG(sb.st_mode)) {
+		log_info("%s (%s): not a regular file", diag, path);
+		return (-EINVAL);
+	}
 	fd = open(path, O_RDONLY, 0);
 	if (fd == -1) {
 		r = -errno;
@@ -314,6 +324,8 @@ fs_inode_create(char *key, size_t key_size, uint32_t uid, uint32_t gid,
 
 	log_debug("%s: %s mode %o chunk_size %ld", diag, p, mode, chunk_size);
 	if (S_ISREG(mode)) {
+		if (!(flags & CHFS_FS_CACHE))
+			flags |= CHFS_FS_DIRTY;
 		fd = r = fs_open(p, O_CREAT|O_WRONLY|O_TRUNC, mode, &chunk_size,
 			&flags, NULL);
 		if (fd >= 0) {
@@ -430,7 +442,7 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 	memcpy(key_save, key, key_size);
 
 	p = key_to_path(key, key_size);
-	log_debug("%s: %s size %ld offset %ld", diag, p, *size, offset);
+	log_debug("%s: %s size %ld offset %ld flags %o", diag, p, *size, offset, flags);
 	ss = *size;
 	if (ss + offset > chunk_size) {
 		if (offset >= chunk_size) {
@@ -439,7 +451,7 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 		}
 		ss = chunk_size - offset;
 	}
-	if (!(flags & CHFS_FS_CLEAN))
+	if (!(flags & CHFS_FS_CACHE))
 		flags |= CHFS_FS_DIRTY;
 	/* lock chunk */
 	fd = r = fs_open(p, O_RDWR, mode, &chunk_size, &flags, &does_create);
@@ -447,9 +459,9 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 		r = pwrite(fd, buf, ss, offset + msize);
 		if (r == -1)
 			r = -errno;
-		else if (!does_create && !(flags & CHFS_FS_CLEAN))
+		else if (!does_create && !(flags & CHFS_FS_CACHE))
 			r = fs_inode_dirty(fd);
-		fs_inode_flush(key_save, key_size);
+		fs_inode_flush_enq(key_save, key_size);
 		close(fd);
 	}
 	if (r >= 0)
@@ -579,9 +591,15 @@ rmdir_r(const char *dir)
 int
 fs_inode_truncate(char *key, size_t key_size, off_t len)
 {
-	char *p = key_to_path(key, key_size);
+	char *p, *key_save;
 	int r, fd;
 
+	key_save = malloc(key_size);
+	if (key_save == NULL)
+		return (KV_ERR_NO_MEMORY);
+	memcpy(key_save, key, key_size);
+
+	p = key_to_path(key, key_size);
 	log_debug("fs_inode_truncate: %s len %ld", p, len);
 	r = truncate(p, len + msize);
 	if (r == -1)
@@ -590,10 +608,12 @@ fs_inode_truncate(char *key, size_t key_size, off_t len)
 		fd = r = open(p, O_RDWR, 0);
 		if (fd >= 0) {
 			r = fs_inode_dirty(fd);
+			fs_inode_flush_enq(key_save, key_size);
 			close(fd);
 		} else
 			r = -errno;
 	}
+	free(key_save);
 	return (fs_err(r));
 }
 
@@ -621,7 +641,7 @@ int
 fs_inode_readdir(char *path, void (*cb)(struct dirent *, void *),
 	void *arg)
 {
-	char *p = key_to_path(path, strlen(path) + 1);
+	char *p = key_to_path(path, strlen(path) + 1), *pp;
 	struct dirent *dent;
 	DIR *dp;
 	size_t size;
@@ -635,9 +655,13 @@ fs_inode_readdir(char *path, void (*cb)(struct dirent *, void *),
 		while ((dent = readdir(dp)) != NULL) {
 			if (strchr(dent->d_name, ':'))
 				continue;
-			r2 = get_metadata(dent->d_name, &size, &flags);
-			if (r2 < 0 || flags & CHFS_FS_CLEAN)
-				continue;
+			pp = make_path(p, dent->d_name);
+			if (pp != NULL) {
+				r2 = get_metadata(pp, &size, &flags);
+				free(pp);
+				if (r2 > 0 && flags & CHFS_FS_CACHE)
+					continue;
+			}
 			cb(dent, arg);
 		}
 		closedir(dp);
@@ -750,7 +774,7 @@ fs_inode_flush(void *key, size_t key_size)
 	}
 
 	flags = O_WRONLY;
-	if (!(cache_flags & CHFS_FS_CLEAN))
+	if (!(cache_flags & CHFS_FS_CACHE))
 		flags |= O_CREAT;
 
 	if ((dst_fd = open(dst, flags, sb.st_mode)) == -1)
@@ -786,7 +810,7 @@ free_dst:
 	free(dst);
 	if (r == KV_SUCCESS) {
 		r = set_metadata(p, chunk_size,
-		    (cache_flags & ~CHFS_FS_DIRTY) | CHFS_FS_CLEAN);
+		    (cache_flags & ~CHFS_FS_DIRTY) | CHFS_FS_CACHE);
 		r = fs_err(r);
 	}
 	if (r != KV_SUCCESS)

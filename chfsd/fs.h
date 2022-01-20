@@ -18,3 +18,4 @@ int fs_inode_readdir(char *path, void (*cb)(struct dirent *, void *),
 	void *arg);
 
 int fs_inode_flush(void *key, size_t key_size);
+int fs_inode_flush_enq(void *key, size_t key_size);

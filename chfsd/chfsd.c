@@ -20,6 +20,7 @@
 #include "fs_rpc.h"
 #include "host.h"
 #include "file.h"
+#include "flush.h"
 #include "log.h"
 
 static char *self;
@@ -300,6 +301,8 @@ main(int argc, char *argv[])
 	pthread_sigmask(SIG_BLOCK, &sigset, NULL);
 	pthread_create(&t, NULL, handle_sig, &sigset);
 	pthread_detach(t);
+
+	fs_inode_flush_thread_start();
 
 	/* XXX - should check the validity of input string */
 	sprintf(info_string, "%s", protocol);
