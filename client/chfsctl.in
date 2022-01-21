@@ -18,6 +18,7 @@ NO_SERVER=true
 SUDO=
 NUM_SERVS=32
 NUM_FLUSH_THREADS=1
+NO_MOUNT=false
 
 program=$(basename $0)
 
@@ -28,7 +29,7 @@ err() {
 
 usage() {
 	[ "X$*" = X ] || echo >&2 $program: $*
-	echo >&2 "usage: $program [-h hostfile] [-c scratch_dir] [-D] [-m mount_point]"
+	echo >&2 "usage: $program [-h hostfile] [-c scratch_dir] [-D] [-m mount_point] [-M]"
 	echo >&2 "	[-b backend_dir] [-f #flush_threads] [-p proto] [-s db_size] [-N vname]"
 	echo >&2 "	[-I interface] [-C socket#] [-L log_dir] [-A] [-O options]"
 	echo >&2 "	[-n #servers for CHFS_SERVER]"
@@ -49,6 +50,7 @@ while [ $# -gt 0 ]; do
 	    -I) shift; IFACE=$1 ;;
 	    -L) shift; LOG_DIR=$1 ;;
 	    -m) shift; MDIR=$1 ;;
+	    -M) NO_MOUNT=true ;;
 	    -n) shift; NUM_SERVS=$1 ;;
 	    -N) shift; VNAME=$1 ;;
 	    -O) shift; OPTIONS="$1" ;;
@@ -98,7 +100,7 @@ stop_chfs() {
 	if [ "X$HOSTS" = Xlocalhost ]; then
 		$SUDO pkill $PKILL_FLAG chfsd
 		[ "$mode" = kill ] && pkill $PKILL_FLAG chfuse
-		if [ X"$MDIR" != X ]; then
+		if ! $NO_MOUNT && [ X"$MDIR" != X ]; then
 			fusermount -u "$MDIR"
 		fi
 		HOSTS=
@@ -108,7 +110,7 @@ stop_chfs() {
 	do
 		ssh $host $SUDO pkill $PKILL_FLAG chfsd &
 		[ "$mode" = kill ] && ssh $host pkill $PKILL_FLAG chfuse &
-		if [ X"$MDIR" != X ]; then
+		if ! $NO_MOUNT && [ X"$MDIR" != X ]; then
 			ssh $host fusermount -u "$MDIR" &
 		fi
 
@@ -262,7 +264,7 @@ while [ $timeout -gt 0 -a $(chlist | wc -l) -lt $nservers ]; do
 done
 echo "CHFS_SERVER=\"$(chlist -c -n $NUM_SERVS)\"; export CHFS_SERVER;"
 CHFS_SERVER="$(chlist -c -n $NUM_SERVS)"; export CHFS_SERVER
-if [ X"$MDIR" != X ]; then
+if ! $NO_MOUNT && [ X"$MDIR" != X ]; then
 	if [ $(chlist | wc -l) -lt $nservers ]; then
 		echo >&2 "$program: timeout, $(chlist | wc -l) of $nservers servers are running.  you may need chmkdir $MDIR manually"
 	fi
