@@ -17,6 +17,7 @@ DEVDAX=false
 NO_SERVER=true
 SUDO=
 NUM_SERVS=32
+NUM_FLUSH_THREADS=1
 
 program=$(basename $0)
 
@@ -28,7 +29,7 @@ err() {
 usage() {
 	[ "X$*" = X ] || echo >&2 $program: $*
 	echo >&2 "usage: $program [-h hostfile] [-c scratch_dir] [-D] [-m mount_point]"
-	echo >&2 "	[-b backend_dir] [-p proto] [-s db_size] [-N vname]"
+	echo >&2 "	[-b backend_dir] [-f #flush_threads] [-p proto] [-s db_size] [-N vname]"
 	echo >&2 "	[-I interface] [-C socket#] [-L log_dir] [-A] [-O options]"
 	echo >&2 "	[-n #servers for CHFS_SERVER]"
 	echo >&2 "	start | stop | status | kill | clean"
@@ -43,6 +44,7 @@ while [ $# -gt 0 ]; do
 	    -c) shift; DBDIR=$1 ;;
 	    -C) shift; CPUSOCKET=$1 ;;
 	    -D) DEVDAX=true ;;
+	    -f) shift; NUM_FLUSH_THREADS=$1 ;;
 	    -h) shift; HOSTFILE=$1 ;;
 	    -I) shift; IFACE=$1 ;;
 	    -L) shift; LOG_DIR=$1 ;;
@@ -85,7 +87,7 @@ if [ "X$BEDIR" != X ]; then
 		export CHFS_SUBDIR_PATH="$MDIR"
 	fi
 fi
-CHFS_OPTIONS="$CHFS_OPTIONS -p $PROTO -s $DBSIZE $OPTIONS"
+CHFS_OPTIONS="$CHFS_OPTIONS -p $PROTO -s $DBSIZE -f $NUM_FLUSH_THREADS $OPTIONS"
 SERVER_INFO_FILE=/tmp/server-info-file-$USER
 
 MAX_JOBS=8

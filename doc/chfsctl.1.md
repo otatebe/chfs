@@ -27,6 +27,9 @@ chfsctl - manage CHFS servers
 -b backend_directory
 : specifies a backend directory to cache.
 
+-f num_flush_threads
+: specifies the number of flush threads.  Default is 1.
+
 -p protocol
 : specifies a protocol like sm, sockets, tcp, and verbs.  Default is sockets.
 
