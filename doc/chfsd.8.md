@@ -33,6 +33,9 @@ chfsd - CHFS server
 -B subdir
 : specify a subdir that is considered to be a root directory in CHFS for the backend directory.
 
+-f num_flush_threads
+: specify the number of flush threads.  Default is 1.  0 means no flush.
+
 -l log_file
 : specifies a log file.
 

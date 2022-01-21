@@ -100,14 +100,19 @@ leave()
 		ring_release_next_next();
 	}
 	ring_list_remove(self);
+	log_debug("move_all_data");
 	if (ret == HG_SUCCESS)
 		move_all_data();
+	log_debug("move_all_data: done");
 leave_prev:
 	ring_release_prev();
 	if (prev_prev == 1)
 		ring_release_prev_prev();
 leave:
 	ring_release_next();
+	log_debug("flush_wait");
+	fs_inode_flush_wait();
+	log_debug("flush_wait: done");
 	fs_server_term();
 	log_term();
 }
@@ -188,9 +193,10 @@ usage(char *prog_name)
 	fprintf(stderr, "Usage: %s [-d] [-c db_dir] [-s db_size] "
 		"[-b backend_dir] [-B subdir]\n\t[-p protocol] "
 		"[-h host[:port]/device] [-n vname] [-N virtual_name]\n\t"
-		"[-l log_file] [-S server_info_file] [-t rpc_timeout_msec]\n\t"
-		"[-T nthreads] [-I niothreads] [-H heartbeat_interval] "
-		"[-L log_priority]\n\t[server]\n", prog_name);
+		"[-f num_flush_threads] [-l log_file] [-S server_info_file]\n\t"
+		"[-t rpc_timeout_msec] [-T nthreads] [-I niothreads]\n\t"
+		"[-H heartbeat_interval] [-L log_priority] [server]\n",
+		prog_name);
 	exit(EXIT_FAILURE);
 }
 
@@ -209,11 +215,12 @@ main(int argc, char *argv[])
 	char *addr_name = NULL, *backend_dir = NULL, *subdir = NULL;
 	int opt, debug = 0, rpc_timeout_msec = 0, nthreads = 5;
 	int heartbeat_interval = 10, log_priority = -1, niothreads = 2;
+	int nflushthreads = 1;
 	char *prog_name;
 
 	prog_name = basename(argv[0]);
 
-	while ((opt = getopt(argc, argv, "b:B:c:dh:H:I:l:L:n:N:p:s:S:t:T:"))
+	while ((opt = getopt(argc, argv, "b:B:c:df:h:H:I:l:L:n:N:p:s:S:t:T:"))
 			!= -1) {
 		switch (opt) {
 		case 'b':
@@ -229,6 +236,9 @@ main(int argc, char *argv[])
 			debug = 1;
 			if (log_priority == -1)
 				log_priority = LOG_DEBUG;
+			break;
+		case 'f':
+			nflushthreads = atoi(optarg);
 			break;
 		case 'h':
 			hostname = optarg;
@@ -302,7 +312,7 @@ main(int argc, char *argv[])
 	pthread_create(&t, NULL, handle_sig, &sigset);
 	pthread_detach(t);
 
-	fs_inode_flush_thread_start();
+	fs_inode_flush_thread_start(nflushthreads);
 
 	/* XXX - should check the validity of input string */
 	sprintf(info_string, "%s", protocol);

@@ -6,6 +6,8 @@
 #include "fs.h"
 #include "log.h"
 
+static int num_threads = 0;
+
 struct entry {
 	struct entry *next;
 	void *key;
@@ -14,6 +16,7 @@ struct entry {
 
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+static pthread_cond_t wait_cond = PTHREAD_COND_INITIALIZER;
 
 static struct fs_flush_list {
 	struct entry *head;
@@ -22,10 +25,32 @@ static struct fs_flush_list {
 	NULL, &flush_list.head
 };
 
+static int
+get_num_threads(void)
+{
+	int num;
+
+	pthread_mutex_lock(&mutex);
+	num = num_threads;
+	pthread_mutex_unlock(&mutex);
+	return (num);
+}
+
+static void
+set_num_threads(int num)
+{
+	pthread_mutex_lock(&mutex);
+	num_threads = num;
+	pthread_mutex_unlock(&mutex);
+}
+
 int
 fs_inode_flush_enq(void *key, size_t size)
 {
 	struct entry *e;
+
+	if (get_num_threads() <= 0)
+		return (0);
 
 	log_debug("fs_inode_flush_enq: %s (%ld)", (char *)key, size);
 	e = malloc(sizeof *e);
@@ -59,11 +84,25 @@ fs_inode_flush_deq(void)
 		pthread_cond_wait(&cond, &mutex);
 	e = flush_list.head;
 	flush_list.head = e->next;
-	if (flush_list.head == NULL)
+	if (flush_list.head == NULL) {
 		flush_list.tail = &flush_list.head;
+		pthread_cond_signal(&wait_cond);
+	}
 	pthread_mutex_unlock(&mutex);
 
 	return (e);
+}
+
+void
+fs_inode_flush_wait(void)
+{
+	if (get_num_threads() <= 0)
+		return;
+
+	pthread_mutex_lock(&mutex);
+	while (flush_list.head)
+		pthread_cond_wait(&wait_cond, &mutex);
+	pthread_mutex_unlock(&mutex);
 }
 
 static struct entry *
@@ -122,12 +161,15 @@ flush_thread(void *a)
 }
 
 void
-fs_inode_flush_thread_start()
+fs_inode_flush_thread_start(int nthreads)
 {
 	pthread_t th;
 
-	pthread_create(&th, NULL, flush_thread, NULL);
-	pthread_detach(th);
+	set_num_threads(nthreads);
+	for (; nthreads > 0; --nthreads) {
+		pthread_create(&th, NULL, flush_thread, NULL);
+		pthread_detach(th);
+	}
 }
 
 void
