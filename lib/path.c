@@ -66,7 +66,7 @@ canonical_path(const char *path)
 		if (i < depth - 1)
 			l++;
 	}
-	pp = malloc(++l);
+	pp = malloc(l + 1);
 	if (pp == NULL)
 		return (NULL);
 	for (l = 0, i = 0; i < depth; ++i) {
