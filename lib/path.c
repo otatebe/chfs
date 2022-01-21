@@ -61,9 +61,12 @@ canonical_path(const char *path)
 		}
 		p = skip_slash(p);
 	}
-	for (l = 0, i = 0; i < depth; ++i)
-		l += d[i].l + 1;
-	pp = malloc(l);
+	for (l = 0, i = 0; i < depth; ++i) {
+		l += d[i].l;
+		if (i < depth - 1)
+			l++;
+	}
+	pp = malloc(++l);
 	if (pp == NULL)
 		return (NULL);
 	for (l = 0, i = 0; i < depth; ++i) {
