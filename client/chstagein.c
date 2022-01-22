@@ -8,6 +8,7 @@
 #include <log.h>
 
 static int opt_bufsize = 1024 * 1024;
+static int opt_chunk_size = 64 * 1024;
 
 int
 stagein(char *src, char *dst)
@@ -25,7 +26,8 @@ stagein(char *src, char *dst)
 		perror(src);
 		goto free_buf;
 	}
-	d = chfs_create(dst, O_WRONLY|CHFS_O_CACHE, sb.st_mode);
+	d = chfs_create_chunk_size(dst, O_WRONLY|CHFS_O_CACHE, sb.st_mode,
+		opt_chunk_size);
 	if (d < 0) {
 		log_error("%s: cannot create", dst);
 		goto close_s;
@@ -57,7 +59,8 @@ free_buf:
 void
 usage(char *progname)
 {
-	fprintf(stderr, "usage: %s [-b bufsize] src dest\n", progname);
+	fprintf(stderr, "usage: %s [-b bufsize] [-c chunk_size] src dest\n",
+		progname);
 	exit(EXIT_FAILURE);
 }
 
@@ -69,10 +72,13 @@ main(int argc, char *argv[])
 
 	progname = basename(argv[0]);
 
-	while ((opt = getopt(argc, argv, "b:")) != -1) {
+	while ((opt = getopt(argc, argv, "b:c:")) != -1) {
 		switch (opt) {
 		case 'b':
 			opt_bufsize = strtol(optarg, NULL, 8);
+			break;
+		case 'c':
+			opt_chunk_size = strtol(optarg, NULL, 8);
 			break;
 		default:
 			usage(progname);
