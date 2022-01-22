@@ -29,13 +29,11 @@ struct metadata {
 	uint16_t msize;
 	uint16_t flags;
 };
-#else
-struct metadata {
-	uint16_t msize;
-	uint16_t flags;
-};
-#endif
+
 static int msize = sizeof(struct metadata);
+#else
+static int msize = 0;
+#endif
 
 #ifdef USE_ABT_IO
 static abt_io_instance_id abtio;
@@ -128,13 +126,26 @@ key_to_path(char *key, size_t key_size)
 }
 
 #define FS_XATTR_CHUNK_SIZE "user.chunk_size"
+#define FS_XATTR_CACHE_FLAGS "user.cache_flags"
 
 static int
 set_metadata(const char *path, size_t size, int16_t flags)
 {
 	static const char diag[] = "set_metadata";
+	int r;
+
+#ifdef USE_XATTR
+	r = setxattr(path, FS_XATTR_CHUNK_SIZE, &size, sizeof(size), 0);
+	if (r == 0)
+		r = setxattr(path, FS_XATTR_CACHE_FLAGS, &flags, sizeof(flags),
+			0);
+	if (r == -1) {
+		r = -errno;
+		log_error("%s (%s): %s", diag, path, strerror(errno));
+	}
+#else
 	struct metadata mdata;
-	int fd, r;
+	int fd;
 
 	fd = open(path, O_WRONLY, 0);
 	if (fd == -1) {
@@ -142,16 +153,7 @@ set_metadata(const char *path, size_t size, int16_t flags)
 		log_error("%s (%s): %s", diag, path, strerror(errno));
 		return (r);
 	}
-#ifdef USE_XATTR
-	r = setxattr(path, FS_XATTR_CHUNK_SIZE, &size, sizeof(size), 0);
-	if (r == -1) {
-		r = -errno;
-		log_error("%s (%s): %s", diag, path, strerror(errno));
-		goto close_fd;
-	}
-#else
 	mdata.chunk_size = size;
-#endif
 	mdata.msize = msize;
 	mdata.flags = flags;
 	r = write(fd, &mdata, msize);
@@ -163,10 +165,8 @@ set_metadata(const char *path, size_t size, int16_t flags)
 			r, msize);
 		r = -ENOSPC;
 	}
-#ifdef USE_XATTR
-close_fd:
-#endif
 	close(fd);
+#endif
 	return (r);
 }
 
@@ -174,9 +174,20 @@ static int
 get_metadata(const char *path, size_t *size, int16_t *flags)
 {
 	static const char diag[] = "get_metadata";
+	int r;
+
+#ifdef USE_XATTR
+	r = getxattr(path, FS_XATTR_CHUNK_SIZE, size, sizeof(*size));
+	if (r > 0)
+		r = getxattr(path, FS_XATTR_CACHE_FLAGS, flags, sizeof(*flags));
+	if (r == -1) {
+		r = -errno;
+		log_info("%s (%s): %s", diag, path, strerror(errno));
+	}
+#else
 	struct metadata mdata;
 	struct stat sb;
-	int fd, r;
+	int fd;
 
 	r = lstat(path, &sb);
 	if (r == -1) {
@@ -204,22 +215,11 @@ get_metadata(const char *path, size_t *size, int16_t *flags)
 		log_error("%s (%s): metadata size mismatch", diag, path);
 		r = -EIO;
 	} else {
-#ifdef USE_XATTR
-		r = getxattr(path, FS_XATTR_CHUNK_SIZE, size, sizeof(*size));
-		if (r == -1) {
-			r = -errno;
-			log_info("%s (%s): %s", diag, path, strerror(errno));
-			goto close_fd;
-		}
-#else
 		*size = mdata.chunk_size;
-#endif
 		*flags = mdata.flags;
 	}
-#ifdef USE_XATTR
-close_fd:
-#endif
 	close(fd);
+#endif
 	return (r);
 }
 
@@ -227,8 +227,23 @@ static int
 fs_inode_dirty(int fd)
 {
 	static const char diag[] = "fs_inode_dirty";
-	struct metadata mdata;
 	int r;
+
+#ifdef USE_XATTR
+	int16_t flags;
+
+	r = fgetxattr(fd, FS_XATTR_CACHE_FLAGS, &flags, sizeof(flags));
+	if (r > 0 && !(flags & CHFS_FS_DIRTY)) {
+		flags |= CHFS_FS_DIRTY;
+		r = fsetxattr(fd, FS_XATTR_CACHE_FLAGS, &flags, sizeof(flags),
+			0);
+	}
+	if (r == -1) {
+		r = -errno;
+		log_error("%s (xattr): %s", diag, strerror(errno));
+	}
+#else
+	struct metadata mdata;
 
 	r = pread(fd, &mdata, msize, 0);
 	if (r == -1) {
@@ -252,6 +267,7 @@ fs_inode_dirty(int fd)
 			r = -ENOSPC;
 		}
 	}
+#endif
 	return (r);
 }
 
