@@ -61,7 +61,6 @@ chfs_set_node_list_cache_timeout(int timeout)
 	chfs_node_list_cache_timeout = timeout;
 }
 
-
 static void
 fd_table_init()
 {
