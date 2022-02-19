@@ -485,7 +485,7 @@ inode_copy_rdma(hg_handle_t h)
 	}
 
 	if (in.flag == 0) {
-		/* may fowared RPC */
+		/* may forward RPC */
 		target = ring_list_lookup(in.key.v, in.key.s);
 		if (target && strcmp(self, target) != 0) {
 			ret = fs_rpc_inode_copy_rdma_bulk(target,
