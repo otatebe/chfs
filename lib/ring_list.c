@@ -39,8 +39,8 @@ static struct ring_list {
 	struct ring_node *nodes;
 } ring_list;
 
-static char *ring_list_self;
-static int ring_list_self_index;
+static char *ring_list_self = NULL;
+static int ring_list_self_index = -1;
 static ABT_mutex ring_list_mutex;
 
 void
@@ -53,8 +53,6 @@ ring_list_init(char *self, char *name)
 	if (self == NULL) {
 		ring_list.n = 0;
 		ring_list.nodes = NULL;
-		ring_list_self = NULL;
-		ring_list_self_index = -1;
 		return;
 	}
 	n.n = 1;
@@ -126,6 +124,7 @@ ring_list_term()
 	ring_list_clear();
 	ring_list.n = 0;
 	ring_list.nodes = NULL;
+	free(ring_list_self);
 	ring_list_self = NULL;
 	ring_list_self_index = -1;
 
