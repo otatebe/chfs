@@ -12,8 +12,21 @@
 #include "fs_rpc.h"
 #include "fs.h"
 #include "log.h"
+#include "hash.h"
 
 static char *self;
+static hash_t *stat_hash = NULL;
+#define HASH_SIZE	16381
+struct hash_entry {
+	mode_t mode;
+	size_t chunk_size;
+};
+#define MAX_KEY_SIZE	16360
+struct {
+	char key[MAX_KEY_SIZE];
+	size_t size;
+	struct hash_entry entry;
+} saved_entry;
 
 DECLARE_MARGO_RPC_HANDLER(inode_create)
 DECLARE_MARGO_RPC_HANDLER(inode_stat)
@@ -62,6 +75,8 @@ fs_server_init(margo_instance_id mid, char *db_dir, size_t db_size, int timeout,
 	fs_server_init_more(mid, db_dir, db_size, niothreads);
 
 	self = ring_get_self();
+	stat_hash = hash_make(HASH_SIZE);
+	saved_entry.size = 0;
 }
 
 void
@@ -70,13 +85,25 @@ fs_server_term()
 	fs_server_term_more();
 }
 
+#if 0
+static void
+print_entry(void *k, size_t s, void **d, void *a)
+{
+	char *key = k;
+	struct hash_entry *e = *d;
+
+	log_debug("<%s> <mode %o chunk %ld>", key, e->mode, e->chunk_size);
+}
+#endif
+
 static void
 inode_create(hg_handle_t h)
 {
 	hg_return_t ret;
 	fs_create_in_t in;
-	int32_t err;
+	int32_t err = -1;
 	char *target;
+	struct hash_entry **hash_data;
 	static const char diag[] = "inode_create RPC";
 
 	ret = margo_get_input(h, &in);
@@ -85,6 +112,47 @@ inode_create(hg_handle_t h)
 		return;
 	}
 	log_debug("%s: key=%s", diag, (char *)in.key.v);
+
+	if (stat_hash && in.key.s <= MAX_KEY_SIZE) {
+		if (saved_entry.size != in.key.s || memcmp(saved_entry.key,
+		    in.key.v, in.key.s) != 0) {
+			saved_entry.size = in.key.s;
+			memcpy(saved_entry.key, in.key.v, in.key.s);
+			saved_entry.entry.mode = in.mode;
+			saved_entry.entry.chunk_size = in.chunk_size;
+			hash_data = (struct hash_entry **)hash_find(stat_hash,
+				in.key.v, in.key.s);
+		} else
+			hash_data = (struct hash_entry **)hash_get(stat_hash,
+				in.key.v, in.key.s);
+		if (hash_data) {
+			if (*hash_data) {
+				if ((*hash_data)->mode == in.mode &&
+				    (*hash_data)->chunk_size == in.chunk_size) {
+					log_debug("%s: cache hit %s", diag,
+						(char *)in.key.v);
+					err = KV_SUCCESS;
+				}
+			} else {
+				*hash_data = malloc(sizeof(**hash_data));
+				if (*hash_data) {
+					(*hash_data)->mode = in.mode;
+					(*hash_data)->chunk_size =
+						in.chunk_size;
+				}
+				if (saved_entry.entry.mode == (*hash_data)->mode
+				    && saved_entry.entry.chunk_size ==
+					(*hash_data)->chunk_size) {
+					err = KV_SUCCESS;
+				}
+				log_debug("%s: insert %s (%d)", diag,
+					(char *)in.key.v, err);
+			}
+			hash_release(stat_hash, (void **)hash_data);
+		}
+	}
+	if (err == KV_SUCCESS)
+		goto free_input;
 
 	target = ring_list_lookup(in.key.v, in.key.s);
 	if (target && strcmp(self, target) != 0) {
@@ -97,7 +165,7 @@ inode_create(hg_handle_t h)
 		err = fs_inode_create(in.key.v, in.key.s, in.uid, in.gid,
 			in.mode, in.chunk_size, in.value.v, in.value.s);
 	free(target);
-
+free_input:
 	ret = margo_free_input(h, &in);
 	if (ret != HG_SUCCESS)
 		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
@@ -122,6 +190,7 @@ inode_stat(hg_handle_t h)
 	kv_byte_t in;
 	fs_stat_out_t out;
 	char *target;
+	struct hash_entry **hash_data;
 	static const char diag[] = "inode_stat RPC";
 
 	ret = margo_get_input(h, &in);
@@ -134,13 +203,27 @@ inode_stat(hg_handle_t h)
 	memset(&out, 0, sizeof(out));
 	target = ring_list_lookup(in.v, in.s);
 	if (target && strcmp(self, target) != 0) {
+		if (stat_hash) {
+			hash_data = (struct hash_entry **)hash_find(stat_hash,
+				in.v, in.s);
+			if (hash_data && *hash_data) {
+				sb.mode = (*hash_data)->mode;
+				sb.chunk_size = (*hash_data)->chunk_size;
+				hash_release(stat_hash, (void **)hash_data);
+				log_debug("%s: cache hit %s", diag,
+					(char *)in.v);
+				out.err = KV_SUCCESS;
+				goto free_input;
+			}
+		}
+		log_debug("%s: %s forward to %s", diag, (char *)in.v, target);
 		ret = fs_rpc_inode_stat(target, in.v, in.s, &sb, &out.err);
 		if (ret != HG_SUCCESS)
 			out.err = KV_ERR_SERVER_DOWN;
 	} else
 		out.err = fs_inode_stat(in.v, in.s, &sb);
 	free(target);
-
+free_input:
 	ret = margo_free_input(h, &in);
 	if (ret != HG_SUCCESS)
 		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));

@@ -42,6 +42,8 @@ static struct ring_list {
 static char *ring_list_self = NULL;
 static int ring_list_self_index = -1;
 static ABT_mutex ring_list_mutex;
+static char *ring_list_client = NULL;
+static char *ring_list_local_server = NULL;
 
 void
 ring_list_init(char *self, char *name)
@@ -76,6 +78,15 @@ ring_list_display_node(struct ring_node *node)
 	printf("%s %s ", node->address, node->name);
 	display_hash(node->hash);
 	printf("\n");
+}
+
+void
+ring_list_set_client(char *client)
+{
+	if (client) {
+		free(ring_list_client);
+		ring_list_client = strdup(client);
+	}
 }
 
 void
@@ -127,6 +138,10 @@ ring_list_term()
 	free(ring_list_self);
 	ring_list_self = NULL;
 	ring_list_self_index = -1;
+	free(ring_list_client);
+	ring_list_client = NULL;
+	free(ring_list_local_server);
+	ring_list_local_server = NULL;
 
 	ABT_mutex_free(&ring_list_mutex);
 }
@@ -172,6 +187,44 @@ ring_list_copy_free(node_list_t *list)
 	free(list->s);
 }
 
+static void
+strdiff(const char *s1, const char *s2, int *len, int *diff)
+{
+	int i = 0;
+
+	if (s1 == NULL || s2 == NULL)
+		return;
+
+	while (s1[i] && s1[i] == s2[i])
+		++i;
+	if (len)
+		*len = i;
+	if (diff)
+		*diff = s1[i] > s2[i] ? s1[i] - s2[i] : s2[i] - s1[i];
+	return;
+}
+
+static char *
+get_local_server_unlocked()
+{
+	int max_len = 0, min_diff = 0x7fffffff, min_i = 0;
+	int len = max_len, diff = min_diff, i;
+
+	if (ring_list_client == NULL)
+		return (NULL);
+
+	for (i = 0; i < ring_list.n; ++i) {
+		strdiff(ring_list_client, ring_list.nodes[i].address,
+			&len, &diff);
+		if (max_len < len || (max_len == len && min_diff > diff)) {
+			min_i = i;
+			max_len = len;
+			min_diff = diff;
+		}
+	}
+	return (strdup(ring_list.nodes[min_i].address));
+}
+
 void
 ring_list_update(node_list_t *src)
 {
@@ -199,6 +252,12 @@ ring_list_update(node_list_t *src)
 	}
 	qsort(ring_list.nodes, ring_list.n, sizeof(ring_list.nodes[0]),
 		ring_list_cmp);
+	if (ring_list_client) {
+		free(ring_list_local_server);
+		ring_list_local_server = get_local_server_unlocked();
+		log_debug("client: %s local_server: %s", ring_list_client,
+			ring_list_local_server);
+	}
 	if (ring_list_self == NULL)
 		goto unlock;
 	for (i = 0; i < src->n; ++i)
@@ -212,6 +271,12 @@ ring_list_update(node_list_t *src)
 	}
 unlock:
 	ABT_mutex_unlock(ring_list_mutex);
+}
+
+char *
+ring_list_get_local_server()
+{
+	return (strdup(ring_list_local_server));
 }
 
 void

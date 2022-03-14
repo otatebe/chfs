@@ -236,6 +236,7 @@ chfs_init(const char *server)
 	margo_addr_to_string(mid, chfs_client, &client_size, client_addr);
 	margo_addr_free(mid, client_addr);
 
+	ring_list_set_client(chfs_client);
 	fd_table_init();
 	chfs_uid = getuid();
 	chfs_gid = getgid();
@@ -394,6 +395,14 @@ chfs_rpc_inode_create_data(void *key, size_t key_size, mode_t mode,
 	hg_return_t ret;
 	static const char diag[] = "rpc_inode_create_data";
 
+	target = ring_list_get_local_server();
+	if (target) {
+		ret = fs_rpc_inode_create(target, key, key_size, chfs_uid,
+			chfs_gid, mode, chunk_size, buf, size, errp);
+		free(target);
+		if (ret == HG_SUCCESS)
+			return (ret);
+	}
 	while (1) {
 		target = ring_list_lookup(key, key_size);
 		if (target == NULL) {
@@ -565,6 +574,23 @@ chfs_rpc_inode_stat(void *key, size_t key_size, struct fs_stat *st, int *errp)
 	return (ret);
 }
 
+static hg_return_t
+chfs_rpc_inode_stat_local(void *key, size_t key_size, struct fs_stat *st,
+	int *errp)
+{
+	char *target;
+	hg_return_t ret;
+
+	target = ring_list_get_local_server();
+	if (target) {
+		ret = fs_rpc_inode_stat(target, key, key_size, st, errp);
+		free(target);
+		if (ret == HG_SUCCESS)
+			return (ret);
+	}
+	return (chfs_rpc_inode_stat(key, key_size, st, errp));
+}
+
 int
 chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,
 	int chunk_size)
@@ -606,7 +632,7 @@ chfs_open(const char *path, int32_t flags)
 
 	if (p == NULL)
 		return (-1);
-	ret = chfs_rpc_inode_stat(p, strlen(p) + 1, &st, &err);
+	ret = chfs_rpc_inode_stat_local(p, strlen(p) + 1, &st, &err);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
 		free(p);
 		return (-1);
