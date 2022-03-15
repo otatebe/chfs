@@ -6,6 +6,7 @@
 #include <abt.h>
 #include "ll.h"
 #include "hash.h"
+#include "log.h"
 
 #define ENTRY_LOCKED 1
 
@@ -41,6 +42,7 @@ struct hash {
 	hash_entry_t *start;	/* first entry in master chain */
 };
 
+#ifndef NDEBUG
 /* call while lock is held */
 static int
 hash_check(hash_t *ptr)
@@ -74,6 +76,7 @@ hash_check(hash_t *ptr)
 	assert(count2 == count1);
 	return (1);
 }
+#endif
 
 static unsigned
 hash_string(char *s, size_t size)
@@ -145,8 +148,10 @@ hash_find_unlocked(hash_t *tbl, char *key, size_t key_size, unsigned int sig,
 
 			while (wait.wakeup == 0)
 				ABT_cond_wait(wait.cv, tbl->lock);
+
 			tst = (hash_waiter_t *)ll_dequeue(&tmp->waiters);
-			assert(tst == &wait);
+			if (tst != &wait)
+				log_error("hash_find: unexpected waiter");
 			--tmp->num_waiters;
 			ABT_cond_free(&wait.cv);
 		}

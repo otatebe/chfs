@@ -65,6 +65,7 @@ ll_traverse(llh_t *head, int (*func)(void *, void *), void *user)
 	return (NULL);
 }
 
+#ifndef NDEBUG
 /* make sure the list isn't corrupt and returns number of list items */
 int
 ll_check(llh_t *head)
@@ -82,3 +83,4 @@ ll_check(llh_t *head)
 	assert(head->back == prev);
 	return (i);
 }
+#endif
