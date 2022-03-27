@@ -117,7 +117,7 @@ key_to_path(char *key, size_t key_size)
 	log_debug("%s: key %s", diag, key);
 	if (klen + 1 < key_size)
 		key[klen] = ':';
-	while (*key && *key == '/')
+	while (*key == '/')
 		++key;
 	if (*key == '\0')
 		key = ".";

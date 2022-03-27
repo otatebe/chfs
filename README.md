@@ -41,7 +41,7 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
 
        % spack load mochi-margo
        % autoreconf -i
-       % ./configure [--with-pmemkv] [--prefix=PREFIX]
+       % ./configure [--prefix=PREFIX] [--with-pmemkv] [--enable-modular-hashing]
        % make
        # make install
 
