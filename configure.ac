@@ -20,8 +20,8 @@ AM_CONDITIONAL([HAVE_PANDOC], [test x$PANDOC = xyes])
 AC_MSG_CHECKING([whether modular hashing is used])
 AC_ARG_ENABLE([modular-hashing],
   [AS_HELP_STRING([--enable-modular-hashing],
-    [use modular hashing @<:@default=no@:>@])],
-  [], [enableval=no])
+    [use modular hashing @<:@default=yes@:>@])],
+  [], [enableval=yes])
 AC_MSG_RESULT([$enableval])
 if test x$enableval != xno; then
   AC_DEFINE([USE_MODULAR_HASHING], [1], [Use modular hashing])
