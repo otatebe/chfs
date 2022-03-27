@@ -8,16 +8,24 @@
 #ifdef USE_DIGEST_MD5
 #include <openssl/md5.h>
 
-typedef uint8_t HASH_T[MD5_DIGEST_LENGTH];
-#define HASH(data, len, hash) MD5(data, len, hash)
-#define HASH_CMP(a, b) memcmp(a, b, MD5_DIGEST_LENGTH)
+typedef union {
+	uint8_t c[MD5_DIGEST_LENGTH];
+#ifdef USE_MODULAR_HASHING
+	unsigned __int128 l;
+#endif
+} HASH_T;
+#define HASH(data, len, hash) MD5(data, len, hash.c)
+#define HASH_CMP(a, b) memcmp(a.c, b.c, MD5_DIGEST_LENGTH)
+#ifdef USE_MODULAR_HASHING
+#define HASH_MODULO(a, b) (a.l % (b))	/* XXX - ignore endian */
+#endif
 
 void display_hash(HASH_T hash)
 {
 	int i;
 
 	for (i = 0; i < MD5_DIGEST_LENGTH; ++i)
-		printf("%02X", hash[i]);
+		printf("%02X", hash.c[i]);
 }
 #else
 #include "murmur3.h"
@@ -25,6 +33,9 @@ void display_hash(HASH_T hash)
 typedef uint32_t HASH_T[1];
 #define HASH(data, len, hash) MurmurHash3_x86_32(data, len, 1234, hash)
 #define HASH_CMP(a, b) ((a[0] < b[0]) ? -1 : ((a[0] > b[0]) ? 1 : 0))
+#ifdef USE_MODULAR_HASHING
+#define HASH_MODULO(a, b) (a[0] % (b))
+#endif
 #define display_hash(hash) printf("%08X", hash[0])
 #endif
 
@@ -305,6 +316,49 @@ ring_list_remove(char *host)
 	ABT_mutex_unlock(ring_list_mutex);
 }
 
+#ifdef USE_MODULAR_HASHING
+
+int
+ring_list_is_in_charge(const char *key, int key_size)
+{
+	HASH_T hash;
+	unsigned int i, index = 0;
+	int klen = strlen(key) + 1, r;
+
+	if (klen < key_size)
+		index = atoi(key + klen);
+	HASH((const unsigned char *)key, klen, hash);
+	ABT_mutex_lock(ring_list_mutex);
+	i = HASH_MODULO(hash, ring_list.n);
+	if (index > 0)
+		i = (i + index) % ring_list.n;
+	r = i == ring_list_self_index;
+	ABT_mutex_unlock(ring_list_mutex);
+	return (r);
+}
+
+static char *
+ring_list_lookup_modulo(const char *key, int key_size)
+{
+	HASH_T hash;
+	unsigned int i, index = 0;
+	int klen = strlen(key) + 1;
+	char *r;
+
+	if (klen < key_size)
+		index = atoi(key + klen);
+	HASH((const unsigned char *)key, klen, hash);
+	ABT_mutex_lock(ring_list_mutex);
+	i = HASH_MODULO(hash, ring_list.n);
+	if (index > 0)
+		i = (i + index) % ring_list.n;
+	r = strdup(ring_list.nodes[i].address);
+	ABT_mutex_unlock(ring_list_mutex);
+	return (r);
+}
+
+#else
+
 int
 ring_list_is_in_charge(const char *key, int key_size)
 {
@@ -374,15 +428,21 @@ ring_list_lookup_binary(const char *key, int key_size)
 	return (r);
 }
 
+#endif
+
 char *
 ring_list_lookup(const char *key, int key_size)
 {
 	if (ring_list.n == 0)
 		return (NULL);
+#ifdef USE_MODULAR_HASHING
+	return (ring_list_lookup_modulo(key, key_size));
+#else
 	if (ring_list.n < 7)
 		return (ring_list_lookup_linear(key, key_size));
 	else
 		return (ring_list_lookup_binary(key, key_size));
+#endif
 }
 
 int
