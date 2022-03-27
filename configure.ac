@@ -17,6 +17,16 @@ LT_INIT
 AC_CHECK_PROG([PANDOC], [pandoc], [yes])
 AM_CONDITIONAL([HAVE_PANDOC], [test x$PANDOC = xyes])
 
+AC_MSG_CHECKING([whether modular hashing is used])
+AC_ARG_ENABLE([modular-hashing],
+  [AS_HELP_STRING([--enable-modular-hashing],
+    [use modular hashing @<:@default=no@:>@])],
+  [], [enableval=no])
+AC_MSG_RESULT([$enableval])
+if test x$enableval != xno; then
+  AC_DEFINE([USE_MODULAR_HASHING], [1], [Use modular hashing])
+fi
+
 AC_MSG_CHECKING([whether xattr is used for metadata])
 AC_ARG_ENABLE([xattr],
   [AS_HELP_STRING([--enable-xattr],
@@ -51,6 +61,17 @@ fi
 PKG_CHECK_MODULES([MARGO], [margo])
 PKG_CHECK_MODULES([FUSE], [fuse])
 
+AC_MSG_CHECKING([whether MD5 digest is used])
+AC_ARG_ENABLE([digest-md5],
+  [AS_HELP_STRING([--enable-digest-md5],
+    [use md5 digest @<:@default=no@:>@])],
+  [], [enableval=no])
+AC_MSG_RESULT([$enableval])
+if test x$enableval != xno; then
+  AC_DEFINE([USE_DIGEST_MD5], [1], [Use md5 digest])
+  PKG_CHECK_MODULES([OPENSSL], [openssl])
+fi
+
 AC_MSG_CHECKING([pmemkv])
 AC_ARG_WITH([pmemkv],
   [AS_HELP_STRING([--with-pmemkv],
@@ -74,17 +95,6 @@ if test x$with_abt_io != xno; then
   AC_DEFINE([USE_ABT_IO], [1], [Use abt-io])
   PKG_CHECK_MODULES([ABT_IO], [abt-io])
   AC_CHECK_FUNCS([abt_io_truncate])
-fi
-
-AC_MSG_CHECKING([digest-md5])
-AC_ARG_WITH([digest-md5],
-  [AS_HELP_STRING([--with-digest-md5],
-    [use md5 digest @<:@default=no@:>@])],
-  [], [with_digest_md5=no])
-AC_MSG_RESULT([$with_digest_md5])
-if test x$with_digest_md5 != xno; then
-  AC_DEFINE([USE_DIGEST_MD5], [1], [Use md5 digest])
-  PKG_CHECK_MODULES([OPENSSL], [openssl])
 fi
 
 # Checks for header files.
