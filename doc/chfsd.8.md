@@ -19,7 +19,7 @@ chfsd - CHFS server
 : specifies a database directory or a DAX device.  If the directory does not exist, it will be created.
 
 -s db_size
-: specifies a database size.  This option is only effective when using the pmemkv.  Default is 256 MiB.
+: specifies a database size.  This option is only effective when using the pmemkv and fsdax.  Default is 256 MiB.
 
 -p protocol
 : specifies a protocol like sm, sockets, tcp, and verbs.  Default is sockets.

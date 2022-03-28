@@ -37,7 +37,7 @@ chfsctl - manage CHFS servers
 : specifies a protocol like sm, sockets, tcp, and verbs.  Default is sockets.
 
 -s db_size
-: specifies a database size.  This option is only effective when using the pmemkv.  Default is 256 MiB.
+: specifies a database size.  This option is only effective when using the pmemkv and fsdax.  Default is 256 MiB.
 
 -D
 : use devdax.
