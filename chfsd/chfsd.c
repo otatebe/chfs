@@ -110,6 +110,9 @@ leave:
 	log_term();
 }
 
+static int heartbeat_stop = 0;
+static int heartbeat_done = 0;
+
 void *
 handle_sig(void *arg)
 {
@@ -117,7 +120,11 @@ handle_sig(void *arg)
 	int sig;
 
 	sigwait(a, &sig);
+	heartbeat_stop = 1;
+	while (!heartbeat_done)
+		sleep(1);
 	leave();
+	return (NULL);
 }
 
 static void
@@ -339,14 +346,19 @@ main(int argc, char *argv[])
 		join_ring(mid, argv[0]);
 		ring_wait_coordinator_rpc();
 	}
-	while (heartbeat_interval > 0) {
+	while (heartbeat_interval > 0 && !heartbeat_stop) {
+		int i;
+
 		if (ring_list_is_coordinator(addr_str)) {
 			log_debug("coordinator");
 			ring_heartbeat();
 		} else if (ring_heartbeat_is_timeout())
 			ring_start_election();
-		margo_thread_sleep(mid, 1000.0 * heartbeat_interval);
+		i = 0;
+		while (i++ < heartbeat_interval && !heartbeat_stop)
+			margo_thread_sleep(mid, 1000.0);
 	}
+	heartbeat_done = 1;
 	margo_wait_for_finalize(mid);
 
 	return (0);
