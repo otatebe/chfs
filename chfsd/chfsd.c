@@ -125,7 +125,6 @@ handle_sig(void *arg)
 
 	sigwait(a, &sig);
 	leave();
-	exit(1);
 }
 
 static void

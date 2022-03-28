@@ -92,6 +92,8 @@ When you use pmemkv, devdax is desirable.  When you use fsdax, the following env
        % spack load mochi-margo
        % mpirun -x PATH -x LD_LIBRARY_PATH -x CHFS_SERVER ior -a CHFS [--chfs.chunk_size=SIZE]
 
+   Large chunk size, i.e. 1 MiB, should be specified for best performance.
+
 ## CHFS API
 
 The following APIs are supported.
