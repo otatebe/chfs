@@ -118,6 +118,7 @@ handle_sig(void *arg)
 
 	sigwait(a, &sig);
 	leave();
+	return (NULL);
 }
 
 static void
