@@ -6,7 +6,7 @@
 chlist - list CHFS servers
 
 # SYNOPSIS
-**chlist** [-c] [-s _server_]
+**chlist** [_options_]
 
 # DESCRIPTION
 **chlist** lists CHFS servers.
@@ -20,6 +20,9 @@ chlist - list CHFS servers
 
 -s server
 : specifies a CHFS server.  The server can be specified by the CHFS_SERVER environment variable.
+
+-V
+: display version.
 
 # ENVIRONMENT
 CHFS_SERVER

@@ -8,7 +8,7 @@
 void
 usage()
 {
-	fprintf(stderr, "usage: chlist [-c] [-n #servers] [-s server]\n");
+	fprintf(stderr, "usage: chlist [-c] [-n #servers] [-s server] [-V]\n");
 	exit(EXIT_FAILURE);
 }
 
@@ -19,7 +19,7 @@ main(int argc, char *argv[])
 	int num_servers = 0;
 	void (*display)(int) = ring_list_display;
 
-	while ((opt = getopt(argc, argv, "cn:s:")) != -1) {
+	while ((opt = getopt(argc, argv, "cn:s:V")) != -1) {
 		switch (opt) {
 		case 'c':
 			display = ring_list_csv;
@@ -30,6 +30,9 @@ main(int argc, char *argv[])
 		case 's':
 			server = optarg;
 			break;
+		case 'V':
+			fprintf(stderr, "CHFS version %s\n", chfs_version());
+			exit(0);
 		default:
 			usage();
 		}

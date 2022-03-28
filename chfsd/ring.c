@@ -20,14 +20,13 @@ ring_print_node(ring_node_t *node, const char *diag)
 {
 	int index = 0;
 
-	if (diag != NULL)
-		printf("%s: ", diag);
+	if (diag == NULL)
+		return;
 	ABT_mutex_lock(node->mutex);
 	if (node->ref_count > 0 && node->host[1])
 		index = 1;
 	if (node->host[index])
-		printf("%s", node->host[index]);
-	printf("\n");
+		log_info("%s: %s", diag, node->host[index]);
 	ABT_mutex_unlock(node->mutex);
 }
 

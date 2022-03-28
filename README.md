@@ -98,6 +98,7 @@ The following APIs are supported.
 
     int chfs_init(const char *server);
     int chfs_term();
+    const char *chfs_version();
     void chfs_set_chunk_size(int chunk_size);
     void chfs_set_rdma_thresh(int thresh);
     void chfs_set_rpc_timeout_msec(int timeout_msec);

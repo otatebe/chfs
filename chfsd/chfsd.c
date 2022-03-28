@@ -287,6 +287,8 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
+	log_info("CHFS version %s", VERSION);
+
 	check_directory(db_dir);
 	if (backend_dir) {
 		check_directory(backend_dir);

@@ -277,6 +277,12 @@ chfs_term()
 	return (0);
 }
 
+const char *
+chfs_version(void)
+{
+	return (VERSION);
+}
+
 static int
 create_fd_unlocked(const char *path, uint32_t mode, int chunk_size)
 {
