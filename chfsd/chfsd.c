@@ -269,6 +269,8 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
+	log_info("CHFS version %s", VERSION);
+
 	check_directory(db_dir);
 	if (!debug) {
 		if (log_file) {

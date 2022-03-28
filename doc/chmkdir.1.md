@@ -6,7 +6,7 @@
 chmkdir - create a directory in CHFS
 
 # SYNOPSIS
-**chmkdir** [-m _mode_] _directory_
+**chmkdir** [_options_] _directory_
 
 # DESCRIPTION
 **chmkdir** creates a directory in CHFS.
@@ -14,6 +14,9 @@ chmkdir - create a directory in CHFS
 # OPTIONS
 -m _mode_
 : specifies the mode
+
+-V
+: display version
 
 # ENVIRONMENT
 CHFS_SERVER

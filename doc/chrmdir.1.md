@@ -6,10 +6,14 @@
 chrmdir - remove a directory in CHFS
 
 # SYNOPSIS
-**chrmdir** _directory_
+**chrmdir** [_options_] _directory_
 
 # DESCRIPTION
 **chrmdir** removes a directory in CHFS.
+
+# OPTIONS
+-V
+: display version
 
 # ENVIRONMENT
 CHFS_SERVER

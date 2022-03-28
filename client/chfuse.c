@@ -16,7 +16,7 @@ chfuse_init(struct fuse_conn_info *conn)
 	struct fuse_context *ctx = fuse_get_context();
 	const char *server = ctx->private_data;
 
-	puts("init");
+	printf("init: CHFS version %s\n", chfs_version());
 	chfs_init(server);
 	return (NULL);
 }
@@ -230,6 +230,7 @@ static const struct fuse_operations chfs_op = {
 static struct options {
 	const char *server;
 	int usage;
+	int version;
 } options;
 
 #define OPTION(t, p) { t, offsetof(struct options, p), 1 }
@@ -237,6 +238,8 @@ static const struct fuse_opt option_spec[] = {
 	OPTION("--server=%s", server),
 	OPTION("-h", usage),
 	OPTION("--help", usage),
+	OPTION("-V", version),
+	OPTION("--version", version),
 	FUSE_OPT_END
 };
 
@@ -261,6 +264,9 @@ main(int argc, char *argv[])
 	if (options.usage) {
 		usage(argv[0]);
 		fuse_opt_add_arg(&args, "-ho");
+	} else if (options.version) {
+		fprintf(stderr, "CHFS version %s\n", chfs_version());
+		fuse_opt_add_arg(&args, "--version");
 	}
 
 	ret = fuse_main(args.argc, args.argv, &chfs_op, (void *)options.server);
