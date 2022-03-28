@@ -8,7 +8,7 @@
 void
 usage(char *progname)
 {
-	fprintf(stderr, "usage: %s [-m mode] dir\n", progname);
+	fprintf(stderr, "usage: %s [-V] [-m mode] dir\n", progname);
 	exit(EXIT_FAILURE);
 }
 
@@ -21,11 +21,14 @@ main(int argc, char *argv[])
 
 	progname = basename(argv[0]);
 
-	while ((opt = getopt(argc, argv, "m:")) != -1) {
+	while ((opt = getopt(argc, argv, "m:V")) != -1) {
 		switch (opt) {
 		case 'm':
 			mode = strtol(optarg, NULL, 8);
 			break;
+		case 'V':
+			fprintf(stderr, "CHFS version %s\n", chfs_version());
+			exit(0);
 		default:
 			usage(progname);
 		}
