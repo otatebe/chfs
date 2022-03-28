@@ -21,6 +21,13 @@ chfuse_init(struct fuse_conn_info *conn)
 	return (NULL);
 }
 
+void
+chfuse_destroy(void *arg)
+{
+	puts("destroy");
+	chfs_term();
+}
+
 static int
 chfuse_getattr(const char *path, struct stat *st)
 {
@@ -210,6 +217,7 @@ chfuse_readlink(const char *path, char *buf, size_t size)
 
 static const struct fuse_operations chfs_op = {
 	.init		= chfuse_init,
+	.destroy	= chfuse_destroy,
 	.getattr	= chfuse_getattr,
 	.create		= chfuse_create,
 	.open		= chfuse_open,

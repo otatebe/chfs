@@ -45,6 +45,7 @@ main(int argc, char *argv[])
 
 	chfs_init(server);
 	display(num_servers);
+	chfs_term();
 
 	return (0);
 }

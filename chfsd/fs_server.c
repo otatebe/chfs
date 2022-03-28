@@ -13,7 +13,10 @@
 #include "fs.h"
 #include "log.h"
 
-static char *self;
+static struct {
+	margo_instance_id mid;
+	char *self;
+} env;
 
 DECLARE_MARGO_RPC_HANDLER(inode_create)
 DECLARE_MARGO_RPC_HANDLER(inode_stat)
@@ -35,6 +38,7 @@ fs_server_init(margo_instance_id mid, char *db_dir, size_t db_size, int timeout,
 	hg_id_t write_rpc, write_rdma_rpc, read_rpc, read_rdma_rpc = -1;
 	hg_id_t truncate_rpc;
 
+	env.mid = mid;
 	create_rpc = MARGO_REGISTER(mid, "inode_create", fs_create_in_t,
 		int32_t, inode_create);
 	stat_rpc = MARGO_REGISTER(mid, "inode_stat", kv_byte_t, fs_stat_out_t,
@@ -61,13 +65,14 @@ fs_server_init(margo_instance_id mid, char *db_dir, size_t db_size, int timeout,
 		truncate_rpc, remove_rpc);
 	fs_server_init_more(mid, db_dir, db_size, niothreads);
 
-	self = ring_get_self();
+	env.self = ring_get_self();
 }
 
 void
 fs_server_term()
 {
 	fs_server_term_more();
+	margo_finalize(env.mid);
 }
 
 static void
@@ -87,7 +92,7 @@ inode_create(hg_handle_t h)
 	log_debug("%s: key=%s", diag, (char *)in.key.v);
 
 	target = ring_list_lookup(in.key.v, in.key.s);
-	if (target && strcmp(self, target) != 0) {
+	if (target && strcmp(env.self, target) != 0) {
 		ret = fs_rpc_inode_create(target, in.key.v, in.key.s, in.uid,
 			in.gid, in.mode, in.chunk_size, in.value.v, in.value.s,
 			&err);
@@ -133,7 +138,7 @@ inode_stat(hg_handle_t h)
 
 	memset(&out, 0, sizeof(out));
 	target = ring_list_lookup(in.v, in.s);
-	if (target && strcmp(self, target) != 0) {
+	if (target && strcmp(env.self, target) != 0) {
 		ret = fs_rpc_inode_stat(target, in.v, in.s, &sb, &out.err);
 		if (ret != HG_SUCCESS)
 			out.err = KV_ERR_SERVER_DOWN;
@@ -179,7 +184,7 @@ inode_write(hg_handle_t h)
 
 	out.value_size = in.value.s;
 	target = ring_list_lookup(in.key.v, in.key.s);
-	if (target && strcmp(self, target) != 0) {
+	if (target && strcmp(env.self, target) != 0) {
 		ret = fs_rpc_inode_write(target, in.key.v, in.key.s, in.value.v,
 			&out.value_size, in.offset, in.mode, in.chunk_size,
 			&out.err);
@@ -240,7 +245,7 @@ inode_write_rdma(hg_handle_t h)
 	}
 
 	target = ring_list_lookup(in.key.v, in.key.s);
-	if (target && strcmp(self, target) != 0) {
+	if (target && strcmp(env.self, target) != 0) {
 		ret = fs_rpc_inode_write_rdma_bulk(target, in.key.v, in.key.s,
 			in.client, in.value, &out.value_size, in.offset,
 			in.mode, in.chunk_size, &out.err);
@@ -331,7 +336,7 @@ inode_read(hg_handle_t h)
 		goto free_input;
 	}
 	target = ring_list_lookup(in.key.v, in.key.s);
-	if (target && strcmp(self, target) != 0) {
+	if (target && strcmp(env.self, target) != 0) {
 		ret = fs_rpc_inode_read(target, in.key.v, in.key.s,
 			out.value.v, &out.value.s, in.offset, &out.err);
 		if (ret != HG_SUCCESS)
@@ -393,7 +398,7 @@ inode_read_rdma(hg_handle_t h)
 	}
 
 	target = ring_list_lookup(in.key.v, in.key.s);
-	if (target && strcmp(self, target) != 0) {
+	if (target && strcmp(env.self, target) != 0) {
 		ret = fs_rpc_inode_read_rdma_bulk(target, in.key.v, in.key.s,
 			in.client, in.value, &out.value_size, in.offset,
 			&out.err);
@@ -487,7 +492,7 @@ inode_copy_rdma(hg_handle_t h)
 	if (in.flag == 0) {
 		/* may forward RPC */
 		target = ring_list_lookup(in.key.v, in.key.s);
-		if (target && strcmp(self, target) != 0) {
+		if (target && strcmp(env.self, target) != 0) {
 			ret = fs_rpc_inode_copy_rdma_bulk(target,
 				in.key.v, in.key.s, in.client, &in.stat,
 				in.value, in.value_size, &out);
@@ -568,7 +573,7 @@ inode_truncate(hg_handle_t h)
 	log_debug("%s: key=%s, len=%ld", diag, (char *)in.key.v, in.len);
 
 	target = ring_list_lookup(in.key.v, in.key.s);
-	if (target && strcmp(self, target) != 0) {
+	if (target && strcmp(env.self, target) != 0) {
 		ret = fs_rpc_inode_truncate(target, in.key.v, in.key.s, in.len,
 			&err);
 		if (ret != HG_SUCCESS)
@@ -610,7 +615,7 @@ inode_remove(hg_handle_t h)
 	log_debug("%s: key=%s", diag, (char *)key.v);
 
 	target = ring_list_lookup(key.v, key.s);
-	if (target && strcmp(self, target) != 0) {
+	if (target && strcmp(env.self, target) != 0) {
 		ret = fs_rpc_inode_remove(target, key.v, key.s, &err);
 		if (ret != HG_SUCCESS)
 			err = KV_ERR_SERVER_DOWN;
