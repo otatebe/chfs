@@ -574,12 +574,19 @@ election(hg_handle_t h)
 DEFINE_MARGO_RPC_HANDLER(election)
 
 static int coordinator_rpc_done = 0;
+static ABT_mutex_memory coord_mutex_mem = ABT_MUTEX_INITIALIZER;
+static ABT_cond_memory coord_cond_mem = ABT_COND_INITIALIZER;
 
 void
 ring_wait_coordinator_rpc()
 {
+	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&coord_mutex_mem);
+	ABT_cond cond = ABT_COND_MEMORY_GET_HANDLE(&coord_cond_mem);
+
+	ABT_mutex_lock(mutex);
 	while (!coordinator_rpc_done)
-		margo_thread_sleep(env.mid, 1000.0);
+		ABT_cond_wait(cond, mutex);
+	ABT_mutex_unlock(mutex);
 }
 
 static void
@@ -589,6 +596,8 @@ coordinator(hg_handle_t h)
 	coordinator_t in;
 	char *next;
 	int i;
+	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&coord_mutex_mem);
+	ABT_cond cond = ABT_COND_MEMORY_GET_HANDLE(&coord_cond_mem);
 	static const char diag[] = "coordinator RPC";
 
 	log_debug("%s", diag);
@@ -637,6 +646,9 @@ coordinator(hg_handle_t h)
 	if (ret != HG_SUCCESS)
 		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
 
+	ABT_mutex_lock(mutex);
 	coordinator_rpc_done = 1;
+	ABT_mutex_unlock(mutex);
+	ABT_cond_signal(cond);
 }
 DEFINE_MARGO_RPC_HANDLER(coordinator)
