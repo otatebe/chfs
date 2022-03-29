@@ -112,17 +112,28 @@ leave:
 
 static int heartbeat_stop = 0;
 static int heartbeat_done = 0;
+static ABT_mutex_memory hb_mutex_mem = ABT_MUTEX_INITIALIZER;
+static ABT_cond_memory hb_stop_cond_mem = ABT_COND_INITIALIZER;
+static ABT_cond_memory hb_done_cond_mem = ABT_COND_INITIALIZER;
 
 void *
 handle_sig(void *arg)
 {
 	sigset_t *a = arg;
 	int sig;
+	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&hb_mutex_mem);
+	ABT_cond stop_cond = ABT_COND_MEMORY_GET_HANDLE(&hb_stop_cond_mem);
+	ABT_cond done_cond = ABT_COND_MEMORY_GET_HANDLE(&hb_done_cond_mem);
 
 	sigwait(a, &sig);
+	ABT_mutex_lock(mutex);
 	heartbeat_stop = 1;
+	ABT_mutex_unlock(mutex);
+	ABT_cond_signal(stop_cond);
+	ABT_mutex_lock(mutex);
 	while (!heartbeat_done)
-		sleep(1);
+		ABT_cond_wait(done_cond, mutex);
+	ABT_mutex_unlock(mutex);
 	leave();
 	return (NULL);
 }
@@ -214,6 +225,9 @@ main(int argc, char *argv[])
 	int opt, debug = 0, rpc_timeout_msec = 0, nthreads = 5;
 	int heartbeat_interval = 10, log_priority = -1, niothreads = 2;
 	char *prog_name;
+	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&hb_mutex_mem);
+	ABT_cond stop_cond = ABT_COND_MEMORY_GET_HANDLE(&hb_stop_cond_mem);
+	ABT_cond done_cond = ABT_COND_MEMORY_GET_HANDLE(&hb_done_cond_mem);
 
 	prog_name = basename(argv[0]);
 
@@ -346,19 +360,29 @@ main(int argc, char *argv[])
 		join_ring(mid, argv[0]);
 		ring_wait_coordinator_rpc();
 	}
-	while (heartbeat_interval > 0 && !heartbeat_stop) {
-		int i;
+	while (heartbeat_interval > 0) {
+		struct timespec ts;
+		int ret = ABT_SUCCESS, stop;
 
 		if (ring_list_is_coordinator(addr_str)) {
 			log_debug("coordinator");
 			ring_heartbeat();
 		} else if (ring_heartbeat_is_timeout())
 			ring_start_election();
-		i = 0;
-		while (i++ < heartbeat_interval && !heartbeat_stop)
-			margo_thread_sleep(mid, 1000.0);
+		clock_gettime(CLOCK_REALTIME, &ts);
+		ts.tv_sec += heartbeat_interval;
+		ABT_mutex_lock(mutex);
+		while (!heartbeat_stop && ret != ABT_ERR_COND_TIMEDOUT)
+			ret = ABT_cond_timedwait(stop_cond, mutex, &ts);
+		stop = heartbeat_stop;
+		ABT_mutex_unlock(mutex);
+		if (stop)
+			break;
 	}
+	ABT_mutex_lock(mutex);
 	heartbeat_done = 1;
+	ABT_mutex_unlock(mutex);
+	ABT_cond_signal(done_cond);
 	margo_wait_for_finalize(mid);
 
 	return (0);
