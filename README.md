@@ -49,7 +49,7 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
 
 1. Create CHFS
 
-       % eval `chfsctl [-h hostfile] start`
+       % eval `chfsctl [-h hostfile] [-p verbs] [-c /scr] [-m /mount/point] start`
 
    For details, see [manual page of chfsctl](doc/chfsctl.1.md).
 
