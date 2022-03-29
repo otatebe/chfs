@@ -1,5 +1,6 @@
 #!/bin/sh
 
+${DEBUG:="false"} && set -x
 prefix=@prefix@
 exec_prefix=@exec_prefix@
 PATH=@bindir@:@sbindir@:$PATH
@@ -8,7 +9,7 @@ export PATH
 PROTO=sockets
 DBDIR=/tmp/$USER
 DBSIZE=$((256 * 1024 * 1024))
-LOG_DIR=$HOME
+LOG_DIR=
 IFACE=default
 VNAME=default
 CHFSD="env LD_LIBRARY_PATH=$LD_LIBRARY_PATH $(which chfsd)"
@@ -54,14 +55,17 @@ while [ $# -gt 0 ]; do
 		usage ;;
 	    *) usage ;;
 	esac
+	[ $# -eq 0 ] && usage
 	shift
 done
 
 [ "X$mode" = X ] && usage
 [ "X$HOSTFILE" != X ] &&
 	[ ! -f $HOSTFILE ] && usage $HOSTFILE: no such file
-[ -d "$LOG_DIR" ] || mkdir -p "$LOG_DIR"
-[ -d "$LOG_DIR" ] || err $LOG_DIR: no such directory
+if [ "X$LOG_DIR" != X ]; then
+	[ -d "$LOG_DIR" ] || mkdir -p "$LOG_DIR"
+	[ -d "$LOG_DIR" ] || err $LOG_DIR: no such directory
+fi
 
 [ "$mode" = kill ] && PKILL_FLAG=-9 || PKILL_FLAG=
 if $DEVDAX; then
@@ -206,11 +210,11 @@ do
 	[ $VNAME = default ] && NOPT= || NOPT="-n $VNAME"
 	[ $IFACE = default ] && HOPT= || HOPT="-h $IFACE"
 	if $DEVDAX; then COPT="-c $DBDIR"; else COPT="-c $DBDIR/$IFACE-$VNAME"; fi
-	LOPT="-l $LOG_DIR/$host-$IFACE-$VNAME"
+	[ "X$LOG_DIR" = X ] && LOPT= || LOPT="-l $LOG_DIR/$host-$IFACE-$VNAME"
 	if [ "X$host" = Xlocalhost ]; then
 		$SUDO $NUMACTL $CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $NOPT "$1"
 	else
-		ssh $host $SUDO mkdir -p $LOG_DIR
+		[ "X$LOG_DIR" != X ] && ssh $host $SUDO mkdir -p $LOG_DIR
 		ssh $host LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH\" PATH=\"$PATH\" $SUDO $NUMACTL $CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $NOPT \"$1\"
 	fi
 	[ $? -eq 0 ] || continue
