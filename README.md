@@ -51,7 +51,7 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
 
        % eval `chfsctl [-h hostfile] start`
 
-   For details, see manual page of chfsctl.
+   For details, see [manual page of chfsctl](doc/chfsctl.1.md).
 
 ## How to use
 
@@ -59,7 +59,13 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
 
        % chfuse <mount_point>
 
-   For details, see manual page of chfuse.
+   For details, see [manual page of chfuse](doc/chfuse.1.md).
+
+## CHFS commands
+
+- [chlist(1)](doc/chlist.1.md) - list CHFS servers
+- [chmkdir(1)](doc/chmkdir.1.md) - create a directory in CHFS
+- [chrmdir(1)](doc/chrmdir.1.md) - remove a directory in CHFS
 
 ## Environment variable
 

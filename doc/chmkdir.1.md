@@ -12,7 +12,7 @@ chmkdir - create a directory in CHFS
 **chmkdir** creates a directory in CHFS.
 
 # OPTIONS
--m _mode_
+-m mode
 : specifies the mode
 
 -V

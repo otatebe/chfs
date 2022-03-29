@@ -9,7 +9,7 @@ chfsctl - manage CHFS servers
 **chfsctl** [_options_] _mode_
 
 # DESCRIPTION
-**chfsctl** manages CHFS file servers for CHFS parallel consistent hashing file system.  The _mode_ should be start, stop, status, kill or clean.  When the _mode_ is start, it executes CHFS servers and displays an environment variable to access the CHFS.  When the _mode_ is clean, it removes all files and directories in _scratch_dir_ specified by the -c option.
+**chfsctl** manages CHFS file servers for CHFS parallel consistent hashing file system.  The _mode_ should be start, stop, status, kill or clean.  When the _mode_ is start, it executes CHFS servers and displays an environment variable to access the CHFS.  When the _mode_ is clean, it removes all files and directories in *scratch_dir* specified by the -c option.
 
 # OPTIONS
 -A
@@ -34,10 +34,10 @@ chfsctl - manage CHFS servers
 : use devdax.
 
 -C
-: specifies CPU socket number.
+: specifies CPU socket number to execute.
 
 -N virtual_name
-: specifies a virtual name of servers.
+: specifies a virtual name of servers.  Each server name consists of server address and virtual name.  Virtual name is useful to balance the load among servers when using consistent hashing.
 
 -I interface
 : specifies an interface to execute chfsd when there are multiple interfaces such as mlx5_0 and mlx5_1.
@@ -46,7 +46,7 @@ chfsctl - manage CHFS servers
 : specifies a log directory.  If the directory does not exist, it will be created.  Default is $HOME.
 
 -n num_servers
-: specifies the maximum number of servers for CHFS_SERVER.  Default is 32.
+: specifies the maximum number of first contact servers.  Default is 32.
 
 -O options
 : specifies options for chfsd.
