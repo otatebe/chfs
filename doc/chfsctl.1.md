@@ -22,7 +22,7 @@ chfsctl - manage CHFS servers
 : specifies a hostfile.
 
 -m mount_directory
-: specifies a mount directory.  When chfsctl start is executed multiple times with -A option, -m option should be specified at the last execution of chfsctl start.
+: specifies a mount directory.  When chfsctl start is executed multiple times with -A option, -m and -M options should be specified at every execution except the last execution of chfsctl start.  For the last execution, only -m option is specified without -M option.
 
 -M
 : do not mount
