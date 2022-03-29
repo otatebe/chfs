@@ -40,7 +40,7 @@ chfsctl - manage CHFS servers
 : specifies a database size.  This option is only effective when using the pmemkv and fsdax.  Default is 256 MiB.
 
 -D
-: use devdax.
+: use devdax.  In this case, a scratch directory specified by the -c option is a dax device, in which a pmem obj pool is created with the layout pmemkv.
 
 -C
 : specifies CPU socket number to execute.
@@ -52,7 +52,7 @@ chfsctl - manage CHFS servers
 : specifies an interface to execute chfsd when there are multiple interfaces such as mlx5_0 and mlx5_1.
 
 -L log_dir
-: specifies a log directory.  If the directory does not exist, it will be created.  Default is $HOME.
+: specifies a log directory.  If the directory does not exist, it will be created.  If not specified, log messages are sent to the system logger.
 
 -n num_servers
 : specifies the maximum number of first contact servers.  Default is 32.
