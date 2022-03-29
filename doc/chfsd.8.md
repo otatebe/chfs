@@ -40,7 +40,7 @@ chfsd - CHFS server
 : specifies a log file.
 
 -n vname
-: specifies a vname which is used to construct a virtual name such as server info:vname.
+: specifies a vname which is used to construct a virtual name such as server_address:vname.
 
 -N virtual_name
 : specifies a virtual name.
