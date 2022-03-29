@@ -26,7 +26,7 @@ struct hash_entry {
 	size_t chunk_size;
 };
 #define MAX_KEY_SIZE	16360
-struct {
+static struct {
 	char key[MAX_KEY_SIZE];
 	size_t size;
 	struct hash_entry entry;
