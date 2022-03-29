@@ -51,13 +51,21 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
 
        % eval `chfsctl [-h hostfile] [-p verbs] [-c /scr] [-m /mount/point] start`
 
+   This executes chfsd servers and mounts the CHFS at /mount point on hosts specified by the hostfile.  The -p option specifies communication protocol.  The -c option specifies a scratch directory on each host.
+
+   chfsctl outputs the setting of CHFS_SERVER environment variable, which is used to execute chfuse and CHFS commands.
+
    For details, see [manual page of chfsctl](doc/chfsctl.1.md).
 
 ## How to use
 
 1. Mount the CHFS
 
+   CHFS is mounted by the chfsctl command.  If you need to mount it on other hosts, chfuse command is used;
+
        % chfuse <mount_point>
+
+   CHFS_SERVER environment variable, which is the output of chfsctl command, should be defined.
 
    For details, see [manual page of chfuse](doc/chfuse.1.md).
 
