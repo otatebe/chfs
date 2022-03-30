@@ -58,9 +58,11 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
 
 1. Create CHFS
 
-       % eval `chfsctl [-h hostfile] [-p verbs] [-c /scr] [-m /mount/point] start`
+       % eval `chfsctl [-h hostfile] [-p verbs] [-D] [-c /dev/dax0.0] [-m /mount/point] start`
 
-   This executes chfsd servers and mounts the CHFS at /mount/point on hosts specified by the hostfile.  The -p option specifies communication protocol.  The -c option specifies a scratch directory on each host.
+   This executes chfsd servers and mounts the CHFS at /mount/point on hosts specified by the hostfile.  The -p option specifies a communication protocol.  The -c option specifies a devdax device or a scratch directory on each host.
+
+   For the devdax device, -D option is required.  A pmem obj pool should be created with the layout pmemkv by `pmempool create -l pmemkv obj /dev/dax0.0`.  For user-level access, the permission of the device is modified; bad block check is disabled by `pmempool feature --disable CHECK_BAD_BLOCKS /dev/dax0.0`.
 
    chfsctl outputs the setting of CHFS_SERVER environment variable, which is used to execute chfuse and CHFS commands.
 
