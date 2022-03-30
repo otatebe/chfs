@@ -20,6 +20,15 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
 
        % spack install mochi-margo
 
+   Or, more recommended way as follows;
+
+       % spack external find automake autoconf libtool cmake m4
+       % spack config edit packages
+       manually add rdma-core
+       % spack spec mochi-margo ^mercury~boostsys ^libfabric fabrics=rxm,sockets,tcp,udp,verbs
+       see what packages will be built
+       % spack install mochi-margo ^mercury~boostsys ^libfabric fabrics=rxm,sockets,tcp,udp,verbs
+
    For details, see https://mochi.readthedocs.io/
 
 1. (Optional) Install pmemkv
