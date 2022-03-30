@@ -20,7 +20,7 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
 
        % spack install mochi-margo
 
-   Or, more recommended way as follows;
+   Or, more recommended way to include verbs as follows;
 
        % spack external find automake autoconf libtool cmake m4
        % spack config edit packages
