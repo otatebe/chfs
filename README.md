@@ -48,8 +48,10 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
 
 1. Install CHFS
 
-       % spack load mochi-margo
+       % git clone https://github.com/otatebe/chfs.git
+       % cd chfs
        % autoreconf -i
+       % spack load mochi-margo
        % ./configure [--prefix=PREFIX] [--with-pmemkv] [--enable-zero-copy-read-rdma]
        % make
        # make install
