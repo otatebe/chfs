@@ -153,3 +153,7 @@ The following APIs are supported.
             int (*filler)(void *, const char *, const struct stat *, off_t));
     int chfs_symlink(const char *target, const char *path);
     int chfs_readlink(const char *path, char *buf, size_t size);
+
+## References
+
+Osamu Tatebe, Kazuki Obata, Kohei Hiraga, Hiroki Ohtsuji, "[CHFS: Parallel Consistent Hashing File System for Node-local Persistent Memory](https://dl.acm.org/doi/fullHtml/10.1145/3492805.3492807)", Proceedings of the ACM International Conference on High Performance Computing in Asia-Pacific Region (HPC Asia 2022), pp.115-124, 2022
