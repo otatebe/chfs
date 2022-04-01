@@ -1,6 +1,6 @@
 # CHFS - Consistent hashing file system
 
-CHFS is a parallel consistent hashing file system.  File chunks are distributed among file servers using consistent hashing.
+CHFS is a parallel consistent hashing file system created instantly using node-local storages such as persistent memory and NVMe SSD.  It exploits the performance of persistent memory using persistent in-memory key-value store pmemkv.  For NVMe SSD, it uses the POSIX backend.  It supports InfiniBand verbs for high performance data access.
 
 ## Quick installation steps
 
@@ -31,7 +31,7 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
 
    For details, see https://mochi.readthedocs.io/
 
-1. (Optional) Install pmemkv
+1. (Optional) Install pmemkv for a pmemkv backend
 
        # apt install libpmemkv-dev
        # apt install libpmemobj-cpp-dev libmemkind-dev libtbb-dev
@@ -42,7 +42,7 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
 
        # apt install libfuse-dev
 
-1. (Optional) Install pandoc
+1. (Optional) Install pandoc to generate manual pages
 
        # apt install pandoc
 
@@ -55,6 +55,8 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
        % ./configure [--prefix=PREFIX] [--with-pmemkv] [--enable-zero-copy-read-rdma]
        % make
        # make install
+
+   If --with-pmemkv is not specified, CHFS uses a POSIX backend.
 
 ## How to create file system
 
