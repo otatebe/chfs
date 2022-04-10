@@ -89,3 +89,5 @@ hg_proc_fs_readdir_out_t(hg_proc_t proc, void *data)
 		free(k->fi);
 	return (ret);
 }
+
+#define CHFS_S_IFREP	(1 << 30)

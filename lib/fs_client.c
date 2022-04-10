@@ -512,10 +512,10 @@ destroy:
 	return (ret);
 }
 
-hg_return_t
-fs_rpc_readdir(const char *server, const char *path, void *buf,
+static hg_return_t
+fs_rpc_readdir_common(const char *server, const char *path, void *buf,
 	int (*filler)(void *, const char *, const struct stat *, off_t),
-	int *errp)
+	int with_replica, int *errp)
 {
 	hg_handle_t h;
 	fs_readdir_out_t out;
@@ -541,10 +541,13 @@ fs_rpc_readdir(const char *server, const char *path, void *buf,
 	*errp = out.err;
 	if (out.err == 0) {
 		for (i = 0; i < out.n; ++i) {
+			if (!with_replica && (out.fi[i].sb.mode & CHFS_S_IFREP))
+				continue;
 			memset(&sb, 0, sizeof(sb));
 			sb.st_uid = out.fi[i].sb.uid;
 			sb.st_gid = out.fi[i].sb.gid;
 			sb.st_mode = out.fi[i].sb.mode;
+			sb.st_size = out.fi[i].sb.size;
 			sb.st_mtim = out.fi[i].sb.mtime;
 			sb.st_ctim = out.fi[i].sb.ctime;
 			if (filler(buf, out.fi[i].name, &sb, 0))
@@ -557,6 +560,22 @@ err:
 	if (ret == HG_SUCCESS)
 		ret = ret2;
 	return (ret);
+}
+
+hg_return_t
+fs_rpc_readdir(const char *server, const char *path, void *buf,
+	int (*filler)(void *, const char *, const struct stat *, off_t),
+	int *errp)
+{
+	return (fs_rpc_readdir_common(server, path, buf, filler, 0, errp));
+}
+
+hg_return_t
+fs_rpc_readdir_replica(const char *server, const char *path, void *buf,
+	int (*filler)(void *, const char *, const struct stat *, off_t),
+	int *errp)
+{
+	return (fs_rpc_readdir_common(server, path, buf, filler, 1, errp));
 }
 
 void

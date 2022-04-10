@@ -251,6 +251,20 @@ ring_list_remove(char *host)
 	ABT_mutex_unlock(ring_list_mutex);
 }
 
+char *
+ring_list_lookup_index(int i)
+{
+	char *r = NULL;
+
+	if (i < 0)
+		return (r);
+	ABT_mutex_lock(ring_list_mutex);
+	if (i < ring_list.n)
+		r = strdup(ring_list.nodes[i].address);
+	ABT_mutex_unlock(ring_list_mutex);
+	return (r);
+}
+
 #ifdef USE_MODULAR_HASHING
 
 int

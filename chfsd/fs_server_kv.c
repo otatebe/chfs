@@ -179,7 +179,8 @@ free_fs_readdir_arg(struct fs_readdir_arg *a)
 }
 
 static void
-fs_add_entry(const char *name, struct inode *ino, struct fs_readdir_arg *a)
+fs_add_entry(const char *name, struct inode *ino, struct fs_readdir_arg *a,
+	int is_rep)
 {
 	fs_file_info_t *tfi;
 	const char *s = name;
@@ -211,6 +212,9 @@ fs_add_entry(const char *name, struct inode *ino, struct fs_readdir_arg *a)
 	a->fi[a->n].sb.uid = ino->uid;
 	a->fi[a->n].sb.gid = ino->gid;
 	a->fi[a->n].sb.mode = ino->mode;
+	if (is_rep)
+		a->fi[a->n].sb.mode |= CHFS_S_IFREP;
+	a->fi[a->n].sb.size = ino->size;
 	a->fi[a->n].sb.mtime = ino->mtime;
 	a->fi[a->n].sb.ctime = ino->ctime;
 	++a->n;
@@ -225,9 +229,9 @@ fs_readdir_cb(const char *key, size_t key_size, const char *value,
 	struct inode *ino = (struct inode *)value;
 
 	if (ksize + 1 == key_size && a->pathlen < ksize &&
-		strncmp(a->path, key, a->pathlen) == 0 &&
-		ring_list_is_in_charge(key, key_size))
-		fs_add_entry(key + a->pathlen, ino, a);
+		strncmp(a->path, key, a->pathlen) == 0)
+		fs_add_entry(key + a->pathlen, ino, a,
+			!ring_list_is_in_charge(key, key_size));
 	return (0);
 }
 

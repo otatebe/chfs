@@ -1,5 +1,6 @@
 #include <dirent.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 #include <margo.h>
 #include "config.h"
 #include "ring.h"
@@ -61,7 +62,7 @@ free_fs_readdir_arg(struct fs_readdir_arg *a)
 }
 
 static void
-fs_add_entry(struct dirent *dent, void *arg)
+fs_add_entry(struct dirent *dent, struct stat *st, void *arg)
 {
 	struct fs_readdir_arg *a = arg;
 	fs_file_info_t *tfi;
@@ -74,8 +75,6 @@ fs_add_entry(struct dirent *dent, void *arg)
 		return;
 	}
 	strcpy(a->path + a->pathlen, dent->d_name);
-	if (!ring_list_is_in_charge(a->path, a->pathlen + namelen + 1))
-		return;
 	if (a->n >= a->size) {
 		tfi = realloc(a->fi, sizeof(a->fi[0]) * a->size * 2);
 		if (tfi == NULL) {
@@ -91,7 +90,14 @@ fs_add_entry(struct dirent *dent, void *arg)
 		return;
 	}
 	memset(&a->fi[a->n].sb, 0, sizeof(a->fi[a->n].sb));
-	a->fi[a->n].sb.mode = dent->d_type << 12;
+	a->fi[a->n].sb.mode = st->st_mode;
+	if (!ring_list_is_in_charge(a->path, a->pathlen + namelen + 1))
+		a->fi[a->n].sb.mode |= CHFS_S_IFREP;
+	a->fi[a->n].sb.size = st->st_size;
+	a->fi[a->n].sb.uid = st->st_uid;
+	a->fi[a->n].sb.gid = st->st_gid;
+	a->fi[a->n].sb.mtime = st->st_mtim;
+	a->fi[a->n].sb.ctime = st->st_ctim;
 	++a->n;
 }
 

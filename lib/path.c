@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 #define IS_SLASH_OR_NULL(c) (c == '/' || c == '\0')
 
@@ -47,8 +48,10 @@ canonical_path(const char *path)
 
 	p = skip_slash(p);
 	while (*p) {
-		if (depth >= MAX_DEPTH)
+		if (depth >= MAX_DEPTH) {
+			errno = ENAMETOOLONG;
 			return (NULL);
+		}
 		d[depth].s = p;
 		p = next_token(p, &l);
 		if (l > 0)
@@ -66,8 +69,10 @@ canonical_path(const char *path)
 			l++;
 	}
 	pp = malloc(l + 1);
-	if (pp == NULL)
+	if (pp == NULL) {
+		errno = ENOMEM;
 		return (NULL);
+	}
 	for (l = 0, i = 0; i < depth; ++i) {
 		strncpy(&pp[l], d[i].s, d[i].l);
 		l += d[i].l;
