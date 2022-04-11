@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <sys/stat.h>
 #include <margo.h>
 #include "config.h"
 #include "ring.h"
@@ -11,6 +12,7 @@
 #include "fs_types.h"
 #include "fs_rpc.h"
 #include "fs.h"
+#include "shash.h"
 #include "log.h"
 #include "fs_kv.h"
 
@@ -165,6 +167,7 @@ DEFINE_MARGO_RPC_HANDLER(inode_read_rdma)
 struct fs_readdir_arg {
 	char path[PATH_MAX];
 	int n, size, pathlen;
+	struct shash *hash;
 	fs_file_info_t *fi;
 };
 
@@ -176,6 +179,37 @@ free_fs_readdir_arg(struct fs_readdir_arg *a)
 	for (i = 0; i < a->n; ++i)
 		free(a->fi[i].name);
 	free(a->fi);
+	shash_free(a->hash);
+}
+
+static void
+fs_add_ventry(void *name, size_t size, void **d, void *arg)
+{
+	struct fs_readdir_arg *a = arg;
+	int *data = (int *)d;
+	fs_file_info_t *tfi;
+	static const char diag[] = "fs_add_ventry";
+
+	if (*data == 2)
+		return;
+
+	if (a->n >= a->size) {
+		tfi = realloc(a->fi, sizeof(a->fi[0]) * a->size * 2);
+		if (tfi == NULL) {
+			log_error("%s: no memory", diag);
+			return;
+		}
+		a->fi = tfi;
+		a->size *= 2;
+	}
+	a->fi[a->n].name = strndup(name, size);
+	if (a->fi[a->n].name == NULL) {
+		log_error("%s: no memory", diag);
+		return;
+	}
+	memset(&a->fi[a->n].sb, 0, sizeof(a->fi[a->n].sb));
+	a->fi[a->n].sb.mode = S_IFDIR | CHFS_S_IFREP;
+	++a->n;
 }
 
 static void
@@ -184,12 +218,20 @@ fs_add_entry(const char *name, struct inode *ino, struct fs_readdir_arg *a,
 {
 	fs_file_info_t *tfi;
 	const char *s = name;
+	int *data;
 	static const char diag[] = "fs_add_entry";
 
 	while (*s && *s != '/')
 		++s;
-	if (*s == '/')
+	if (*s == '/') {
+		data = (int *)shash_get(a->hash, name, s - name);
+		if (*data == 0)
+			*data = 1;
 		return;
+	} else if (S_ISDIR(ino->mode)) {
+		data = (int *)shash_get(a->hash, name, strlen(name));
+		*data = 2;
+	}
 
 	if (ino->msize != fs_msize)
 		return;		/* metadata size mismatch */
@@ -235,6 +277,8 @@ fs_readdir_cb(const char *key, size_t key_size, const char *value,
 	return (0);
 }
 
+#define HASH_SIZE	16381
+
 static void
 inode_readdir(hg_handle_t h)
 {
@@ -254,8 +298,9 @@ inode_readdir(hg_handle_t h)
 	memset(&out, 0, sizeof(out));
 	a.n = 0;
 	a.size = 1000;
+	a.hash = shash_make(HASH_SIZE);
 	a.fi = malloc(sizeof(a.fi[0]) * a.size);
-	if (a.fi == NULL) {
+	if (a.hash == NULL || a.fi == NULL) {
 		log_error("%s: no memory", diag);
 		out.err = KV_ERR_NO_MEMORY;
 		goto free_input;
@@ -273,6 +318,7 @@ inode_readdir(hg_handle_t h)
 	}
 	out.err = kv_get_all_cb(fs_readdir_cb, &a);
 	if (out.err == KV_SUCCESS) {
+		shash_operate(a.hash, fs_add_ventry, &a);
 		out.n = a.n;
 		out.fi = a.fi;
 	}
