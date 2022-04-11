@@ -20,15 +20,16 @@ static struct option options[] = {
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: chfind [dir ...] [-name pat] [-size size] "
-			"[-newer file]\n\t[-type type] [-version]\n");
+	fprintf(stderr, "usage: chfind [-qv] [dir ...] [-name pat] "
+		"[-size size] [-newer file]\n\t[-type type] [-version]\n");
 	exit(EXIT_FAILURE);
 }
 
 static struct {
-	char *name, type, *newer;
-	size_t size;
+	char *name, type, *newer, *size;
 	struct stat newer_sb;
+	int quiet, verbose;
+	long size_prefix, size_unit, size_count;
 } opt;
 
 enum {
@@ -38,6 +39,86 @@ enum {
 };
 static uint64_t local_count[NUM_COUNT], total_count[NUM_COUNT];
 
+static void
+parse_size(char *str_size)
+{
+	char *s = str_size;
+	long prefix = 0, count = 0, unit = 0;
+
+	switch (*s) {
+	case '-':
+		prefix = -1;
+		++s;
+		break;
+	case '+':
+		prefix = 1;
+		++s;
+		break;
+	}
+	while (*s >= '0' && *s <= '9')
+		count = 10 * count + (*s++ - '0');
+	switch (*s) {
+	case 'b':
+		unit = 512;
+		++s;
+		break;
+	case 'c':
+		unit = 1;
+		++s;
+		break;
+	case 'w':
+		unit = 2;
+		++s;
+		break;
+	case 'k':
+		unit = 1024;
+		++s;
+		break;
+	case 'M':
+		unit = 1024 * 1024;
+		++s;
+		break;
+	case 'G':
+		unit = 1024 * 1024 * 1024;
+		++s;
+		break;
+	case '\0':
+		unit = 512;
+		break;
+	}
+	if (*s) {
+		fprintf(stderr, "invalid size: %s\n", str_size);
+		exit(EXIT_FAILURE);
+	}
+	opt.size_prefix = prefix;
+	opt.size_count = count;
+	opt.size_unit = unit;
+}
+
+static int
+match_size(size_t size)
+{
+	size_t tmp = size / opt.size_unit;
+
+	if (size != tmp * opt.size_unit)
+		return (0);
+	switch (opt.size_prefix) {
+	case -1:
+		if (tmp < opt.size_count)
+			return (1);
+		break;
+	case 0:
+		if (tmp == opt.size_count)
+			return (1);
+		break;
+	case 1:
+		if (tmp > opt.size_count)
+			return (1);
+		break;
+	}
+	return (0);
+}
+
 static int
 find(const char *name, const struct stat *st)
 {
@@ -46,7 +127,7 @@ find(const char *name, const struct stat *st)
 		 st->st_mtim.tv_nsec < opt.newer_sb.st_mtim.tv_nsec)))
 		return (0);
 
-	if (opt.size != -1 && st->st_size != opt.size)
+	if (opt.size && !match_size(st->st_size))
 		return (0);
 
 	if (opt.name && fnmatch(opt.name, name, 0))
@@ -128,7 +209,7 @@ filler(void *buf, const char *name, const struct stat *st, off_t off)
 	}
 	if (st->st_mode & CHFS_S_IFREP)
 		return (0);
-	if (find(name, st))
+	if (find(name, st) && !opt.quiet)
 		printf("%s/%s\n", (char *)buf, name);
 	return (0);
 }
@@ -144,8 +225,7 @@ main(int argc, char *argv[])
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-	opt.size = -1;
-	while ((c = getopt_long_only(argc, argv, "", options, NULL)) != -1) {
+	while ((c = getopt_long_only(argc, argv, "qv", options, NULL)) != -1) {
 		switch (c) {
 		case 'n':
 			opt.name = optarg;
@@ -153,11 +233,18 @@ main(int argc, char *argv[])
 		case 'N':
 			opt.newer = optarg;
 			break;
+		case 'q':
+			opt.quiet = 1;
+			break;
 		case 's':
-			opt.size = atoi(optarg);
+			opt.size = optarg;
+			parse_size(opt.size);
 			break;
 		case 't':
 			opt.type = optarg[0];
+			break;
+		case 'v':
+			opt.verbose++;
 			break;
 		case 'V':
 			fprintf(stderr, "CHFS version %s\n", chfs_version());
@@ -180,7 +267,7 @@ main(int argc, char *argv[])
 				perror(".");
 		} else {
 			if (rank == 0) {
-				if (find(".", &sb))
+				if (find(".", &sb) && !opt.quiet)
 					printf(".\n");
 				local_count[TOTAL]++;
 			}
@@ -194,7 +281,7 @@ main(int argc, char *argv[])
 				continue;
 			}
 			if (rank == 0) {
-				if (find(*argv, &sb))
+				if (find(*argv, &sb) && !opt.quiet)
 					printf("%s\n", *argv);
 				local_count[TOTAL]++;
 			}
@@ -210,6 +297,9 @@ main(int argc, char *argv[])
 	}
 	MPI_Reduce(local_count, total_count, NUM_COUNT, MPI_LONG_LONG_INT,
 		MPI_SUM, 0, MPI_COMM_WORLD);
+	if (opt.verbose)
+		printf("[%d] %lu/%lu\n", rank, local_count[FOUND],
+			local_count[TOTAL]);
 	if (rank == 0)
 		printf("MATCHED %lu/%lu\n", total_count[FOUND],
 			total_count[TOTAL]);
