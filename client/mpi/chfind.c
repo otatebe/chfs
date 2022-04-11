@@ -43,18 +43,15 @@ find(const char *name, const struct stat *st)
 {
 	if (opt.newer && (st->st_mtim.tv_sec < opt.newer_sb.st_mtim.tv_sec ||
 		(st->st_mtim.tv_sec == opt.newer_sb.st_mtim.tv_sec &&
-		 st->st_mtim.tv_nsec < opt.newer_sb.st_mtim.tv_nsec))) {
-		puts("old");
+		 st->st_mtim.tv_nsec < opt.newer_sb.st_mtim.tv_nsec)))
 		return (0);
-	}
-	if (opt.size != -1 && st->st_size != opt.size) {
-		puts("size");
+
+	if (opt.size != -1 && st->st_size != opt.size)
 		return (0);
-	}
-	if (opt.name && fnmatch(opt.name, name, 0)) {
-		puts("name");
+
+	if (opt.name && fnmatch(opt.name, name, 0))
 		return (0);
-	}
+
 	switch (opt.type) {
 	case 'f':
 		if (!S_ISREG(st->st_mode))
@@ -214,7 +211,7 @@ main(int argc, char *argv[])
 	MPI_Reduce(local_count, total_count, NUM_COUNT, MPI_LONG_LONG_INT,
 		MPI_SUM, 0, MPI_COMM_WORLD);
 	if (rank == 0)
-		printf("MATHED %lu/%lu\n", total_count[FOUND],
+		printf("MATCHED %lu/%lu\n", total_count[FOUND],
 			total_count[TOTAL]);
 	chfs_term();
 	MPI_Finalize();
