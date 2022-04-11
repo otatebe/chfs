@@ -126,7 +126,7 @@ find(const char *name, const struct stat *st)
 {
 	if (opt.newer && (st->st_mtim.tv_sec < opt.newer_sb.st_mtim.tv_sec ||
 		(st->st_mtim.tv_sec == opt.newer_sb.st_mtim.tv_sec &&
-		 st->st_mtim.tv_nsec < opt.newer_sb.st_mtim.tv_nsec)))
+		 st->st_mtim.tv_nsec <= opt.newer_sb.st_mtim.tv_nsec)))
 		return (0);
 
 	if (opt.size && !match_size(st->st_size))
@@ -234,8 +234,6 @@ main(int argc, char *argv[])
 			break;
 		case 'N':
 			opt.newer = optarg;
-			if (lstat(opt.newer, &opt.newer_sb))
-				perror(opt.newer), exit(EXIT_FAILURE);
 			break;
 		case 'q':
 			opt.quiet = 1;
@@ -261,6 +259,10 @@ main(int argc, char *argv[])
 	argv += optind;
 
 	chfs_init(NULL);
+	if (opt.newer)
+		if (chfs_stat(opt.newer, &opt.newer_sb))
+			perror(opt.newer), exit(EXIT_FAILURE);
+
 	if (argc == 0) {
 		if (chfs_stat(".", &sb)) {
 			if (rank == 0)
@@ -297,10 +299,10 @@ main(int argc, char *argv[])
 	}
 	MPI_Reduce(local_count, total_count, NUM_COUNT, MPI_LONG_LONG_INT,
 		MPI_SUM, 0, MPI_COMM_WORLD);
-	if (opt.verbose)
+	if (opt.verbose > 1)
 		printf("[%d] %lu/%lu\n", rank, local_count[FOUND],
 			local_count[TOTAL]);
-	if (rank == 0)
+	if (opt.verbose > 0 && rank == 0)
 		printf("MATCHED %lu/%lu\n", total_count[FOUND],
 			total_count[TOTAL]);
 	chfs_term();
