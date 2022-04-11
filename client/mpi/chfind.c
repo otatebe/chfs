@@ -57,6 +57,7 @@ parse_size(char *str_size)
 	}
 	while (*s >= '0' && *s <= '9')
 		count = 10 * count + (*s++ - '0');
+
 	switch (*s) {
 	case 'b':
 		unit = 512;
@@ -102,6 +103,7 @@ match_size(size_t size)
 
 	if (size != tmp * opt.size_unit)
 		return (0);
+
 	switch (opt.size_prefix) {
 	case -1:
 		if (tmp < opt.size_count)
@@ -232,6 +234,8 @@ main(int argc, char *argv[])
 			break;
 		case 'N':
 			opt.newer = optarg;
+			if (lstat(opt.newer, &opt.newer_sb))
+				perror(opt.newer), exit(EXIT_FAILURE);
 			break;
 		case 'q':
 			opt.quiet = 1;
@@ -255,10 +259,6 @@ main(int argc, char *argv[])
 	}
 	argc -= optind;
 	argv += optind;
-
-	if (opt.newer)
-		if (lstat(opt.newer, &opt.newer_sb))
-			perror(opt.newer), exit(EXIT_FAILURE);
 
 	chfs_init(NULL);
 	if (argc == 0) {
