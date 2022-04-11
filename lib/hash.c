@@ -279,15 +279,12 @@ hash_delete(hash_t *tbl, void **dataptr)
 	--tbl->lock_status;
 	op_wait = (tbl->operator_wait_count && tbl->lock_status == 0);
 	if (tmp->num_waiters) {	/* others are waiting so keep entry here */
-		if (tmp->num_waiters) {
-			sleeper = (hash_waiter_t *)ll_peek(&tmp->waiters);
-			sleeper->wakeup = 1;
-			tmp->data = NULL;
-			tmp->status &= ~ENTRY_LOCKED;
-			tmp = NULL;	/* so we don't free it later */
-		}
-	}
-	else {
+		sleeper = (hash_waiter_t *)ll_peek(&tmp->waiters);
+		sleeper->wakeup = 1;
+		tmp->data = NULL;
+		tmp->status &= ~ENTRY_LOCKED;
+		tmp = NULL;	/* so we don't free it later */
+	} else {
 		hash_entry_t *r, *l;
 		/*
 		 * tmp now points to entry marked for deletion, prev
