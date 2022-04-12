@@ -11,6 +11,8 @@ AC_CONFIG_MACRO_DIRS([m4])
 # Checks for programs.
 AC_PROG_CC
 AM_PROG_CC_C_O
+AX_MPI([], [MPICC=$CC])
+AM_CONDITIONAL([HAVE_MPI], [test x"$MPILIBS" != x])
 AM_PROG_AR
 LT_INIT
 
@@ -116,5 +118,5 @@ AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_CHECK_FUNCS([memset mkdir rmdir strchr strdup strerror])
 
-AC_CONFIG_FILES([Makefile lib/Makefile chfsd/Makefile client/Makefile client/chfsctl doc/Makefile])
+AC_CONFIG_FILES([Makefile lib/Makefile chfsd/Makefile client/Makefile client/chfsctl client/mpi/Makefile doc/Makefile])
 AC_OUTPUT

@@ -36,7 +36,7 @@ chfuse_getattr(const char *path, struct stat *st)
 	printf("getattr: %s\n", path);
 	ret = chfs_stat(path, st);
 	if (ret == -1)
-		return (-ENOENT);
+		return (-errno);
 	/* FUSE requires at least 8 bytes for a directory */
 	if (S_ISDIR(st->st_mode) && st->st_size < 8)
 		st->st_size = 8;
@@ -53,7 +53,7 @@ chfuse_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 	if (fd >= 0)
 		fi->fh = fd;
 	else
-		ret = -EIO;
+		ret = -errno;
 
 	return (ret);
 }
@@ -68,7 +68,7 @@ chfuse_open(const char *path, struct fuse_file_info *fi)
 	if (fd >= 0)
 		fi->fh = fd;
 	else
-		ret = -EIO;
+		ret = -errno;
 
 	return (ret);
 }
@@ -81,7 +81,7 @@ chfuse_release(const char *path, struct fuse_file_info *fi)
 	printf("release: %s\n", path);
 	ret = chfs_close(fi->fh);
 	if (ret == -1)
-		return (-EIO);
+		return (-errno);
 	return (ret);
 }
 
@@ -93,7 +93,7 @@ chfuse_truncate(const char *path, off_t size)
 	printf("truncate: path %s size %ld\n", path, size);
 	ret = chfs_truncate(path, size);
 	if (ret == -1)
-		return (-EIO);
+		return (-errno);
 	return (ret);
 }
 
@@ -106,7 +106,7 @@ chfuse_write(const char *path, const char *buf, size_t size,
 	printf("pwrite: path %s size %ld offset %ld\n", path, size, offset);
 	ret = chfs_pwrite(fi->fh, buf, size, offset);
 	if (ret == -1)
-		return (-EIO);
+		return (-errno);
 	return (ret);
 }
 
@@ -119,7 +119,7 @@ chfuse_read(const char *path, char *buf, size_t size, off_t offset,
 	printf("pread: path %s size %ld offset %ld\n", path, size, offset);
 	ret = chfs_pread(fi->fh, buf, size, offset);
 	if (ret == -1)
-		return (-EIO);
+		return (-errno);
 	return (ret);
 }
 
@@ -131,7 +131,7 @@ chfuse_fsync(const char *path, int isdatasync, struct fuse_file_info *fi)
 	printf("fsync: %s\n", path);
 	ret = chfs_fsync(fi->fh);
 	if (ret == -1)
-		return (-EIO);
+		return (-errno);
 	return (ret);
 }
 
@@ -143,7 +143,7 @@ chfuse_unlink(const char *path)
 	printf("unlink: %s\n", path);
 	ret = chfs_unlink(path);
 	if (ret == -1)
-		return (-EIO);
+		return (-errno);
 	return (ret);
 }
 
@@ -155,7 +155,7 @@ chfuse_mkdir(const char *path, mode_t mode)
 	printf("mkdir: %s\n", path);
 	ret = chfs_mkdir(path, mode);
 	if (ret == -1)
-		return (-EIO);
+		return (-errno);
 	return (ret);
 }
 
@@ -167,7 +167,7 @@ chfuse_rmdir(const char *path)
 	printf("rmdir: %s\n", path);
 	ret = chfs_rmdir(path);
 	if (ret == -1)
-		return (-EIO);
+		return (-errno);
 	return (ret);
 }
 
@@ -180,7 +180,7 @@ chfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	printf("readdir: %s\n", path);
 	ret = chfs_readdir(path, buf, filler);
 	if (ret == -1)
-		return (-EIO);
+		return (-errno);
 	return (ret);
 }
 
@@ -198,7 +198,7 @@ chfuse_symlink(const char *target, const char *path)
 	printf("symlink: %s %s\n", target, path);
 	ret = chfs_symlink(target, path);
 	if (ret == -1)
-		return (-EIO);
+		return (-errno);
 	return (ret);
 }
 
@@ -210,7 +210,7 @@ chfuse_readlink(const char *path, char *buf, size_t size)
 	printf("readlink: %s\n", path);
 	ret = chfs_readlink(path, buf, size);
 	if (ret == -1)
-		return (-EIO);
+		return (-errno);
 	buf[ret] = '\0';
 	return (0);
 }

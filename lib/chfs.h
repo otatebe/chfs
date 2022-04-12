@@ -25,7 +25,10 @@ int chfs_rmdir(const char *path);
 int chfs_stat(const char *path, struct stat *st);
 int chfs_readdir(const char *path, void *buf,
 	int (*filler)(void *, const char *, const struct stat *, off_t));
+int chfs_readdir_index(const char *path, int index, void *buf,
+	int (*filler)(void *, const char *, const struct stat *, off_t));
 int chfs_symlink(const char *target, const char *path);
 int chfs_readlink(const char *path, char *buf, size_t size);
 
 #define CHFS_O_CACHE	(1 << 28)
+#define CHFS_S_IFREP	(1 << 30)

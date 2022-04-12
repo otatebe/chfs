@@ -636,7 +636,7 @@ fs_inode_remove(char *key, size_t key_size)
 }
 
 int
-fs_inode_readdir(char *path, void (*cb)(struct dirent *, void *),
+fs_inode_readdir(char *path, void (*cb)(struct dirent *, struct stat *, void *),
 	void *arg)
 {
 	char *p = key_to_path(path, strlen(path) + 1), *pp;
@@ -644,6 +644,7 @@ fs_inode_readdir(char *path, void (*cb)(struct dirent *, void *),
 	DIR *dp;
 	size_t size;
 	int16_t flags;
+	struct stat sb;
 	int r, r2;
 
 	log_debug("fs_inode_readdir: %s", p);
@@ -660,7 +661,12 @@ fs_inode_readdir(char *path, void (*cb)(struct dirent *, void *),
 				if (r2 > 0 && flags & CHFS_FS_CACHE)
 					continue;
 			}
-			cb(dent, arg);
+			if (fstatat(dirfd(dp), dent->d_name, &sb,
+				AT_SYMLINK_NOFOLLOW))
+				continue;
+			if (S_ISREG(sb.st_mode))
+				sb.st_size -= msize;
+			cb(dent, &sb, arg);
 		}
 		closedir(dp);
 	} else

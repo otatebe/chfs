@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <errno.h>
 #include <margo.h>
 #include "config.h"
 #include "ring_types.h"
@@ -15,6 +16,7 @@
 #include "path.h"
 #include "log.h"
 #include "chfs.h"
+#include "chfs_err.h"
 
 static char chfs_client[PATH_MAX];
 static uint32_t chfs_uid, chfs_gid;
@@ -337,10 +339,14 @@ clear_fd_table_unlocked(struct fd_table *tab)
 static int
 check_fd_unlocked(int fd)
 {
-	if (fd < 0 || fd >= fd_table_size)
+	if (fd < 0 || fd >= fd_table_size) {
+		errno = EBADF;
 		return (-1);
-	if (fd_table[fd].path == NULL)
+	}
+	if (fd_table[fd].path == NULL) {
+		errno = EBADF;
 		return (-1);
+	}
 	return (0);
 }
 
@@ -601,6 +607,7 @@ chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,
 	fd = create_fd(p, emode, chunk_size);
 	if (fd < 0) {
 		free(p);
+		errno = ENOMEM;
 		return (-1);
 	}
 	ret = chfs_rpc_inode_create(p, strlen(p) + 1, emode, chunk_size, &err);
@@ -609,6 +616,7 @@ chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,
 		return (fd);
 
 	clear_fd(fd);
+	chfs_set_errno(ret, err);
 	return (-1);
 }
 
@@ -668,8 +676,10 @@ chfs_open(const char *path, int32_t flags)
 	if (ret == HG_SUCCESS && err == KV_ERR_NO_ENTRY) {
 		st.chunk_size = chfs_chunk_size;
 		buf = backend_data(p, 0, st.chunk_size, &st.mode, &size);
-		if (buf == NULL)
+		if (buf == NULL) {
+			errno = ENOENT;
 			goto free_p;
+		}
 		ret2 = chfs_rpc_inode_write(p, psize, buf, &size, 0,
 			st.mode | CHFS_O_CACHE, st.chunk_size, &err2);
 		free(buf);
@@ -678,6 +688,8 @@ chfs_open(const char *path, int32_t flags)
 	}
 	if (ret == HG_SUCCESS && err == KV_SUCCESS)
 		fd = create_fd(p, MODE_MASK(st.mode), st.chunk_size);
+	else
+		chfs_set_errno(ret, err);
 free_p:
 	free(p);
 	return (fd);
@@ -748,9 +760,10 @@ chfs_pwrite(int fd, const void *buf, size_t size, off_t offset)
 	ret = chfs_rpc_inode_write(path, psize, (void *)buf, &s, local_pos,
 		emode, chunk_size, &err);
 	free(path);
-	if (ret != HG_SUCCESS || err != KV_SUCCESS)
+	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
+		chfs_set_errno(ret, err);
 		return (-1);
-
+	}
 	if (size - s > 0) {
 		ss = chfs_pwrite(fd, buf + s, size - s, offset + s);
 		if (ss < 0)
@@ -817,8 +830,10 @@ chfs_pread(int fd, void *buf, size_t size, off_t offset)
 	}
 free_path:
 	free(path);
-	if (ret != HG_SUCCESS || err != KV_SUCCESS)
+	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
+		chfs_set_errno(ret, err);
 		return (-1);
+	}
 	if (s == 0)
 		return (0);
 
@@ -863,6 +878,7 @@ chfs_unlink(const char *path)
 	ret = chfs_rpc_remove(p, strlen(p) + 1, &err);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
 		free(p);
+		chfs_set_errno(ret, err);
 		return (-1);
 	}
 	for (i = 1; i < UNLINK_CHUNK_SIZE; ++i) {
@@ -892,8 +908,10 @@ chfs_mkdir(const char *path, mode_t mode)
 	mode |= S_IFDIR;
 	ret = chfs_rpc_inode_create(p, strlen(p) + 1, mode, 0, &err);
 	free(p);
-	if (ret != HG_SUCCESS || err != KV_SUCCESS)
+	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
+		chfs_set_errno(ret, err);
 		return (-1);
+	}
 	return (0);
 }
 
@@ -909,8 +927,10 @@ chfs_rmdir(const char *path)
 	/* XXX check child entries */
 	ret = chfs_rpc_remove(p, strlen(p) + 1, &err);
 	free(p);
-	if (ret != HG_SUCCESS || err != KV_SUCCESS)
+	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
+		chfs_set_errno(ret, err);
 		return (-1);
+	}
 	return (0);
 }
 
@@ -922,8 +942,10 @@ chfs_symlink(const char *target, const char *path)
 	hg_return_t ret;
 	int err, len;
 
-	if (target == NULL)
+	if (target == NULL) {
+		errno = ENOENT;
 		return (-1);
+	}
 	p = canonical_path(path);
 	if (p == NULL)
 		return (-1);
@@ -932,8 +954,10 @@ chfs_symlink(const char *target, const char *path)
 	ret = chfs_rpc_inode_create_data(p, strlen(p) + 1, mode, len + 1,
 		target, len + 1, &err);
 	free(p);
-	if (ret != HG_SUCCESS || err != KV_SUCCESS)
+	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
+		chfs_set_errno(ret, err);
 		return (-1);
+	}
 	return (0);
 }
 
@@ -957,8 +981,10 @@ chfs_readlink(const char *path, char *buf, size_t size)
 		}
 	}
 	free(p);
-	if (ret != HG_SUCCESS || err != KV_SUCCESS)
+	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
+		chfs_set_errno(ret, err);
 		return (-1);
+	}
 	if (s > 1 && buf[s - 1] == '\0')
 		--s;
 	return (s);
@@ -1000,6 +1026,7 @@ chfs_stat(const char *path, struct stat *st)
 		return (r);
 	} else if (ret != HG_SUCCESS || err != KV_SUCCESS) {
 		free(p);
+		chfs_set_errno(ret, err);
 		return (-1);
 	}
 	st->st_mode = MODE_MASK(sb.mode);
@@ -1043,7 +1070,7 @@ chfs_stat(const char *path, struct stat *st)
 int
 chfs_truncate(const char *path, off_t len)
 {
-	char *p = canonical_path(path);
+	char *p;
 	struct fs_stat sb;
 	size_t psize, index, local_len;
 	void *pi;
@@ -1051,12 +1078,20 @@ chfs_truncate(const char *path, off_t len)
 	mode_t mode;
 	int err, i;
 
+	if (len < 0) {
+		errno = EINVAL;
+		return (-1);
+	}
+	p = canonical_path(path);
 	if (p == NULL)
 		return (-1);
 	ret = chfs_rpc_inode_stat(p, strlen(p) + 1, &sb, &err);
 	mode = MODE_MASK(sb.mode);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS || !S_ISREG(mode)) {
 		free(p);
+		chfs_set_errno(ret, err);
+		if (errno == 0 && !S_ISREG(sb.mode))
+			errno = EINVAL;
 		return (-1);
 	}
 	index = len / sb.chunk_size;
@@ -1067,6 +1102,7 @@ chfs_truncate(const char *path, off_t len)
 	free(pi);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
 		free(p);
+		chfs_set_errno(ret, err);
 		return (-1);
 	}
 	for (i = index + 1;; ++i) {
@@ -1164,6 +1200,23 @@ chfs_readdir(const char *path, void *buf,
 			continue;
 	}
 	ring_list_copy_free(&node_list);
+	free(p);
+	return (0);
+}
+
+int
+chfs_readdir_index(const char *path, int index, void *buf,
+	int (*filler)(void *, const char *, const struct stat *, off_t))
+{
+	char *p = canonical_path(path), *target;
+	int err;
+
+	if (p == NULL)
+		return (-1);
+	target = ring_list_lookup_index(index);
+	if (target && filler)
+		fs_rpc_readdir_replica(target, p, buf, filler, &err);
+	free(target);
 	free(p);
 	return (0);
 }

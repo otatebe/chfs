@@ -97,3 +97,5 @@ hg_proc_fs_readdir_out_t(hg_proc_t proc, void *data)
 #define MODE_MASK(m)		((m) & ((1 << FLAGS_SHIFT) - 1))
 #define MODE_FLAGS(m, f)	((m) | (f) << FLAGS_SHIFT)
 #define FLAGS_FROM_MODE(m)	((m) >> FLAGS_SHIFT)
+
+#define CHFS_S_IFREP		(1 << 30)

@@ -1,6 +1,6 @@
 # CHFS - Consistent hashing file system
 
-CHFS is a parallel consistent hashing file system.  File chunks are distributed among file servers using consistent hashing.
+CHFS is a parallel consistent hashing file system created instantly using node-local storages such as persistent memory and NVMe SSD.  It exploits the performance of persistent memory using persistent in-memory key-value store pmemkv.  For NVMe SSD, it uses the POSIX backend.  It supports InfiniBand verbs for high performance data access.
 
 ## Quick installation steps
 
@@ -11,7 +11,7 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
 
 1. Install Spack
 
-       % git clone https://github.com/spack/spack.git
+       % git clone -c feature.manyFiles=true https://github.com/spack/spack.git
        % . spack/share/spack/setup-env.sh
 
    For details, see https://spack.readthedocs.io/
@@ -20,9 +20,18 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
 
        % spack install mochi-margo
 
+   Or, more recommended way to include verbs as follows;
+
+       % spack external find automake autoconf libtool cmake m4
+       % spack config edit packages
+       manually add rdma-core
+       % spack spec mochi-margo ^mercury~boostsys ^libfabric fabrics=rxm,sockets,tcp,udp,verbs
+       see what packages will be built
+       % spack install mochi-margo ^mercury~boostsys ^libfabric fabrics=rxm,sockets,tcp,udp,verbs
+
    For details, see https://mochi.readthedocs.io/
 
-1. (Optional) Install pmemkv
+1. (Optional) Install pmemkv for a pmemkv backend
 
        # apt install libpmemkv-dev
        # apt install libpmemobj-cpp-dev libmemkind-dev libtbb-dev
@@ -33,25 +42,31 @@ CHFS is a parallel consistent hashing file system.  File chunks are distributed 
 
        # apt install libfuse-dev
 
-1. (Optional) Install pandoc
+1. (Optional) Install pandoc to generate manual pages
 
        # apt install pandoc
 
 1. Install CHFS
 
-       % spack load mochi-margo
+       % git clone https://github.com/otatebe/chfs.git
+       % cd chfs
        % autoreconf -i
+       % spack load mochi-margo
        % ./configure [--prefix=PREFIX] [--with-pmemkv] [--enable-zero-copy-read-rdma]
        % make
        # make install
+
+   If --with-pmemkv is not specified, CHFS uses a POSIX backend.
 
 ## How to create file system
 
 1. Create CHFS
 
-       % eval `chfsctl [-h hostfile] [-p verbs] [-c /scr] [-m /mount/point] start`
+       % eval `chfsctl [-h hostfile] [-p verbs] [-D] [-c /dev/dax0.0] [-m /mount/point] start`
 
-   This executes chfsd servers and mounts the CHFS at /mount/point on hosts specified by the hostfile.  The -p option specifies communication protocol.  The -c option specifies a scratch directory on each host.
+   This executes chfsd servers and mounts the CHFS at /mount/point on hosts specified by the hostfile.  The -p option specifies a communication protocol.  The -c option specifies a devdax device or a scratch directory on each host.
+
+   For the devdax device, -D option is required.  A pmem obj pool should be created with the layout pmemkv by `pmempool create -l pmemkv obj /dev/dax0.0`.  For user-level access, the permission of the device is modified; bad block check is disabled by `pmempool feature --disable CHECK_BAD_BLOCKS /dev/dax0.0`.
 
    chfsctl outputs the setting of CHFS_SERVER environment variable, which is used to execute chfuse and CHFS commands.
 
@@ -139,3 +154,7 @@ The following APIs are supported.
             int (*filler)(void *, const char *, const struct stat *, off_t));
     int chfs_symlink(const char *target, const char *path);
     int chfs_readlink(const char *path, char *buf, size_t size);
+
+## References
+
+Osamu Tatebe, Kazuki Obata, Kohei Hiraga, Hiroki Ohtsuji, "[CHFS: Parallel Consistent Hashing File System for Node-local Persistent Memory](https://dl.acm.org/doi/fullHtml/10.1145/3492805.3492807)", Proceedings of the ACM International Conference on High Performance Computing in Asia-Pacific Region (HPC Asia 2022), pp.115-124, 2022

@@ -59,3 +59,13 @@ chfsctl - manage CHFS servers
 
 -O options
 : specifies options for chfsd.
+
+# EXAMPLES
+Here is an example to execute chfsd on host listed in hostfile, which utilizes the devdax device /dev/dax0.0.  It is mounted at /tmp/chfs on every node.
+
+    % eval `chfsctl -h hostfile -p verbs -D -c /dev/dax0.0 -m /tmp/chfs start`
+
+Here is an example to execute two chfsds on host listed in hostfile.  One is executed on CPU 0 and utilizes the devdax device /dev/dax0.0 and InfiniBand interface mlx5_0, the other is executed on CPU 1 and utilizes /dev/dax0.1 and mlx5_1.  Except the last execution -M option is required.  The second or later execution of chfctl requires -A option.
+
+    % eval `chfsctl -h hostfile -p verbs -D -c /dev/dax0.0 -C 0 -I mlx5_0 -M -m /tmp/chfs start`
+    % eval `chfsctl -h hostfile -p verbs -D -c /dev/dax1.0 -C 1 -I mlx5_1 -A -m /tmp/chfs start`
