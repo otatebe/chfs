@@ -264,7 +264,8 @@ main(int argc, char *argv[])
 
 	chfs_init(NULL);
 	if (opt.newer)
-		if (chfs_stat(opt.newer, &opt.newer_sb))
+		if (chfs_stat(opt.newer, &opt.newer_sb) &&
+			lstat(opt.newer, &opt.newer_sb))
 			perror(opt.newer), exit(EXIT_FAILURE);
 
 	if (argc == 0) {
