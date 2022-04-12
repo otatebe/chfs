@@ -1,6 +1,4 @@
-if HAVE_MPI
 bin_PROGRAMS = chfind
-endif
 
 CC=$(MPICC)
 

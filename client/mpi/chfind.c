@@ -1,3 +1,4 @@
+#include "config.h"
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -5,7 +6,9 @@
 #include <string.h>
 #include <fnmatch.h>
 #include <getopt.h>
+#ifdef HAVE_MPI
 #include <mpi.h>
+#endif
 #include <chfs.h>
 
 static struct option options[] = {
@@ -219,14 +222,15 @@ filler(void *buf, const char *name, const struct stat *st, off_t off)
 int
 main(int argc, char *argv[])
 {
-	int c, rank, size;
+	int c, rank = 0, size = 1;
 	char *d;
 	struct stat sb;
 
+#ifdef HAVE_MPI
 	MPI_Init(&argc, &argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
+#endif
 	while ((c = getopt_long_only(argc, argv, "qv", options, NULL)) != -1) {
 		switch (c) {
 		case 'n':
@@ -297,8 +301,12 @@ main(int argc, char *argv[])
 			chfs_readdir(d, d, filler);
 		free(d);
 	}
+#ifdef HAVE_MPI
 	MPI_Reduce(local_count, total_count, NUM_COUNT, MPI_LONG_LONG_INT,
 		MPI_SUM, 0, MPI_COMM_WORLD);
+#else
+	memcpy(total_count, local_count, NUM_COUNT * sizeof(local_count[0]));
+#endif
 	if (opt.verbose > 1)
 		printf("[%d] %lu/%lu\n", rank, local_count[FOUND],
 			local_count[TOTAL]);
@@ -306,6 +314,8 @@ main(int argc, char *argv[])
 		printf("MATCHED %lu/%lu\n", total_count[FOUND],
 			total_count[TOTAL]);
 	chfs_term();
+#ifdef HAVE_MPI
 	MPI_Finalize();
+#endif
 	return (0);
 }

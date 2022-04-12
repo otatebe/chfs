@@ -11,7 +11,7 @@ AC_CONFIG_MACRO_DIRS([m4])
 # Checks for programs.
 AC_PROG_CC
 AM_PROG_CC_C_O
-AX_MPI
+AX_MPI([], [MPICC=$CC])
 AM_CONDITIONAL([HAVE_MPI], [test x"$MPILIBS" != x])
 AM_PROG_AR
 LT_INIT
