@@ -676,21 +676,18 @@ chfs_open(const char *path, int32_t flags)
 	if (ret == HG_SUCCESS && err == KV_ERR_NO_ENTRY) {
 		st.chunk_size = chfs_chunk_size;
 		buf = backend_data(p, 0, st.chunk_size, &st.mode, &size);
-		if (buf == NULL) {
-			errno = ENOENT;
-			goto free_p;
+		if (buf != NULL) {
+			ret2 = chfs_rpc_inode_write(p, psize, buf, &size, 0,
+				st.mode | CHFS_O_CACHE, st.chunk_size, &err2);
+			free(buf);
+			if (ret2 == HG_SUCCESS && err2 == KV_SUCCESS)
+				err = KV_SUCCESS;
 		}
-		ret2 = chfs_rpc_inode_write(p, psize, buf, &size, 0,
-			st.mode | CHFS_O_CACHE, st.chunk_size, &err2);
-		free(buf);
-		if (ret2 == HG_SUCCESS && err2 == KV_SUCCESS)
-			err = KV_SUCCESS;
 	}
 	if (ret == HG_SUCCESS && err == KV_SUCCESS)
 		fd = create_fd(p, MODE_MASK(st.mode), st.chunk_size);
 	else
 		chfs_set_errno(ret, err);
-free_p:
 	free(p);
 	return (fd);
 }
@@ -808,11 +805,9 @@ chfs_pread(int fd, void *buf, size_t size, off_t offset)
 	if (path == NULL)
 		return (-1);
 	ret = chfs_rpc_inode_read(path, psize, buf, &s, local_pos, &err);
-	if (ret == HG_SUCCESS && err == KV_ERR_NO_ENTRY) {
-		bdata = backend_data(path, index * chunk_size, chunk_size,
-			&mode, &cs);
-		if (bdata == NULL)
-			goto free_path;
+	if (ret == HG_SUCCESS && err == KV_ERR_NO_ENTRY &&
+		(bdata = backend_data(path, index * chunk_size, chunk_size,
+			&mode, &cs)) != NULL) {
 		ret2 = chfs_rpc_inode_write(path, psize, bdata, &cs, 0,
 			mode | CHFS_O_CACHE, chunk_size, &err2);
 		if (ret2 != HG_SUCCESS || err2 != KV_SUCCESS) {
@@ -972,13 +967,12 @@ chfs_readlink(const char *path, char *buf, size_t size)
 	if (p == NULL)
 		return (-1);
 	ret = chfs_rpc_inode_read(p, strlen(p) + 1, buf, &s, 0, &err);
-	if (ret == HG_SUCCESS && err == KV_ERR_NO_ENTRY) {
-		if ((bp = path_backend(p)) != NULL) {
-			s = readlink(bp, buf, size);
-			free(bp);
-			free(p);
-			return (s);
-		}
+	if (ret == HG_SUCCESS && err == KV_ERR_NO_ENTRY &&
+		((bp = path_backend(p)) != NULL)) {
+		s = readlink(bp, buf, size);
+		free(bp);
+		free(p);
+		return (s);
 	}
 	free(p);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
@@ -1018,13 +1012,15 @@ chfs_stat(const char *path, struct stat *st)
 	if (ret == HG_SUCCESS && (err == KV_ERR_NO_ENTRY ||
 		(err == KV_SUCCESS && S_ISREG(MODE_MASK(sb.mode))
 		 && sb.mode & CHFS_O_CACHE) /* XXX */)) {
-		if ((bp = path_backend(p)) == NULL)
-			return (-1);
-		r = lstat(bp, st);
-		free(bp);
-		free(p);
-		return (r);
-	} else if (ret != HG_SUCCESS || err != KV_SUCCESS) {
+		bp = path_backend(p);
+		if (bp != NULL) {
+			r = lstat(bp, st);
+			free(bp);
+			free(p);
+			return (r);
+		}
+	}
+	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
 		free(p);
 		chfs_set_errno(ret, err);
 		return (-1);
