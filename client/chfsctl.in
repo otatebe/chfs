@@ -266,7 +266,14 @@ while [ $timeout -gt 0 -a $(chlist | wc -l) -lt $nservers ]; do
 	timeout=$((timeout - 1))
 	sleep 1;
 done
-echo "CHFS_SERVER=\"$(chlist -c -n $NUM_SERVS)\"; export CHFS_SERVER;"
+echo -n "CHFS_SERVER=\"$(chlist -c -n $NUM_SERVS)\"; export CHFS_SERVER;"
+if [ "X$BEDIR" != X ]; then
+	echo -n " CHFS_BACKEND_PATH=\"$BEDIR\"; export CHFS_BACKEND_PATH;"
+	if [ "X$MDIR" != X ]; then
+		echo -n " CHFS_SUBDIR_PATH=\"$MDIR\"; export CHFS_SUBDIR_PATH;"
+	fi
+fi
+echo
 CHFS_SERVER="$(chlist -c -n $NUM_SERVS)"; export CHFS_SERVER
 if ! $NO_MOUNT && [ X"$MDIR" != X ]; then
 	if [ $(chlist | wc -l) -lt $nservers ]; then
