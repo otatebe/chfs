@@ -121,8 +121,7 @@ skip_subdir(const char *path)
 
 	if (strncmp(subdir_path, p, subdir_pathlen) == 0)
 		return (skip_slash(p + subdir_pathlen));
-
-	return (p);
+	return (NULL);
 }
 
 char *
