@@ -56,9 +56,9 @@ ARG="LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH\" PATH=\"$PATH\" CHFS_SERVER=\"$CHFS_SER
 rank=0
 for host in `sed -e 's/#.*//' -e '/^[ 	]*$/d' $HOSTFILE | awk '{ print $1 }'`; do
 	if [ X$OUTPUT_DIR = X ]; then
-		$CMD $host "cd $PWD; $ARG --mpi_rank=$rank --mpi_size=$size" &
+		$CMD $host "cd $PWD; set -f; $ARG --mpi_rank=$rank --mpi_size=$size" &
 	else
-		$CMD $host "cd $PWD; $ARG --mpi_rank=$rank --mpi_size=$size" > $OUTPUT_DIR/$rank.out &
+		$CMD $host "cd $PWD; set -f; $ARG --mpi_rank=$rank --mpi_size=$size" > $OUTPUT_DIR/$rank.out &
 	fi
 	rank=$((rank + 1))
 done
