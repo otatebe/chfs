@@ -44,7 +44,10 @@ enum {
 	TOTAL,
 	NUM_COUNT
 };
-static uint64_t local_count[NUM_COUNT], total_count[NUM_COUNT];
+static uint64_t local_count[NUM_COUNT];
+#ifdef HAVE_MPI
+static uint64_t total_count[NUM_COUNT];
+#endif
 
 static void
 parse_size(char *str_size)
