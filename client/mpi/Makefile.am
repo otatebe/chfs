@@ -1,4 +1,5 @@
 bin_PROGRAMS = chfind
+bin_SCRIPTS = chfindrun
 
 CC=$(MPICC)
 

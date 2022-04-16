@@ -17,6 +17,10 @@ static struct option options[] = {
 	{ "newer", required_argument, NULL, 'N' },
 	{ "type", required_argument, NULL, 't' },
 	{ "version", no_argument, NULL, 'V' },
+#ifndef HAVE_MPI
+	{ "mpi_rank", required_argument, NULL, 'R' },
+	{ "mpi_size", required_argument, NULL, 'S' },
+#endif
 	{ 0, 0, 0, 0 }
 };
 
@@ -242,6 +246,14 @@ main(int argc, char *argv[])
 		case 'q':
 			opt.quiet = 1;
 			break;
+#ifndef HAVE_MPI
+		case 'R':
+			rank = atoi(optarg);
+			break;
+		case 'S':
+			size = atoi(optarg);
+			break;
+#endif
 		case 's':
 			opt.size = optarg;
 			parse_size(opt.size);
@@ -305,15 +317,19 @@ main(int argc, char *argv[])
 #ifdef HAVE_MPI
 	MPI_Reduce(local_count, total_count, NUM_COUNT, MPI_LONG_LONG_INT,
 		MPI_SUM, 0, MPI_COMM_WORLD);
-#else
-	memcpy(total_count, local_count, NUM_COUNT * sizeof(local_count[0]));
 #endif
 	if (opt.verbose > 1)
 		printf("[%d] %lu/%lu\n", rank, local_count[FOUND],
 			local_count[TOTAL]);
+#ifdef HAVE_MPI
 	if (opt.verbose > 0 && rank == 0)
 		printf("MATCHED %lu/%lu\n", total_count[FOUND],
 			total_count[TOTAL]);
+#else
+	if (opt.verbose > 0 && rank == 0 && size == 1)
+		printf("MATCHED %lu/%lu\n", local_count[FOUND],
+			local_count[TOTAL]);
+#endif
 	chfs_term();
 #ifdef HAVE_MPI
 	MPI_Finalize();
