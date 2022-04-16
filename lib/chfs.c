@@ -142,7 +142,7 @@ parse_servers(char *arg, char ***servers)
 #define IS_NULL_STRING(str) (str == NULL || str[0] == '\0')
 
 static char *
-get_server()
+get_server(int next)
 {
 	static char *servs = NULL, **servers = NULL;
 	static int index = -1, init_index, nservs = -1, err = 0;
@@ -163,7 +163,7 @@ get_server()
 	if (index == -1) {
 		srandom(getpid());
 		init_index = index = random() % nservs;
-	} else {
+	} else if (next) {
 		index = (index + 1) % nservs;
 		if (index == init_index)
 			goto err;
@@ -195,7 +195,7 @@ chfs_init(const char *server)
 	}
 
 	if (IS_NULL_STRING(server))
-		server = get_server();
+		server = get_server(0);
 	if (IS_NULL_STRING(server))
 		log_fatal("chfs_init: no server");
 	log_info("chfs_init: server %s", server);
@@ -221,7 +221,7 @@ chfs_init(const char *server)
 		if (proto != NULL)
 			break;
 		log_notice("%s: no protocol", server);
-		server = get_server();
+		server = get_server(1);
 	}
 	if (server == NULL)
 		log_fatal("chfs_init: no protocol");
@@ -247,7 +247,7 @@ chfs_init(const char *server)
 		if (ret == HG_SUCCESS)
 			break;
 		log_notice("%s: %s", server, HG_Error_to_string(ret));
-		server = get_server();
+		server = get_server(1);
 	}
 	if (server == NULL)
 		log_fatal("chfs_init: no server");
