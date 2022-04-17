@@ -582,7 +582,8 @@ void
 fs_client_init_internal(margo_instance_id mid, int timeout,
 	hg_id_t create_rpc, hg_id_t stat_rpc, hg_id_t write_rpc,
 	hg_id_t write_rdma_rpc, hg_id_t read_rpc, hg_id_t read_rdma_rpc,
-	hg_id_t copy_rdma_rpc, hg_id_t truncate_rpc, hg_id_t remove_rpc)
+	hg_id_t copy_rdma_rpc, hg_id_t truncate_rpc, hg_id_t remove_rpc,
+	hg_id_t unlink_all_rpc)
 {
 	env.mid = mid;
 	fs_rpc_timeout_msec = timeout;
@@ -595,16 +596,15 @@ fs_client_init_internal(margo_instance_id mid, int timeout,
 	env.copy_rdma_rpc = copy_rdma_rpc;
 	env.truncate_rpc = truncate_rpc;
 	env.remove_rpc = remove_rpc;
+	env.unlink_all_rpc = unlink_all_rpc;
 }
 
 void
-fs_client_init_more_internal(hg_id_t read_rdma_rpc, hg_id_t readdir_rpc,
-	hg_id_t unlink_all_rpc)
+fs_client_init_more_internal(hg_id_t read_rdma_rpc, hg_id_t readdir_rpc)
 {
 	if (read_rdma_rpc != -1)
 		env.read_rdma_rpc = read_rdma_rpc;
 	env.readdir_rpc = readdir_rpc;
-	env.unlink_all_rpc = unlink_all_rpc;
 }
 
 void

@@ -76,11 +76,11 @@ void
 fs_client_init_internal(margo_instance_id mid, int timeout,
 	hg_id_t create_rpc, hg_id_t stat_rpc, hg_id_t write_rpc,
 	hg_id_t write_rdma_rpc, hg_id_t read_rpc, hg_id_t read_rdma_rpc,
-	hg_id_t copy_rpc, hg_id_t truncate_rpc, hg_id_t remove_rpc);
+	hg_id_t copy_rpc, hg_id_t truncate_rpc, hg_id_t remove_rpc,
+	hg_id_t unlink_all_rpc);
 
 void
-fs_client_init_more_internal(hg_id_t read_rdma_rpc, hg_id_t readdir_rpc,
-	hg_id_t unlink_all_rpc);
+fs_client_init_more_internal(hg_id_t read_rdma_rpc, hg_id_t readdir_rpc);
 
 void fs_client_init(margo_instance_id mid, int timeout);
 void fs_client_term(void);
