@@ -1093,39 +1093,18 @@ static int
 chfs_unlink_chunk_all(char *p)
 {
 	node_list_t node_list;
-	hg_handle_t *h;
-	hg_return_t *ret;
-	int i, err;
+	hg_return_t ret;
+	int i;
 
 	chfs_ring_list_copy(&node_list);
-	h = malloc(sizeof(*h) * node_list.n);
-	if (h == NULL)
-		goto list_copy_free;
-	ret = malloc(sizeof(*ret) * node_list.n);
-	if (ret == NULL)
-		goto free_h;
-
 	for (i = 0; i < node_list.n; ++i) {
 		if (node_list.s[i].address == NULL)
 			continue;
-		ret[i] = fs_async_rpc_inode_unlink_chunk_all(
-				node_list.s[i].address, p, &h[i]);
-		if (ret[i] != HG_SUCCESS)
+		ret = fs_async_rpc_inode_unlink_chunk_all(
+				node_list.s[i].address, p);
+		if (ret != HG_SUCCESS)
 			continue;
 	}
-	for (i = 0; i < node_list.n; ++i) {
-		if (node_list.s[i].address == NULL)
-			continue;
-		if (ret[i] == HG_SUCCESS)
-			ret[i] = fs_async_rpc_inode_unlink_chunk_all_wait(
-					&h[i], &err);
-		if (ret[i] != HG_SUCCESS)
-			continue;
-	}
-	free(ret);
-free_h:
-	free(h);
-list_copy_free:
 	ring_list_copy_free(&node_list);
 	return (0);
 }
