@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <syslog.h>
+#include <time.h>
 #include "log.h"
 
 static FILE *log_file = NULL;
@@ -55,21 +56,45 @@ log_set_priority_max_level(int priority)
 }
 
 static void
+log_time(char *s, int size)
+{
+	struct timespec ts;
+	struct tm *tm;
+	size_t s0, s1;
+
+	clock_gettime(CLOCK_REALTIME, &ts);
+	tm = localtime(&ts.tv_sec);
+	s0 = strftime(s, size, "%Y-%m-%d %H:%M:%S", tm);
+	s1 = snprintf(s + s0, size - s0, ".%09ld ", ts.tv_nsec);
+	strftime(s + s0 + s1, size - s0 - s1, "%z", tm);
+}
+
+static void
 log_msg_syslog(int priority, const char *buf)
 {
 	syslog(priority, "%s", buf);
 }
 
+#define TIMEBUF_SIZE	256
+
 static void
 log_msg_stderr(int priority, const char *buf)
 {
-	fprintf(stderr, "<%s> %s\n", log_name_from_priority(priority), buf);
+	char tb[TIMEBUF_SIZE];
+
+	log_time(tb, TIMEBUF_SIZE);
+	fprintf(stderr, "%s: <%s> %s\n", tb, log_name_from_priority(priority),
+		buf);
 }
 
 static void
 log_msg_file(int priority, const char *buf)
 {
-	fprintf(log_file, "<%s> %s\n", log_name_from_priority(priority), buf);
+	char tb[TIMEBUF_SIZE];
+
+	log_time(tb, TIMEBUF_SIZE);
+	fprintf(log_file, "%s: <%s> %s\n", tb, log_name_from_priority(priority),
+		buf);
 }
 
 static void
