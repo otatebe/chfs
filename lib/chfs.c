@@ -777,7 +777,7 @@ chfs_read(int fd, void *buf, size_t size)
 }
 
 static int
-chfs_unlink_chunk_all(char *path);
+chfs_unlink_chunk_all(char *path, int index);
 
 #define UNLINK_CHUNK_SIZE	10
 
@@ -807,7 +807,7 @@ chfs_unlink(const char *path)
 			break;
 	}
 	if (i == UNLINK_CHUNK_SIZE)
-		chfs_unlink_chunk_all(p);
+		chfs_unlink_chunk_all(p, UNLINK_CHUNK_SIZE);
 	free(p);
 	return (0);
 }
@@ -1090,7 +1090,7 @@ chfs_readdir_index(const char *path, int index, void *buf,
 }
 
 static int
-chfs_unlink_chunk_all(char *p)
+chfs_unlink_chunk_all(char *p, int index)
 {
 	node_list_t node_list;
 	hg_return_t ret;
@@ -1101,7 +1101,7 @@ chfs_unlink_chunk_all(char *p)
 		if (node_list.s[i].address == NULL)
 			continue;
 		ret = fs_async_rpc_inode_unlink_chunk_all(
-				node_list.s[i].address, p);
+				node_list.s[i].address, p, index);
 		if (ret != HG_SUCCESS)
 			continue;
 	}

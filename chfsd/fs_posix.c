@@ -573,10 +573,10 @@ fs_inode_readdir(char *path, void (*cb)(struct dirent *, struct stat *, void *),
 }
 
 int
-fs_inode_unlink_chunk_all(char *path)
+fs_inode_unlink_chunk_all(char *path, int i)
 {
 	char p[PATH_MAX];
-	int len, klen, i = 10;
+	int len, klen;
 
 	if (path == NULL)
 		return (0);

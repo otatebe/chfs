@@ -60,6 +60,8 @@ MERCURY_GEN_PROC(fs_truncate_in_t,
 
 MERCURY_GEN_PROC(fs_file_info_t, ((hg_string_t)(name))((fs_stat_t)(sb)))
 
+MERCURY_GEN_PROC(fs_unlink_all_t, ((hg_string_t)(path))((uint32_t)(index)))
+
 typedef struct {
 	int32_t err, n;
 	fs_file_info_t *fi;

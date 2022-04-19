@@ -61,7 +61,7 @@ fs_server_init(margo_instance_id mid, char *db_dir, size_t db_size, int timeout,
 	remove_rpc = MARGO_REGISTER(mid, "inode_remove", kv_byte_t, int32_t,
 		inode_remove);
 	unlink_all_rpc = MARGO_REGISTER(mid, "inode_unlink_chunk_all",
-		hg_string_t, void, inode_unlink_chunk_all);
+		fs_unlink_all_t, void, inode_unlink_chunk_all);
 	margo_registered_disable_response(mid, unlink_all_rpc, HG_TRUE);
 
 	fs_client_init_internal(mid, timeout, create_rpc, stat_rpc, write_rpc,
@@ -646,20 +646,20 @@ DEFINE_MARGO_RPC_HANDLER(inode_remove)
 static void
 inode_unlink_chunk_all(hg_handle_t h)
 {
-	hg_string_t path;
 	hg_return_t ret;
+	fs_unlink_all_t in;
 	static const char diag[] = "inode_unlink_chunk_all RPC";
 
-	ret = margo_get_input(h, &path);
+	ret = margo_get_input(h, &in);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
 		return;
 	}
-	log_debug("%s: path=%s", diag, path);
+	log_debug("%s: path=%s index=%d", diag, in.path, in.index);
 
-	fs_inode_unlink_chunk_all(path);
+	fs_inode_unlink_chunk_all(in.path, in.index);
 
-	ret = margo_free_input(h, &path);
+	ret = margo_free_input(h, &in);
 	if (ret != HG_SUCCESS)
 		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
 

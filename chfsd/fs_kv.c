@@ -223,10 +223,10 @@ fs_inode_remove(char *key, size_t key_size)
 }
 
 int
-fs_inode_unlink_chunk_all(char *path)
+fs_inode_unlink_chunk_all(char *path, int i)
 {
 	char p[PATH_MAX];
-	int len, klen, i = 10;
+	int len, klen;
 
 	if (path == NULL)
 		return (0);

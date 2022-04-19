@@ -56,7 +56,7 @@ hg_return_t
 fs_rpc_inode_remove(const char *server, void *key, size_t key_size, int *errp);
 
 hg_return_t
-fs_async_rpc_inode_unlink_chunk_all(const char *server, void *path);
+fs_async_rpc_inode_unlink_chunk_all(const char *server, void *path, int index);
 
 hg_return_t
 fs_rpc_readdir(const char *server, const char *path, void *buf,
