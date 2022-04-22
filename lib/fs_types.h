@@ -92,4 +92,9 @@ hg_proc_fs_readdir_out_t(hg_proc_t proc, void *data)
 	return (ret);
 }
 
+typedef struct {
+	hg_handle_t h;
+	hg_bulk_t b;
+} fs_request_t;
+
 #define CHFS_S_IFREP	(1 << 30)

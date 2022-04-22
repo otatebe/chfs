@@ -3,6 +3,7 @@
 #include <margo.h>
 #include "ring_types.h"
 #include "kv_types.h"
+#include "kv_err.h"
 #include "fs_types.h"
 #include "fs_rpc.h"
 #include "log.h"
@@ -115,43 +116,129 @@ err:
 }
 
 hg_return_t
-fs_rpc_inode_write(const char *server, void *key, size_t key_size,
-	const void *buf, size_t *size, size_t offset, mode_t mode,
-	size_t chunk_size, int *errp)
+fs_async_rpc_inode_write(const char *server, void *key, size_t key_size,
+	const void *buf, size_t size, size_t offset, mode_t mode,
+	size_t chunk_size, fs_request_t *rp)
 {
-	hg_handle_t h;
-	hg_return_t ret, ret2;
+	hg_return_t ret;
 	fs_write_in_t in;
-	kv_get_rdma_out_t out;
-	static const char diag[] = "fs_rpc_inode_write";
+	static const char diag[] = "fs_async_rpc_inode_write";
 
-	ret = create_rpc_handle(server, env.write_rpc, &h, diag);
+	if (size == 0) {
+		rp->h = NULL;
+		return (HG_SUCCESS);
+	}
+	ret = create_rpc_handle(server, env.write_rpc, &rp->h, diag);
 	if (ret != HG_SUCCESS)
 		return (ret);
 
 	in.key.v = key;
 	in.key.s = key_size;
 	in.value.v = (void *)buf;
-	in.value.s = *size;
+	in.value.s = size;
 	in.offset = offset;
 	in.mode = mode;
 	in.chunk_size = chunk_size;
-	ret = margo_forward_timed(h, &in, fs_rpc_timeout_msec);
-	if (ret != HG_SUCCESS) {
-		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
-		goto err;
+	return (margo_forward_timed(rp->h, &in, fs_rpc_timeout_msec));
+}
+
+hg_return_t
+fs_async_rpc_inode_write_wait(size_t *size, int *errp, fs_request_t *rp)
+{
+	hg_return_t ret, ret2;
+	kv_get_rdma_out_t out;
+	static const char diag[] = "fs_async_rpc_inode_write_wait";
+
+	if (rp->h == NULL) {
+		*size = 0;
+		*errp = KV_SUCCESS;
+		return (HG_SUCCESS);
 	}
-	ret = margo_get_output(h, &out);
+	ret = margo_get_output(rp->h, &out);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (get_output): %s", diag, HG_Error_to_string(ret));
-		goto err;
+		goto margo_destroy;
 	}
 	*errp = out.err;
 	if (out.err == 0 && *size > out.value_size)
 		*size = out.value_size;
-	ret = margo_free_output(h, &out);
-err:
-	ret2 = margo_destroy(h);
+	ret = margo_free_output(rp->h, &out);
+margo_destroy:
+	ret2 = margo_destroy(rp->h);
+	if (ret == HG_SUCCESS)
+		ret = ret2;
+	return (ret);
+}
+
+hg_return_t
+fs_rpc_inode_write(const char *server, void *key, size_t key_size,
+	const void *buf, size_t *size, size_t offset, mode_t mode,
+	size_t chunk_size, int *errp)
+{
+	fs_request_t r;
+	hg_return_t ret;
+	static const char diag[] = "fs_rpc_inode_write";
+
+	ret = fs_async_rpc_inode_write(server, key, key_size, buf, *size,
+		offset, mode, chunk_size, &r);
+	if (ret != HG_SUCCESS) {
+		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
+		return (ret);
+	}
+	return (fs_async_rpc_inode_write_wait(size, errp, &r));
+}
+
+hg_return_t
+fs_async_rpc_inode_read(const char *server, void *key, size_t key_size,
+	size_t size, size_t offset, fs_request_t *rp)
+{
+	hg_return_t ret;
+	fs_read_in_t in;
+	static const char diag[] = "fs_async_rpc_inode_read";
+
+	if (size == 0) {
+		rp->h = NULL;
+		return (HG_SUCCESS);
+	}
+	ret = create_rpc_handle(server, env.read_rpc, &rp->h, diag);
+	if (ret != HG_SUCCESS)
+		return (ret);
+
+	in.key.v = key;
+	in.key.s = key_size;
+	in.size = size;
+	in.offset = offset;
+	return (margo_forward_timed(rp->h, &in, fs_rpc_timeout_msec));
+}
+
+hg_return_t
+fs_async_rpc_inode_read_wait(void *buf, size_t *size, int *errp,
+	fs_request_t *rp)
+{
+	hg_return_t ret, ret2;
+	kv_get_out_t out;
+	static const char diag[] = "fs_async_rpc_inode_read_wait";
+
+	if (rp->h == NULL) {
+		*size = 0;
+		*errp = KV_SUCCESS;
+		return (HG_SUCCESS);
+	}
+	ret = margo_get_output(rp->h, &out);
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_output): %s", diag, HG_Error_to_string(ret));
+		goto margo_destroy;
+	}
+	*errp = out.err;
+	if (out.err == 0) {
+		if (*size > out.value.s)
+			*size = out.value.s;
+		if (buf)
+			memcpy(buf, out.value.v, *size);
+	}
+	ret = margo_free_output(rp->h, &out);
+margo_destroy:
+	ret2 = margo_destroy(rp->h);
 	if (ret == HG_SUCCESS)
 		ret = ret2;
 	return (ret);
@@ -161,39 +248,70 @@ hg_return_t
 fs_rpc_inode_read(const char *server, void *key, size_t key_size, void *buf,
 	size_t *size, size_t offset, int *errp)
 {
-	hg_handle_t h;
-	hg_return_t ret, ret2;
-	fs_read_in_t in;
-	kv_get_out_t out;
+	fs_request_t r;
+	hg_return_t ret;
 	static const char diag[] = "fs_rpc_inode_read";
 
-	ret = create_rpc_handle(server, env.read_rpc, &h, diag);
+	ret = fs_async_rpc_inode_read(server, key, key_size, *size, offset, &r);
+	if (ret != HG_SUCCESS) {
+		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
+		return (ret);
+	}
+	return (fs_async_rpc_inode_read_wait(buf, size, errp, &r));
+}
+
+hg_return_t
+fs_async_rpc_inode_write_rdma_bulk(const char *server, void *key,
+	size_t key_size, char *client, hg_bulk_t buf, hg_size_t size,
+	size_t offset, mode_t mode, size_t chunk_size, fs_request_t *rp)
+{
+	hg_return_t ret;
+	fs_write_rdma_in_t in;
+	static const char diag[] = "fs_async_rpc_inode_write_rdma_bulk";
+
+	if (size == 0) {
+		rp->h = NULL;
+		return (HG_SUCCESS);
+	}
+	ret = create_rpc_handle(server, env.write_rdma_rpc, &rp->h, diag);
 	if (ret != HG_SUCCESS)
 		return (ret);
 
 	in.key.v = key;
 	in.key.s = key_size;
-	in.size = *size;
+	in.client = client;
 	in.offset = offset;
-	ret = margo_forward_timed(h, &in, fs_rpc_timeout_msec);
-	if (ret != HG_SUCCESS) {
-		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
-		goto err;
+	in.value = buf;
+	in.value_size = size;
+	in.mode = mode;
+	in.chunk_size = chunk_size;
+	return (margo_forward_timed(rp->h, &in, fs_rpc_timeout_msec));
+}
+
+hg_return_t
+fs_async_rpc_inode_write_rdma_bulk_wait(hg_size_t *size, int *errp,
+	fs_request_t *rp)
+{
+	hg_return_t ret, ret2;
+	kv_get_rdma_out_t out;
+	static const char diag[] = "fs_rpc_inode_write_rdma_bulk_wait";
+
+	if (rp->h == NULL) {
+		*size = 0;
+		*errp = KV_SUCCESS;
+		return (HG_SUCCESS);
 	}
-	ret = margo_get_output(h, &out);
+	ret = margo_get_output(rp->h, &out);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (get_output): %s", diag, HG_Error_to_string(ret));
-		goto err;
+		goto margo_destroy;
 	}
 	*errp = out.err;
-	if (out.err == 0) {
-		if (*size > out.value.s)
-			*size = out.value.s;
-		memcpy(buf, out.value.v, *size);
-	}
-	ret = margo_free_output(h, &out);
-err:
-	ret2 = margo_destroy(h);
+	if (out.err == 0)
+		*size = out.value_size;
+	ret = margo_free_output(rp->h, &out);
+margo_destroy:
+	ret2 = margo_destroy(rp->h);
 	if (ret == HG_SUCCESS)
 		ret = ret2;
 	return (ret);
@@ -204,42 +322,59 @@ fs_rpc_inode_write_rdma_bulk(const char *server, void *key, size_t key_size,
 	char *client, hg_bulk_t buf, hg_size_t *size, size_t offset,
 	mode_t mode, size_t chunk_size, int *errp)
 {
-	hg_handle_t h;
-	hg_return_t ret, ret2;
-	fs_write_rdma_in_t in;
-	kv_get_rdma_out_t out;
+	fs_request_t req;
+	hg_return_t ret;
 	static const char diag[] = "fs_rpc_inode_write_rdma_bulk";
 
-	ret = create_rpc_handle(server, env.write_rdma_rpc, &h, diag);
-	if (ret != HG_SUCCESS)
-		return (ret);
-
-	in.key.v = key;
-	in.key.s = key_size;
-	in.client = client;
-	in.offset = offset;
-	in.value = buf;
-	in.value_size = *size;
-	in.mode = mode;
-	in.chunk_size = chunk_size;
-	ret = margo_forward_timed(h, &in, fs_rpc_timeout_msec);
+	ret = fs_async_rpc_inode_write_rdma_bulk(server, key, key_size, client,
+		buf, *size, offset, mode, chunk_size, &req);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
-		goto err;
+		return (ret);
 	}
-	ret = margo_get_output(h, &out);
+	return (fs_async_rpc_inode_write_rdma_bulk_wait(size, errp, &req));
+}
+
+hg_return_t
+fs_async_rpc_inode_write_rdma(const char *server, void *key, size_t key_size,
+	char *client, const void *buf, hg_size_t size, size_t offset,
+	mode_t mode, size_t chunk_size, fs_request_t *rp)
+{
+	hg_return_t ret;
+	void *b = (void *)buf;
+	static const char diag[] = "fs_async_rpc_inode_write_rdma";
+
+	if (size == 0) {
+		rp->h = NULL;
+		return (HG_SUCCESS);
+	}
+	ret = margo_bulk_create(env.mid, 1, &b, &size, HG_BULK_READ_ONLY,
+		&rp->b);
 	if (ret != HG_SUCCESS) {
-		log_error("%s (get_output): %s", diag, HG_Error_to_string(ret));
-		goto err;
+		log_error("%s (bulk_create): %s", diag,
+			HG_Error_to_string(ret));
+		return (ret);
 	}
-	*errp = out.err;
-	if (out.err == 0)
-		*size = out.value_size;
-	ret = margo_free_output(h, &out);
-err:
-	ret2 = margo_destroy(h);
-	if (ret == HG_SUCCESS)
-		ret = ret2;
+	return (fs_async_rpc_inode_write_rdma_bulk(server, key, key_size,
+			client, rp->b, size, offset, mode, chunk_size, rp));
+}
+
+hg_return_t
+fs_async_rpc_inode_write_rdma_wait(hg_size_t *size, int *errp, fs_request_t *rp)
+{
+	hg_return_t ret, ret2;
+	static const char diag[] = "fs_async_rpc_inode_write_rdma_wait";
+
+	if (rp->h == NULL) {
+		*size = 0;
+		*errp = KV_SUCCESS;
+		return (HG_SUCCESS);
+	}
+	ret = fs_async_rpc_inode_write_rdma_bulk_wait(size, errp, rp);
+
+	ret2 = margo_bulk_free(rp->b);
+	if (ret2 != HG_SUCCESS)
+		log_error("%s (bulk_free): %s", diag, HG_Error_to_string(ret2));
 	return (ret);
 }
 
@@ -248,23 +383,69 @@ fs_rpc_inode_write_rdma(const char *server, void *key, size_t key_size,
 	char *client, const void *buf, hg_size_t *size, size_t offset,
 	mode_t mode, size_t chunk_size, int *errp)
 {
-	hg_bulk_t bulk;
-	hg_return_t ret, ret2;
-	void *b = (void *)buf;
+	fs_request_t req;
+	hg_return_t ret;
 	static const char diag[] = "fs_rpc_inode_write_rdma";
 
-	if (*size == 0)
-		return (HG_SUCCESS);
-	ret = margo_bulk_create(env.mid, 1, &b, size, HG_BULK_READ_ONLY, &bulk);
+	ret = fs_async_rpc_inode_write_rdma(server, key, key_size, client, buf,
+		*size, offset, mode, chunk_size, &req);
 	if (ret != HG_SUCCESS) {
-		log_error("%s (bulk_create): %s", diag,
-			HG_Error_to_string(ret));
+		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
 		return (ret);
 	}
-	ret = fs_rpc_inode_write_rdma_bulk(server, key, key_size, client,
-		bulk, size, offset, mode, chunk_size, errp);
+	return (fs_async_rpc_inode_write_rdma_wait(size, errp, &req));
+}
 
-	ret2 = margo_bulk_free(bulk);
+hg_return_t
+fs_async_rpc_inode_read_rdma_bulk(const char *server, void *key,
+	size_t key_size, char *client, hg_bulk_t buf, hg_size_t size,
+	size_t offset, fs_request_t *rp)
+{
+	hg_return_t ret;
+	kv_put_rdma_in_t in;
+	static const char diag[] = "fs_async_rpc_inode_read_rdma_bulk";
+
+	if (size == 0) {
+		rp->h = NULL;
+		return (HG_SUCCESS);
+	}
+	ret = create_rpc_handle(server, env.read_rdma_rpc, &rp->h, diag);
+	if (ret != HG_SUCCESS)
+		return (ret);
+
+	in.key.v = key;
+	in.key.s = key_size;
+	in.client = client;
+	in.offset = offset;
+	in.value = buf;
+	in.value_size = size;
+	return (margo_forward_timed(rp->h, &in, fs_rpc_timeout_msec));
+}
+
+hg_return_t
+fs_async_rpc_inode_read_rdma_bulk_wait(hg_size_t *size, int *errp,
+	fs_request_t *rp)
+{
+	hg_return_t ret, ret2;
+	kv_get_rdma_out_t out;
+	static const char diag[] = "fs_async_rpc_inode_read_rdma_bulk_wait";
+
+	if (rp->h == NULL) {
+		*size = 0;
+		*errp = KV_SUCCESS;
+		return (HG_SUCCESS);
+	}
+	ret = margo_get_output(rp->h, &out);
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_output): %s", diag, HG_Error_to_string(ret));
+		goto margo_destroy;
+	}
+	*errp = out.err;
+	if (out.err == 0)
+		*size = out.value_size;
+	ret = margo_free_output(rp->h, &out);
+margo_destroy:
+	ret2 = margo_destroy(rp->h);
 	if (ret == HG_SUCCESS)
 		ret = ret2;
 	return (ret);
@@ -275,40 +456,58 @@ fs_rpc_inode_read_rdma_bulk(const char *server, void *key, size_t key_size,
 	char *client, hg_bulk_t buf, hg_size_t *size, size_t offset,
 	int *errp)
 {
-	hg_handle_t h;
-	hg_return_t ret, ret2;
-	kv_put_rdma_in_t in;
-	kv_get_rdma_out_t out;
+	fs_request_t req;
+	hg_return_t ret;
 	static const char diag[] = "fs_rpc_inode_read_rdma_bulk";
 
-	ret = create_rpc_handle(server, env.read_rdma_rpc, &h, diag);
-	if (ret != HG_SUCCESS)
-		return (ret);
-
-	in.key.v = key;
-	in.key.s = key_size;
-	in.client = client;
-	in.offset = offset;
-	in.value = buf;
-	in.value_size = *size;
-	ret = margo_forward_timed(h, &in, fs_rpc_timeout_msec);
+	ret = fs_async_rpc_inode_read_rdma_bulk(server, key, key_size, client,
+		buf, *size, offset, &req);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
-		goto err;
+		return (ret);
 	}
-	ret = margo_get_output(h, &out);
+	return (fs_async_rpc_inode_read_rdma_bulk_wait(size, errp, &req));
+}
+
+hg_return_t
+fs_async_rpc_inode_read_rdma(const char *server, void *key, size_t key_size,
+	char *client, void *buf, hg_size_t size, size_t offset,
+	fs_request_t *rp)
+{
+	hg_return_t ret;
+	static const char diag[] = "fs_async_rpc_inode_read_rdma";
+
+	if (size == 0) {
+		rp->h = NULL;
+		return (HG_SUCCESS);
+	}
+	ret = margo_bulk_create(env.mid, 1, &buf, &size, HG_BULK_WRITE_ONLY,
+		&rp->b);
 	if (ret != HG_SUCCESS) {
-		log_error("%s (get_output): %s", diag, HG_Error_to_string(ret));
-		goto err;
+		log_error("%s (bulk_create): %s", diag,
+			HG_Error_to_string(ret));
+		return (ret);
 	}
-	*errp = out.err;
-	if (out.err == 0)
-		*size = out.value_size;
-	ret = margo_free_output(h, &out);
-err:
-	ret2 = margo_destroy(h);
-	if (ret == HG_SUCCESS)
-		ret = ret2;
+	return (fs_async_rpc_inode_read_rdma_bulk(server, key, key_size, client,
+			rp->b, size, offset, rp));
+}
+
+hg_return_t
+fs_async_rpc_inode_read_rdma_wait(hg_size_t *size, int *errp, fs_request_t *rp)
+{
+	hg_return_t ret, ret2;
+	static const char diag[] = "fs_async_rpc_inode_read_rdma_wait";
+
+	if (rp->h == NULL) {
+		*size = 0;
+		*errp = KV_SUCCESS;
+		return (HG_SUCCESS);
+	}
+	ret = fs_async_rpc_inode_read_rdma_bulk_wait(size, errp, rp);
+
+	ret2 = margo_bulk_free(rp->b);
+	if (ret2 != HG_SUCCESS)
+		log_error("%s (bulk_free): %s", diag, HG_Error_to_string(ret2));
 	return (ret);
 }
 
@@ -317,26 +516,17 @@ fs_rpc_inode_read_rdma(const char *server, void *key, size_t key_size,
 	char *client, void *buf, hg_size_t *size, size_t offset,
 	int *errp)
 {
-	hg_bulk_t bulk;
-	hg_return_t ret, ret2;
+	fs_request_t req;
+	hg_return_t ret;
 	static const char diag[] = "fs_rpc_inode_read_rdma";
 
-	if (*size == 0)
-		return (HG_SUCCESS);
-	ret = margo_bulk_create(env.mid, 1, &buf, size,
-		HG_BULK_WRITE_ONLY, &bulk);
+	ret = fs_async_rpc_inode_read_rdma(server, key, key_size, client, buf,
+		*size, offset, &req);
 	if (ret != HG_SUCCESS) {
-		log_error("%s (bulk_create): %s", diag,
-			HG_Error_to_string(ret));
+		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
 		return (ret);
 	}
-	ret = fs_rpc_inode_read_rdma_bulk(server, key, key_size, client,
-		bulk, size, offset, errp);
-
-	ret2 = margo_bulk_free(bulk);
-	if (ret == HG_SUCCESS)
-		ret = ret2;
-	return (ret);
+	return (fs_async_rpc_inode_read_rdma_wait(size, errp, &req));
 }
 
 hg_return_t
