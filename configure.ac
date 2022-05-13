@@ -118,5 +118,5 @@ AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_CHECK_FUNCS([memset mkdir rmdir strchr strdup strerror])
 
-AC_CONFIG_FILES([Makefile lib/Makefile chfsd/Makefile client/Makefile client/chfsctl client/mpi/Makefile doc/Makefile])
+AC_CONFIG_FILES([Makefile lib/Makefile chfsd/Makefile client/Makefile client/chfsctl client/mpi/Makefile doc/Makefile pkgconfig/chfs.pc pkgconfig/Makefile])
 AC_OUTPUT

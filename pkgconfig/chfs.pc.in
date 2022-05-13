@@ -1,0 +1,11 @@
+prefix=@prefix@
+exec_prefix=${prefix}
+libdir=@libdir@
+includedir=@includedir@
+
+Name: @PACKAGE_NAME@
+Description: CHFS ad hoc parallel and distributed file system
+Version: @VERSION@
+Requires: margo fuse
+Cflags: -I${includedir}
+Libs: -L${libdir} -lchfs
