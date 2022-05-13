@@ -95,6 +95,7 @@ hg_proc_fs_readdir_out_t(hg_proc_t proc, void *data)
 typedef struct {
 	hg_handle_t h;
 	hg_bulk_t b;
+	margo_request r;
 } fs_request_t;
 
 #define CHFS_S_IFREP	(1 << 30)
