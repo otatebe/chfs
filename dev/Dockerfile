@@ -51,8 +51,8 @@ RUN cd \
 COPY --chown=$USERNAME:$USERNAME . /home/$USERNAME/chfs
 COPY --chown=$USERNAME:$USERNAME dev/hosts /home/$USERNAME/hosts
 
-RUN export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig \
- && cd \
+RUN cd \
+ && export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig \
  && . spack/share/spack/setup-env.sh \
  && spack load mochi-margo \
  && cd chfs \
@@ -61,8 +61,8 @@ RUN export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig \
  && make \
  && make install
 
-RUN export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig \
- && cd \
+RUN cd \
+ && export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig \
  && . spack/share/spack/setup-env.sh \
  && spack load mochi-margo \
  && git clone https://github.com/otatebe/ior.git -b feature/chfs \
