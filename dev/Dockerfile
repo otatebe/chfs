@@ -71,3 +71,5 @@ RUN cd \
  && ./configure --prefix=/home/$USERNAME --with-chfs=/home/$USERNAME \
  && make \
  && make install
+
+COPY --chown=$USERNAME:$USERNAME dev/test.sh /home/$USERNAME/test.sh
