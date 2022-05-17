@@ -1,0 +1,73 @@
+FROM ubuntu
+
+ARG USERNAME=foo
+
+RUN apt-get update \
+ && apt-get -y upgrade \
+ && apt-get -y install build-essential \
+ && apt-get -y install cmake libtool \
+ && apt-get -y install git python3 fuse sudo vim \
+ && apt-get -y install libpmemkv-dev libmemkind-dev libtbb-dev \
+ && apt-get -y install libfuse-dev pandoc \
+ && apt-get -y install openmpi-bin libopenmpi-dev libssl-dev
+
+RUN \
+  # sshd
+  apt-get -y install --no-install-recommends \
+    openssh-server \
+  # sshd_config
+  && printf '%s\n' \
+    'PermitRootLogin yes' \
+    'PasswordAuthentication yes' \
+    'PermitEmptyPasswords yes' \
+    'UsePAM no' \
+    > /etc/ssh/sshd_config.d/auth.conf \
+  # ssh_config
+  && printf '%s\n' \
+    'Host *' \
+    '    StrictHostKeyChecking no' \
+    > /etc/ssh/ssh_config.d/ignore-host-key.conf
+
+# clean up
+RUN apt-get -y autoremove \
+ && apt-get -y clean \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -m -s /bin/bash $USERNAME \
+ && echo "$USERNAME ALL=(ALL:ALL) NOPASSWD: ALL" >> /etc/sudoers \
+ # delete passwd
+ && passwd -d $USERNAME
+
+USER $USERNAME
+RUN cd \
+ && git clone -c feature.manyFiles=true https://github.com/spack/spack.git \
+ && . spack/share/spack/setup-env.sh \
+ && spack external find automake autoconf libtool cmake m4 \
+ && spack install mochi-margo ^mercury~boostsys ^libfabric fabrics=rxm,sockets,tcp,udp \
+ && echo "export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig" >> .bashrc \
+ && echo ". spack/share/spack/setup-env.sh" >> .bashrc \
+ && echo "spack load mochi-margo" >> .bashrc
+
+COPY --chown=$USERNAME:$USERNAME . /home/$USERNAME/chfs
+COPY --chown=$USERNAME:$USERNAME dev/hosts /home/$USERNAME/hosts
+
+RUN export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig \
+ && cd \
+ && . spack/share/spack/setup-env.sh \
+ && spack load mochi-margo \
+ && cd chfs \
+ && if [ -f Makefile ]; then make distclean; fi \
+ && ./configure --prefix=/home/$USERNAME \
+ && make \
+ && make install
+
+RUN export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig \
+ && cd \
+ && . spack/share/spack/setup-env.sh \
+ && spack load mochi-margo \
+ && git clone https://github.com/otatebe/ior.git -b feature/chfs \
+ && cd ior \
+ && ./bootstrap \
+ && ./configure --prefix=/home/$USERNAME --with-chfs=/home/$USERNAME \
+ && make \
+ && make install
