@@ -56,7 +56,7 @@ RUN export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig \
  && . spack/share/spack/setup-env.sh \
  && spack load mochi-margo \
  && cd chfs \
- && if [ -f Makefile ]; then make distclean; fi \
+ && autoreconf -i \
  && ./configure --prefix=/home/$USERNAME \
  && make \
  && make install
