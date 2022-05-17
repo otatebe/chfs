@@ -9,7 +9,7 @@ RUN apt-get update \
  && apt-get -y install git python3 fuse sudo vim \
  && apt-get -y install libpmemkv-dev libmemkind-dev libtbb-dev \
  && apt-get -y install libfuse-dev pandoc \
- && apt-get -y install openmpi-bin libopenmpi-dev libssl-dev
+ && apt-get -y install libopenmpi-dev libssl-dev
 
 RUN \
   # sshd

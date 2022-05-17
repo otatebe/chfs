@@ -46,6 +46,10 @@ CHFS is a parallel consistent hashing file system created instantly using node-l
 
        # apt install pandoc
 
+1. (Optional) Install OpenMPI for parallel find in MPI
+
+       # apt install libopenmpi-dev
+
 1. Install CHFS
 
        % git clone https://github.com/otatebe/chfs.git
@@ -107,10 +111,10 @@ When you use pmemkv, devdax is desirable.  When you use fsdax, the following env
 
 1. Installation
 
+       % spack load mochi-margo
        % git clone https://github.com/otatebe/ior.git -b feature/chfs
        % cd ior
        % ./bootstrap
-       % spack load mochi-margo
        % ./configure --with-chfs=PREFIX [--prefix=PREFIX]
        % make
        # make install
