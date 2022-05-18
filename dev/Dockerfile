@@ -34,7 +34,7 @@ RUN apt-get -y autoremove \
  && rm -rf /var/lib/apt/lists/*
 
 RUN useradd -m -s /bin/bash $USERNAME \
- && echo "$USERNAME ALL=(ALL:ALL) NOPASSWD: ALL" >> /etc/sudoers \
+ && echo "$USERNAME ALL=(ALL:ALL) NOPASSWD: ALL" >> /etc/sudoers.d/$USERNAME \
  # delete passwd
  && passwd -d $USERNAME
 
