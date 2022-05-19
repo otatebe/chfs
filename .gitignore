@@ -13,6 +13,14 @@ lib/config.h.in~
 lib/stamp-h1
 libtool
 .libs
+doc/chfsctl.1
+doc/chfsd.8
+doc/chfuse.1
+doc/chlist.1
+doc/chmkdir.1
+doc/chrmdir.1
+doc/chstagein.1
+pkgconfig/chfs.pc
 
 ## spack
 removed_la_files.txt
