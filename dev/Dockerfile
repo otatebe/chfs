@@ -28,11 +28,6 @@ RUN \
     '    StrictHostKeyChecking no' \
     > /etc/ssh/ssh_config.d/ignore-host-key.conf
 
-# clean up
-RUN apt-get -y autoremove \
- && apt-get -y clean \
- && rm -rf /var/lib/apt/lists/*
-
 RUN useradd -m -s /bin/bash $USERNAME \
  && echo "$USERNAME ALL=(ALL:ALL) NOPASSWD: ALL" >> /etc/sudoers.d/$USERNAME \
  # delete passwd
@@ -59,7 +54,8 @@ RUN cd \
  && autoreconf -i \
  && ./configure --prefix=/home/$USERNAME \
  && make \
- && make install
+ && make install \
+ && make clean
 
 RUN cd \
  && export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig \
@@ -70,6 +66,7 @@ RUN cd \
  && ./bootstrap \
  && ./configure --prefix=/home/$USERNAME --with-chfs=/home/$USERNAME \
  && make \
- && make install
+ && make install \
+ && make clean
 
 COPY --chown=$USERNAME:$USERNAME dev/test.sh /home/$USERNAME/test.sh

@@ -4,7 +4,7 @@
 
 - build image
 
-      % docker compose build --build-arg USERNAME=$(whoami)
+      % docker compose build
 
   This creates a docker image using the current source files of CHFS.  For details, see Dockerfile.
 

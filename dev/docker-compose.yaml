@@ -3,6 +3,8 @@ x-common:
   build:
     context: ..
     dockerfile: dev/Dockerfile
+    args:
+      USERNAME: $USER
   init: true
   networks:
     chfs_net:
