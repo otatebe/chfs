@@ -7,7 +7,7 @@ CHFS is a parallel consistent hashing file system created instantly using node-l
 1. Install development kits
 
        # apt install build-essential
-       # apt install cmake libtool pkg-config
+       # apt install cmake libtool pkgconf
 
 1. Install Spack
 
@@ -22,7 +22,7 @@ CHFS is a parallel consistent hashing file system created instantly using node-l
 
    Or, more recommended way to include verbs as follows;
 
-       % spack external find automake autoconf libtool cmake m4
+       % spack external find automake autoconf libtool cmake m4 pkgconf
        % spack config edit packages
        manually add rdma-core
        % spack spec mochi-margo ^mercury~boostsys ^libfabric fabrics=rxm,sockets,tcp,udp,verbs

@@ -5,7 +5,7 @@ ARG USERNAME=foo
 RUN apt-get update \
  && apt-get -y upgrade \
  && apt-get -y install build-essential \
- && apt-get -y install cmake libtool \
+ && apt-get -y install cmake libtool pkgconf \
  && apt-get -y install git python3 fuse sudo vim \
  && apt-get -y install libpmemkv-dev libmemkind-dev libtbb-dev \
  && apt-get -y install libfuse-dev pandoc \
@@ -37,9 +37,8 @@ USER $USERNAME
 RUN cd \
  && git clone -c feature.manyFiles=true https://github.com/spack/spack.git \
  && . spack/share/spack/setup-env.sh \
- && spack external find automake autoconf libtool cmake m4 \
+ && spack external find automake autoconf libtool cmake m4 pkgconf \
  && spack install mochi-margo ^mercury~boostsys ^libfabric fabrics=rxm,sockets,tcp,udp \
- && echo "export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig" >> .bashrc \
  && echo ". spack/share/spack/setup-env.sh" >> .bashrc \
  && echo "spack load mochi-margo" >> .bashrc
 
@@ -47,7 +46,6 @@ COPY --chown=$USERNAME:$USERNAME . /home/$USERNAME/chfs
 COPY --chown=$USERNAME:$USERNAME dev/hosts /home/$USERNAME/hosts
 
 RUN cd \
- && export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig \
  && . spack/share/spack/setup-env.sh \
  && spack load mochi-margo \
  && cd chfs \
@@ -58,7 +56,6 @@ RUN cd \
  && make clean
 
 RUN cd \
- && export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig \
  && . spack/share/spack/setup-env.sh \
  && spack load mochi-margo \
  && git clone https://github.com/otatebe/ior.git -b feature/chfs \
