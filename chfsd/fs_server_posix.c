@@ -1,5 +1,6 @@
 #include <dirent.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 #include <margo.h>
 #include "config.h"
 #include "ring.h"
@@ -17,24 +18,20 @@
 static char *self;
 
 DECLARE_MARGO_RPC_HANDLER(inode_readdir)
-DECLARE_MARGO_RPC_HANDLER(inode_unlink_chunk_all)
 
 void
 fs_server_init_more(margo_instance_id mid, char *db_dir, size_t db_size,
 	int niothreads)
 {
-	hg_id_t read_rdma_rpc = -1, readdir_rpc, unlink_all_rpc;
+	hg_id_t read_rdma_rpc = -1, readdir_rpc;
 
 #ifdef USE_ZERO_COPY_READ_RDMA
 #error posix backend does not support --enable-zero-copy-read-rdma
 #endif
 	readdir_rpc = MARGO_REGISTER(mid, "inode_readdir", hg_string_t,
 		fs_readdir_out_t, inode_readdir);
-	unlink_all_rpc = MARGO_REGISTER(mid, "inode_unlink_chunk_all",
-		hg_string_t, int32_t, inode_unlink_chunk_all);
 
-	fs_client_init_more_internal(read_rdma_rpc, readdir_rpc,
-		unlink_all_rpc);
+	fs_client_init_more_internal(read_rdma_rpc, readdir_rpc);
 	fs_inode_init(db_dir, niothreads);
 
 	self = ring_get_self();
@@ -61,7 +58,7 @@ free_fs_readdir_arg(struct fs_readdir_arg *a)
 }
 
 static void
-fs_add_entry(struct dirent *dent, void *arg)
+fs_add_entry(struct dirent *dent, struct stat *st, void *arg)
 {
 	struct fs_readdir_arg *a = arg;
 	fs_file_info_t *tfi;
@@ -74,8 +71,6 @@ fs_add_entry(struct dirent *dent, void *arg)
 		return;
 	}
 	strcpy(a->path + a->pathlen, dent->d_name);
-	if (!ring_list_is_in_charge(a->path, a->pathlen + namelen + 1))
-		return;
 	if (a->n >= a->size) {
 		tfi = realloc(a->fi, sizeof(a->fi[0]) * a->size * 2);
 		if (tfi == NULL) {
@@ -91,7 +86,14 @@ fs_add_entry(struct dirent *dent, void *arg)
 		return;
 	}
 	memset(&a->fi[a->n].sb, 0, sizeof(a->fi[a->n].sb));
-	a->fi[a->n].sb.mode = dent->d_type << 12;
+	a->fi[a->n].sb.mode = st->st_mode;
+	if (!ring_list_is_in_charge(a->path, a->pathlen + namelen + 1))
+		a->fi[a->n].sb.mode |= CHFS_S_IFREP;
+	a->fi[a->n].sb.size = st->st_size;
+	a->fi[a->n].sb.uid = st->st_uid;
+	a->fi[a->n].sb.gid = st->st_gid;
+	a->fi[a->n].sb.mtime = st->st_mtim;
+	a->fi[a->n].sb.ctime = st->st_ctim;
 	++a->n;
 }
 
@@ -151,35 +153,3 @@ free_input:
 		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
 }
 DEFINE_MARGO_RPC_HANDLER(inode_readdir)
-
-static void
-inode_unlink_chunk_all(hg_handle_t h)
-{
-	hg_string_t path;
-	hg_return_t ret;
-	int err;
-	static const char diag[] = "inode_unlink_chunk_all RPC";
-
-	ret = margo_get_input(h, &path);
-	if (ret != HG_SUCCESS) {
-		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
-		return;
-	}
-	log_debug("%s: path=%s", diag, path);
-
-	fs_inode_unlink_chunk_all(path);
-
-	ret = margo_free_input(h, &path);
-	if (ret != HG_SUCCESS)
-		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
-
-	err = 0;
-	ret = margo_respond(h, &err);
-	if (ret != HG_SUCCESS)
-		log_error("%s (respond): %s", diag, HG_Error_to_string(ret));
-
-	ret = margo_destroy(h);
-	if (ret != HG_SUCCESS)
-		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
-}
-DEFINE_MARGO_RPC_HANDLER(inode_unlink_chunk_all)

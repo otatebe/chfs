@@ -70,6 +70,8 @@ fi
 [ "$mode" = kill ] && PKILL_FLAG=-9 || PKILL_FLAG=
 if $DEVDAX; then
 	[ -w $DBDIR ] || SUDO=sudo
+else
+	DBDIR=$DBDIR/$IFACE-$VNAME
 fi
 [ "X$HOSTFILE" = X ] && HOSTS=localhost ||
 	HOSTS="$(sed -e 's/#.*//' -e '/^[ 	]*$/d' $HOSTFILE | awk '{ print $1 }')"
@@ -209,7 +211,7 @@ do
 
 	[ $VNAME = default ] && NOPT= || NOPT="-n $VNAME"
 	[ $IFACE = default ] && HOPT= || HOPT="-h $IFACE"
-	if $DEVDAX; then COPT="-c $DBDIR"; else COPT="-c $DBDIR/$IFACE-$VNAME"; fi
+	COPT="-c $DBDIR"
 	[ "X$LOG_DIR" = X ] && LOPT= || LOPT="-l $LOG_DIR/$host-$IFACE-$VNAME"
 	if [ "X$host" = Xlocalhost ]; then
 		$SUDO $NUMACTL $CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $NOPT "$1"

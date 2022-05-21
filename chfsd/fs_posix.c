@@ -14,6 +14,7 @@
 #endif
 
 #include "ring_types.h"
+#include "ring_list.h"
 #include "kv_types.h"
 #include "kv.h"
 #include "kv_err.h"
@@ -541,12 +542,13 @@ fs_inode_remove(char *key, size_t key_size)
 }
 
 int
-fs_inode_readdir(char *path, void (*cb)(struct dirent *, void *),
+fs_inode_readdir(char *path, void (*cb)(struct dirent *, struct stat *, void *),
 	void *arg)
 {
 	char *p = key_to_path(path, strlen(path) + 1);
 	struct dirent *dent;
 	DIR *dp;
+	struct stat sb;
 	int r;
 
 	log_debug("fs_inode_readdir: %s", p);
@@ -556,7 +558,12 @@ fs_inode_readdir(char *path, void (*cb)(struct dirent *, void *),
 		while ((dent = readdir(dp)) != NULL) {
 			if (strchr(dent->d_name, ':'))
 				continue;
-			cb(dent, arg);
+			if (fstatat(dirfd(dp), dent->d_name, &sb,
+				AT_SYMLINK_NOFOLLOW))
+				continue;
+			if (S_ISREG(sb.st_mode))
+				sb.st_size -= msize;
+			cb(dent, &sb, arg);
 		}
 		closedir(dp);
 	} else
@@ -565,57 +572,25 @@ fs_inode_readdir(char *path, void (*cb)(struct dirent *, void *),
 	return (fs_err(r));
 }
 
-static char *
-fs_basename(char *p)
-{
-	int len;
-
-	if (p == NULL || (len = strlen(p)) == 0)
-		return (NULL);
-	while (len > 0 && p[len - 1] != '/')
-		--len;
-	return (&p[len]);
-}
-
 int
-fs_inode_unlink_chunk_all(char *path)
+fs_inode_unlink_chunk_all(char *path, int i)
 {
-	char *d, *b, p[PATH_MAX];
-	DIR *dp;
-	struct dirent *de;
-	int len, plen = 0;
+	char p[PATH_MAX];
+	int len, klen;
 
-	b = fs_basename(path);
-	if (b == NULL || b[0] == '\0')
+	if (path == NULL)
 		return (0);
-	len = strlen(b);
-
-	d = fs_dirname(path);
-	dp = opendir(d != NULL ? d : ".");
-	if (dp == NULL) {
-		free(d);
-		return (fs_err(-errno));
-	}
-	if (d != NULL) {
-		strcpy(p, d);
-		plen = strlen(p);
-		p[plen++] = '/';
-		p[plen] = '\0';
-	}
-	while ((de = readdir(dp)) != NULL) {
-		if (de->d_name[0] == '.' && (de->d_name[1] == '\0' ||
-			(de->d_name[1] == '.' && de->d_name[2] == '\0')))
+	len = strlen(path);
+	strcpy(p, path);
+	for (;; ++i) {
+		sprintf(p + len + 1, "%d", i);
+		klen = len + 1 + strlen(p + len + 1) + 1;
+		if (!ring_list_is_in_charge(p, klen))
 			continue;
-		if (strncmp(de->d_name, b, len) == 0 &&
-			(de->d_name[len] == ':' || de->d_name[len] == '\0')) {
-			if (d != NULL) {
-				strcpy(&p[plen], de->d_name);
-				unlink(p);
-			} else
-				unlink(de->d_name);
-		}
+		p[len] = ':';
+		if (unlink(p))
+			break;
+		p[len] = '\0';
 	}
-	closedir(dp);
-	free(d);
 	return (0);
 }

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <errno.h>
 #include <margo.h>
 #include "config.h"
 #include "ring_types.h"
@@ -14,6 +15,9 @@
 #include "path.h"
 #include "log.h"
 #include "chfs.h"
+#include "chfs_err.h"
+
+#define ASYNC_ACCESS
 
 static char chfs_client[PATH_MAX];
 static uint32_t chfs_uid, chfs_gid;
@@ -140,7 +144,7 @@ parse_servers(char *arg, char ***servers)
 #define IS_NULL_STRING(str) (str == NULL || str[0] == '\0')
 
 static char *
-get_server()
+get_server(int next)
 {
 	static char *servs = NULL, **servers = NULL;
 	static int index = -1, init_index, nservs = -1, err = 0;
@@ -161,7 +165,7 @@ get_server()
 	if (index == -1) {
 		srandom(getpid());
 		init_index = index = random() % nservs;
-	} else {
+	} else if (next) {
 		index = (index + 1) % nservs;
 		if (index == init_index)
 			goto err;
@@ -193,7 +197,7 @@ chfs_init(const char *server)
 	}
 
 	if (IS_NULL_STRING(server))
-		server = get_server();
+		server = get_server(0);
 	if (IS_NULL_STRING(server))
 		log_fatal("chfs_init: no server");
 	log_info("chfs_init: server %s", server);
@@ -219,7 +223,7 @@ chfs_init(const char *server)
 		if (proto != NULL)
 			break;
 		log_notice("%s: no protocol", server);
-		server = get_server();
+		server = get_server(1);
 	}
 	if (server == NULL)
 		log_fatal("chfs_init: no protocol");
@@ -246,7 +250,7 @@ chfs_init(const char *server)
 		if (ret == HG_SUCCESS)
 			break;
 		log_notice("%s: %s", server, HG_Error_to_string(ret));
-		server = get_server();
+		server = get_server(1);
 	}
 	if (server == NULL)
 		log_fatal("chfs_init: no server");
@@ -324,10 +328,14 @@ clear_fd_table_unlocked(struct fd_table *tab)
 static int
 check_fd_unlocked(int fd)
 {
-	if (fd < 0 || fd >= fd_table_size)
+	if (fd < 0 || fd >= fd_table_size) {
+		errno = EBADF;
 		return (-1);
-	if (fd_table[fd].path == NULL)
+	}
+	if (fd_table[fd].path == NULL) {
+		errno = EBADF;
 		return (-1);
+	}
 	return (0);
 }
 
@@ -359,8 +367,10 @@ get_fd_table_unlocked(int fd)
 {
 	if (check_fd_unlocked(fd))
 		return (NULL);
-	if (fd_table[fd].closed)
+	if (fd_table[fd].closed) {
+		errno = EBADF;
 		return (NULL);
+	}
 	++fd_table[fd].ref;
 	return (&fd_table[fd]);
 }
@@ -379,6 +389,8 @@ get_fd_table(int fd)
 static void
 release_fd_table_unlocked(struct fd_table *tab)
 {
+	if (tab == NULL)
+		return;
 	--tab->ref;
 	if (tab->closed == 0 || tab->ref > 0)
 		return;
@@ -438,12 +450,13 @@ chfs_rpc_inode_create(void *key, size_t key_size, mode_t mode, int chunk_size,
 }
 
 static hg_return_t
-chfs_rpc_inode_write(void *key, size_t key_size, const void *buf, size_t *size,
-	size_t offset, mode_t mode, int chunk_size, int *errp)
+chfs_async_rpc_inode_write(void *key, size_t key_size, const void *buf,
+	size_t size, size_t offset, mode_t mode, int chunk_size,
+	fs_request_t *rp)
 {
 	char *target;
 	hg_return_t ret;
-	static const char diag[] = "rpc_inode_write";
+	static const char diag[] = "async_rpc_inode_write";
 
 	while (1) {
 		target = ring_list_lookup(key, key_size);
@@ -451,13 +464,13 @@ chfs_rpc_inode_write(void *key, size_t key_size, const void *buf, size_t *size,
 			log_error("%s: no server", diag);
 			return (HG_PROTOCOL_ERROR);
 		}
-		if (*size < chfs_rdma_thresh)
-			ret = fs_rpc_inode_write(target, key, key_size, buf,
-				size, offset, mode, chunk_size, errp);
+		if (size < chfs_rdma_thresh)
+			ret = fs_async_rpc_inode_write(target, key, key_size,
+				buf, size, offset, mode, chunk_size, rp);
 		else
-			ret = fs_rpc_inode_write_rdma(target, key, key_size,
-				chfs_client, buf, size, offset, mode,
-				chunk_size, errp);
+			ret = fs_async_rpc_inode_write_rdma(target, key,
+				key_size, chfs_client, buf, size, offset, mode,
+				chunk_size, rp);
 		if (ret == HG_SUCCESS)
 			break;
 
@@ -471,12 +484,40 @@ chfs_rpc_inode_write(void *key, size_t key_size, const void *buf, size_t *size,
 }
 
 static hg_return_t
-chfs_rpc_inode_read(void *key, size_t key_size, void *buf, size_t *size,
-	size_t offset, int *errp)
+chfs_async_rpc_inode_write_wait(size_t *size, int *errp, fs_request_t *rp)
+{
+	if (*size < chfs_rdma_thresh)
+		return (fs_async_rpc_inode_write_wait(size, errp, rp));
+	else
+		return (fs_async_rpc_inode_write_rdma_wait(size, errp, rp));
+}
+
+#ifndef ASYNC_ACCESS
+static hg_return_t
+chfs_rpc_inode_write(void *key, size_t key_size, const void *buf, size_t *size,
+	size_t offset, mode_t mode, int chunk_size, int *errp)
+{
+	hg_return_t ret;
+	fs_request_t req;
+	static const char diag[] = "rpc_inode_write";
+
+	ret = chfs_async_rpc_inode_write(key, key_size, buf, *size, offset,
+		mode, chunk_size, &req);
+	if (ret != HG_SUCCESS) {
+		log_error("%s (async_rpc): %s", diag, HG_Error_to_string(ret));
+		return (ret);
+	}
+	return (chfs_async_rpc_inode_write_wait(size, errp, &req));
+}
+#endif
+
+static hg_return_t
+chfs_async_rpc_inode_read(void *key, size_t key_size, void *buf, size_t size,
+	size_t offset, fs_request_t *rp)
 {
 	char *target;
 	hg_return_t ret;
-	static const char diag[] = "rpc_inode_read";
+	static const char diag[] = "rpc_async_inode_read";
 
 	while (1) {
 		target = ring_list_lookup(key, key_size);
@@ -484,12 +525,12 @@ chfs_rpc_inode_read(void *key, size_t key_size, void *buf, size_t *size,
 			log_error("%s: no server", diag);
 			return (HG_PROTOCOL_ERROR);
 		}
-		if (*size < chfs_rdma_thresh)
-			ret = fs_rpc_inode_read(target, key, key_size, buf,
-				size, offset, errp);
+		if (size < chfs_rdma_thresh)
+			ret = fs_async_rpc_inode_read(target, key, key_size,
+				size, offset, rp);
 		else
-			ret = fs_rpc_inode_read_rdma(target, key, key_size,
-				chfs_client, buf, size, offset, errp);
+			ret = fs_async_rpc_inode_read_rdma(target, key,
+				key_size, chfs_client, buf, size, offset, rp);
 		if (ret == HG_SUCCESS)
 			break;
 
@@ -500,6 +541,33 @@ chfs_rpc_inode_read(void *key, size_t key_size, void *buf, size_t *size,
 	}
 	free(target);
 	return (ret);
+}
+
+static hg_return_t
+chfs_async_rpc_inode_read_wait(void *buf, size_t *size, int *errp,
+	fs_request_t *rp)
+{
+	if (*size < chfs_rdma_thresh)
+		return (fs_async_rpc_inode_read_wait(buf, size, errp, rp));
+	else
+		return (fs_async_rpc_inode_read_rdma_wait(size, errp, rp));
+}
+
+static hg_return_t
+chfs_rpc_inode_read(void *key, size_t key_size, void *buf, size_t *size,
+	size_t offset, int *errp)
+{
+	hg_return_t ret;
+	fs_request_t req;
+	static const char diag[] = "rpc_inode_read";
+
+	ret = chfs_async_rpc_inode_read(key, key_size, buf, *size, offset,
+		&req);
+	if (ret != HG_SUCCESS) {
+		log_error("%s (async_rpc): %s", diag, HG_Error_to_string(ret));
+		return (ret);
+	}
+	return (chfs_async_rpc_inode_read_wait(buf, size, errp, &req));
 }
 
 static hg_return_t
@@ -611,6 +679,7 @@ chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,
 	fd = create_fd(p, mode, chunk_size);
 	if (fd < 0) {
 		free(p);
+		errno = ENOMEM;
 		return (-1);
 	}
 	ret = chfs_rpc_inode_create(p, strlen(p) + 1, mode, chunk_size, &err);
@@ -619,6 +688,7 @@ chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,
 		return (fd);
 
 	clear_fd(fd);
+	chfs_set_errno(ret, err);
 	return (-1);
 }
 
@@ -641,12 +711,14 @@ chfs_open(const char *path, int32_t flags)
 	ret = chfs_rpc_inode_stat_local(p, strlen(p) + 1, &st, &err);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
 		free(p);
+		chfs_set_errno(ret, err);
 		return (-1);
 	}
 	fd = create_fd(p, st.mode, st.chunk_size);
 	free(p);
 	if (fd >= 0)
 		return (fd);
+	errno = ENOMEM;
 	return (-1);
 }
 
@@ -662,8 +734,10 @@ path_index(const char *path, int index, size_t *size)
 		return (NULL);
 	path_len = strlen(path) + 1;
 	path_index = malloc(path_len + MAX_INT_SIZE);
-	if (path_index == NULL)
+	if (path_index == NULL) {
+		errno = ENOMEM;
 		return (NULL);
+	}
 	strcpy(path_index, path);
 	if (index == 0) {
 		*size = path_len;
@@ -686,6 +760,7 @@ chfs_close(int fd)
 	return (clear_fd(fd));
 }
 
+#ifndef ASYNC_ACCESS
 ssize_t
 chfs_pwrite(int fd, const void *buf, size_t size, off_t offset)
 {
@@ -715,16 +790,109 @@ chfs_pwrite(int fd, const void *buf, size_t size, off_t offset)
 	ret = chfs_rpc_inode_write(path, psize, (void *)buf, &s, local_pos,
 		mode, chunk_size, &err);
 	free(path);
-	if (ret != HG_SUCCESS || err != KV_SUCCESS)
+	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
+		chfs_set_errno(ret, err);
 		return (-1);
-
+	}
 	if (size - s > 0) {
 		ss = chfs_pwrite(fd, buf + s, size - s, offset + s);
 		if (ss < 0)
-			ss = 0;
+			return (-1);
 	}
 	return (s + ss);
 }
+
+#else
+
+ssize_t
+chfs_pwrite(int fd, const void *buf, size_t size, off_t offset)
+{
+	struct fd_table *tab = get_fd_table(fd);
+	void *path, *p;
+	int index, local_pos, pos, chunk_size, nchunks, i, err, save_errno = 0;
+	mode_t mode;
+	size_t psize, ss = 0;
+	struct {
+		size_t s;
+		fs_request_t r;
+	} *req;
+	hg_return_t ret = HG_SUCCESS;
+
+	if (tab == NULL)
+		return (-1);
+	chunk_size = tab->chunk_size;
+	mode = tab->mode;
+	p = strdup(tab->path);
+	release_fd_table(tab);
+	if (p == NULL)
+		return (-1);
+
+	if (size == 0) {
+		free(p);
+		return (0);
+	}
+	index = offset / chunk_size;
+	local_pos = offset % chunk_size;
+
+	nchunks = (size + local_pos + chunk_size - 1) / chunk_size;
+	req = malloc(sizeof(*req) * nchunks);
+	if (req == NULL) {
+		free(p);
+		errno = ENOMEM;
+		return (-1);
+	}
+
+	req[0].s = size;
+	if (local_pos + req[0].s > chunk_size)
+		req[0].s = chunk_size - local_pos;
+	pos = local_pos;
+	for (i = 0; i < nchunks; ++i) {
+		path = path_index(p, index + i, &psize);
+		if (path == NULL)
+			break;
+		ret = chfs_async_rpc_inode_write(path, psize, buf + ss,
+			req[i].s, pos, mode, chunk_size, &req[i].r);
+		free(path);
+		if (ret != HG_SUCCESS)
+			break;
+		ss += req[i].s;
+		if (i < nchunks - 1) {
+			req[i + 1].s = size - ss;
+			if (req[i + 1].s > chunk_size)
+				req[i + 1].s = chunk_size;
+		}
+		pos = 0;
+	}
+	free(p);
+	if (i < nchunks) {
+		for (--i; i >= 0; --i)
+			chfs_async_rpc_inode_write_wait(&req[i].s, &err,
+				&req[i].r);
+		free(req);
+		if (ret != HG_SUCCESS)
+			chfs_set_errno(ret, KV_SUCCESS);
+		return (-1);
+	}
+
+	ss = 0;
+	for (i = 0; i < nchunks; ++i) {
+		ret = chfs_async_rpc_inode_write_wait(&req[i].s, &err,
+			&req[i].r);
+		if (ret != HG_SUCCESS || err != KV_SUCCESS) {
+			chfs_set_errno(ret, err);
+			if (save_errno == 0)
+				save_errno = errno;
+		}
+		ss += req[i].s;
+	}
+	free(req);
+	if (save_errno) {
+		errno = save_errno;
+		return (-1);
+	}
+	return (ss);
+}
+#endif
 
 ssize_t
 chfs_write(int fd, const void *buf, size_t size)
@@ -739,6 +907,7 @@ chfs_write(int fd, const void *buf, size_t size)
 	return (s);
 }
 
+#ifndef ASYNC_ACCESS
 ssize_t
 chfs_pread(int fd, void *buf, size_t size, off_t offset)
 {
@@ -761,8 +930,10 @@ chfs_pread(int fd, void *buf, size_t size, off_t offset)
 		return (-1);
 	ret = chfs_rpc_inode_read(path, psize, buf, &s, local_pos, &err);
 	free(path);
-	if (ret != HG_SUCCESS || err != KV_SUCCESS)
+	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
+		chfs_set_errno(ret, err);
 		return (-1);
+	}
 	if (s == 0)
 		return (0);
 
@@ -775,6 +946,95 @@ chfs_pread(int fd, void *buf, size_t size, off_t offset)
 	}
 	return (s + ss);
 }
+
+#else
+
+ssize_t
+chfs_pread(int fd, void *buf, size_t size, off_t offset)
+{
+	struct fd_table *tab = get_fd_table(fd);
+	void *path, *p;
+	int index, local_pos, pos, chunk_size, nchunks, i, err;
+	size_t psize, ss = 0;
+	struct {
+		size_t s;
+		fs_request_t r;
+	} *req;
+	hg_return_t ret = HG_SUCCESS, save_ret = HG_SUCCESS;
+
+	if (tab == NULL)
+		return (-1);
+	chunk_size = tab->chunk_size;
+	p = strdup(tab->path);
+	release_fd_table(tab);
+	if (p == NULL)
+		return (-1);
+
+	if (size == 0) {
+		free(p);
+		return (0);
+	}
+	index = offset / chunk_size;
+	local_pos = offset % chunk_size;
+
+	nchunks = (size + local_pos + chunk_size - 1) / chunk_size;
+	req = malloc(sizeof(*req) * nchunks);
+	if (req == NULL) {
+		free(p);
+		errno = ENOMEM;
+		return (-1);
+	}
+
+	req[0].s = size;
+	if (local_pos + req[0].s > chunk_size)
+		req[0].s = chunk_size - local_pos;
+	pos = local_pos;
+	for (i = 0; i < nchunks; ++i) {
+		path = path_index(p, index + i, &psize);
+		if (path == NULL)
+			break;
+		ret = chfs_async_rpc_inode_read(path, psize, buf + ss, req[i].s,
+			pos, &req[i].r);
+		free(path);
+		if (ret != HG_SUCCESS)
+			break;
+		ss += req[i].s;
+		if (i < nchunks - 1) {
+			req[i + 1].s = size - ss;
+			if (req[i + 1].s > chunk_size)
+				req[i + 1].s = chunk_size;
+		}
+		pos = 0;
+	}
+	free(p);
+	if (i < nchunks) {
+		for (--i; i >= 0; --i)
+			chfs_async_rpc_inode_read_wait(NULL, &req[i].s, &err,
+				&req[i].r);
+		free(req);
+		if (ret != HG_SUCCESS)
+			chfs_set_errno(ret, KV_SUCCESS);
+		return (-1);
+	}
+
+	ss = 0;
+	for (i = 0; i < nchunks; ++i) {
+		ret = chfs_async_rpc_inode_read_wait(buf + ss, &req[i].s, &err,
+			&req[i].r);
+		if (ret != HG_SUCCESS)
+			save_ret = ret;
+		else if (err != KV_SUCCESS)
+			continue;
+		ss += req[i].s;
+	}
+	free(req);
+	if (save_ret != HG_SUCCESS) {
+		chfs_set_errno(save_ret, KV_SUCCESS);
+		return (-1);
+	}
+	return (ss);
+}
+#endif
 
 ssize_t
 chfs_read(int fd, void *buf, size_t size)
@@ -790,7 +1050,7 @@ chfs_read(int fd, void *buf, size_t size)
 }
 
 static int
-chfs_unlink_chunk_all(char *path);
+chfs_unlink_chunk_all(char *path, int index);
 
 #define UNLINK_CHUNK_SIZE	10
 
@@ -807,6 +1067,7 @@ chfs_unlink(const char *path)
 	ret = chfs_rpc_remove(p, strlen(p) + 1, &err);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
 		free(p);
+		chfs_set_errno(ret, err);
 		return (-1);
 	}
 	for (i = 1; i < UNLINK_CHUNK_SIZE; ++i) {
@@ -819,7 +1080,7 @@ chfs_unlink(const char *path)
 			break;
 	}
 	if (i == UNLINK_CHUNK_SIZE)
-		chfs_unlink_chunk_all(p);
+		chfs_unlink_chunk_all(p, UNLINK_CHUNK_SIZE);
 	free(p);
 	return (0);
 }
@@ -836,8 +1097,10 @@ chfs_mkdir(const char *path, mode_t mode)
 	mode |= S_IFDIR;
 	ret = chfs_rpc_inode_create(p, strlen(p) + 1, mode, 0, &err);
 	free(p);
-	if (ret != HG_SUCCESS || err != KV_SUCCESS)
+	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
+		chfs_set_errno(ret, err);
 		return (-1);
+	}
 	return (0);
 }
 
@@ -853,8 +1116,10 @@ chfs_rmdir(const char *path)
 	/* XXX check child entries */
 	ret = chfs_rpc_remove(p, strlen(p) + 1, &err);
 	free(p);
-	if (ret != HG_SUCCESS || err != KV_SUCCESS)
+	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
+		chfs_set_errno(ret, err);
 		return (-1);
+	}
 	return (0);
 }
 
@@ -866,8 +1131,10 @@ chfs_symlink(const char *target, const char *path)
 	hg_return_t ret;
 	int err, len;
 
-	if (target == NULL)
+	if (target == NULL) {
+		errno = ENOENT;
 		return (-1);
+	}
 	p = canonical_path(path);
 	if (p == NULL)
 		return (-1);
@@ -877,8 +1144,10 @@ chfs_symlink(const char *target, const char *path)
 	ret = chfs_rpc_inode_create_data(p, strlen(p) + 1, mode, len, target,
 		len + 1, &err);
 	free(p);
-	if (ret != HG_SUCCESS || err != KV_SUCCESS)
+	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
+		chfs_set_errno(ret, err);
 		return (-1);
+	}
 	return (0);
 }
 
@@ -894,8 +1163,10 @@ chfs_readlink(const char *path, char *buf, size_t size)
 		return (-1);
 	ret = chfs_rpc_inode_read(p, strlen(p) + 1, buf, &s, 0, &err);
 	free(p);
-	if (ret != HG_SUCCESS || err != KV_SUCCESS)
+	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
+		chfs_set_errno(ret, err);
 		return (-1);
+	}
 	return (s);
 }
 
@@ -926,6 +1197,7 @@ chfs_stat(const char *path, struct stat *st)
 	ret = chfs_rpc_inode_stat(p, strlen(p) + 1, &sb, &err);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
 		free(p);
+		chfs_set_errno(ret, err);
 		return (-1);
 	}
 	st->st_mode = sb.mode;
@@ -969,18 +1241,26 @@ chfs_stat(const char *path, struct stat *st)
 int
 chfs_truncate(const char *path, off_t len)
 {
-	char *p = canonical_path(path);
+	char *p;
 	struct fs_stat sb;
 	size_t psize, index, local_len;
 	void *pi;
 	hg_return_t ret;
 	int err, i;
 
+	if (len < 0) {
+		errno = EINVAL;
+		return (-1);
+	}
+	p = canonical_path(path);
 	if (p == NULL)
 		return (-1);
 	ret = chfs_rpc_inode_stat(p, strlen(p) + 1, &sb, &err);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS || !S_ISREG(sb.mode)) {
 		free(p);
+		chfs_set_errno(ret, err);
+		if (errno == 0 && !S_ISREG(sb.mode))
+			errno = EINVAL;
 		return (-1);
 	}
 	index = len / sb.chunk_size;
@@ -991,6 +1271,7 @@ chfs_truncate(const char *path, off_t len)
 	free(pi);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
 		free(p);
+		chfs_set_errno(ret, err);
 		return (-1);
 	}
 	for (i = index + 1;; ++i) {
@@ -1064,43 +1345,39 @@ chfs_readdir(const char *path, void *buf,
 	return (0);
 }
 
+int
+chfs_readdir_index(const char *path, int index, void *buf,
+	int (*filler)(void *, const char *, const struct stat *, off_t))
+{
+	char *p = canonical_path(path), *target;
+	int err;
+
+	if (p == NULL)
+		return (-1);
+	target = ring_list_lookup_index(index);
+	if (target && filler)
+		fs_rpc_readdir_replica(target, p, buf, filler, &err);
+	free(target);
+	free(p);
+	return (0);
+}
+
 static int
-chfs_unlink_chunk_all(char *p)
+chfs_unlink_chunk_all(char *p, int index)
 {
 	node_list_t node_list;
-	hg_handle_t *h;
-	hg_return_t *ret;
-	int i, err;
+	hg_return_t ret;
+	int i;
 
 	chfs_ring_list_copy(&node_list);
-	h = malloc(sizeof(*h) * node_list.n);
-	if (h == NULL)
-		goto list_copy_free;
-	ret = malloc(sizeof(*ret) * node_list.n);
-	if (ret == NULL)
-		goto free_h;
-
 	for (i = 0; i < node_list.n; ++i) {
 		if (node_list.s[i].address == NULL)
 			continue;
-		ret[i] = fs_async_rpc_inode_unlink_chunk_all(
-				node_list.s[i].address, p, &h[i]);
-		if (ret[i] != HG_SUCCESS)
+		ret = fs_async_rpc_inode_unlink_chunk_all(
+				node_list.s[i].address, p, index);
+		if (ret != HG_SUCCESS)
 			continue;
 	}
-	for (i = 0; i < node_list.n; ++i) {
-		if (node_list.s[i].address == NULL)
-			continue;
-		if (ret[i] == HG_SUCCESS)
-			ret[i] = fs_async_rpc_inode_unlink_chunk_all_wait(
-					&h[i], &err);
-		if (ret[i] != HG_SUCCESS)
-			continue;
-	}
-	free(ret);
-free_h:
-	free(h);
-list_copy_free:
 	ring_list_copy_free(&node_list);
 	return (0);
 }

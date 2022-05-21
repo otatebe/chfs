@@ -43,6 +43,7 @@ DECLARE_MARGO_RPC_HANDLER(inode_read_rdma)
 DECLARE_MARGO_RPC_HANDLER(inode_copy_rdma)
 DECLARE_MARGO_RPC_HANDLER(inode_truncate)
 DECLARE_MARGO_RPC_HANDLER(inode_remove)
+DECLARE_MARGO_RPC_HANDLER(inode_unlink_chunk_all)
 
 void
 fs_server_init(margo_instance_id mid, char *db_dir, size_t db_size, int timeout,
@@ -50,7 +51,7 @@ fs_server_init(margo_instance_id mid, char *db_dir, size_t db_size, int timeout,
 {
 	hg_id_t create_rpc, stat_rpc, remove_rpc, copy_rdma_rpc;
 	hg_id_t write_rpc, write_rdma_rpc, read_rpc, read_rdma_rpc = -1;
-	hg_id_t truncate_rpc;
+	hg_id_t truncate_rpc, unlink_all_rpc;
 
 	env.mid = mid;
 	create_rpc = MARGO_REGISTER(mid, "inode_create", fs_create_in_t,
@@ -73,10 +74,13 @@ fs_server_init(margo_instance_id mid, char *db_dir, size_t db_size, int timeout,
 		int32_t, inode_truncate);
 	remove_rpc = MARGO_REGISTER(mid, "inode_remove", kv_byte_t, int32_t,
 		inode_remove);
+	unlink_all_rpc = MARGO_REGISTER(mid, "inode_unlink_chunk_all",
+		fs_unlink_all_t, void, inode_unlink_chunk_all);
+	margo_registered_disable_response(mid, unlink_all_rpc, HG_TRUE);
 
 	fs_client_init_internal(mid, timeout, create_rpc, stat_rpc, write_rpc,
 		write_rdma_rpc, read_rpc, read_rdma_rpc, copy_rdma_rpc,
-		truncate_rpc, remove_rpc);
+		truncate_rpc, remove_rpc, unlink_all_rpc);
 	fs_server_init_more(mid, db_dir, db_size, niothreads);
 
 	env.self = ring_get_self();
@@ -722,6 +726,32 @@ inode_remove(hg_handle_t h)
 		ring_start_election();
 }
 DEFINE_MARGO_RPC_HANDLER(inode_remove)
+
+static void
+inode_unlink_chunk_all(hg_handle_t h)
+{
+	hg_return_t ret;
+	fs_unlink_all_t in;
+	static const char diag[] = "inode_unlink_chunk_all RPC";
+
+	ret = margo_get_input(h, &in);
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		return;
+	}
+	log_debug("%s: path=%s index=%d", diag, in.path, in.index);
+
+	fs_inode_unlink_chunk_all(in.path, in.index);
+
+	ret = margo_free_input(h, &in);
+	if (ret != HG_SUCCESS)
+		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
+
+	ret = margo_destroy(h);
+	if (ret != HG_SUCCESS)
+		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
+}
+DEFINE_MARGO_RPC_HANDLER(inode_unlink_chunk_all)
 
 #ifndef USE_ZERO_COPY_READ_RDMA
 void

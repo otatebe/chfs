@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <sys/stat.h>
 #include <margo.h>
 #include "config.h"
 #include "ring.h"
@@ -11,6 +12,7 @@
 #include "fs_types.h"
 #include "fs_rpc.h"
 #include "fs.h"
+#include "shash.h"
 #include "log.h"
 #include "fs_kv.h"
 
@@ -18,7 +20,6 @@
 DECLARE_MARGO_RPC_HANDLER(inode_read_rdma)
 #endif
 DECLARE_MARGO_RPC_HANDLER(inode_readdir)
-DECLARE_MARGO_RPC_HANDLER(inode_unlink_chunk_all)
 
 static char *self;
 
@@ -26,7 +27,7 @@ void
 fs_server_init_more(margo_instance_id mid, char *db_dir, size_t db_size,
 	int niothreads)
 {
-	hg_id_t read_rdma_rpc = -1, readdir_rpc, unlink_all_rpc;
+	hg_id_t read_rdma_rpc = -1, readdir_rpc;
 
 #ifdef USE_ZERO_COPY_READ_RDMA
 	read_rdma_rpc = MARGO_REGISTER(mid, "inode_read_rdma", kv_put_rdma_in_t,
@@ -34,11 +35,8 @@ fs_server_init_more(margo_instance_id mid, char *db_dir, size_t db_size,
 #endif
 	readdir_rpc = MARGO_REGISTER(mid, "inode_readdir", hg_string_t,
 		fs_readdir_out_t, inode_readdir);
-	unlink_all_rpc = MARGO_REGISTER(mid, "inode_unlink_chunk_all",
-		hg_string_t, int32_t, inode_unlink_chunk_all);
 
-	fs_client_init_more_internal(read_rdma_rpc, readdir_rpc,
-		unlink_all_rpc);
+	fs_client_init_more_internal(read_rdma_rpc, readdir_rpc);
 	kv_init(db_dir, "cmap", "kv.db", db_size);
 
 	self = ring_get_self();
@@ -165,6 +163,7 @@ DEFINE_MARGO_RPC_HANDLER(inode_read_rdma)
 struct fs_readdir_arg {
 	char path[PATH_MAX];
 	int n, size, pathlen;
+	struct shash *hash;
 	fs_file_info_t *fi;
 };
 
@@ -176,19 +175,59 @@ free_fs_readdir_arg(struct fs_readdir_arg *a)
 	for (i = 0; i < a->n; ++i)
 		free(a->fi[i].name);
 	free(a->fi);
+	shash_free(a->hash);
 }
 
 static void
-fs_add_entry(const char *name, struct inode *ino, struct fs_readdir_arg *a)
+fs_add_ventry(void *name, size_t size, void **d, void *arg)
+{
+	struct fs_readdir_arg *a = arg;
+	int *data = (int *)d;
+	fs_file_info_t *tfi;
+	static const char diag[] = "fs_add_ventry";
+
+	if (*data == 2)
+		return;
+
+	if (a->n >= a->size) {
+		tfi = realloc(a->fi, sizeof(a->fi[0]) * a->size * 2);
+		if (tfi == NULL) {
+			log_error("%s: no memory", diag);
+			return;
+		}
+		a->fi = tfi;
+		a->size *= 2;
+	}
+	a->fi[a->n].name = strndup(name, size);
+	if (a->fi[a->n].name == NULL) {
+		log_error("%s: no memory", diag);
+		return;
+	}
+	memset(&a->fi[a->n].sb, 0, sizeof(a->fi[a->n].sb));
+	a->fi[a->n].sb.mode = S_IFDIR | CHFS_S_IFREP;
+	++a->n;
+}
+
+static void
+fs_add_entry(const char *name, struct inode *ino, struct fs_readdir_arg *a,
+	int is_rep)
 {
 	fs_file_info_t *tfi;
 	const char *s = name;
+	int *data;
 	static const char diag[] = "fs_add_entry";
 
 	while (*s && *s != '/')
 		++s;
-	if (*s == '/')
+	if (*s == '/') {
+		data = (int *)shash_get(a->hash, name, s - name);
+		if (*data == 0)
+			*data = 1;
 		return;
+	} else if (S_ISDIR(ino->mode)) {
+		data = (int *)shash_get(a->hash, name, strlen(name));
+		*data = 2;
+	}
 
 	if (ino->msize != fs_msize)
 		return;		/* metadata size mismatch */
@@ -211,6 +250,9 @@ fs_add_entry(const char *name, struct inode *ino, struct fs_readdir_arg *a)
 	a->fi[a->n].sb.uid = ino->uid;
 	a->fi[a->n].sb.gid = ino->gid;
 	a->fi[a->n].sb.mode = ino->mode;
+	if (is_rep)
+		a->fi[a->n].sb.mode |= CHFS_S_IFREP;
+	a->fi[a->n].sb.size = ino->size;
 	a->fi[a->n].sb.mtime = ino->mtime;
 	a->fi[a->n].sb.ctime = ino->ctime;
 	++a->n;
@@ -225,11 +267,13 @@ fs_readdir_cb(const char *key, size_t key_size, const char *value,
 	struct inode *ino = (struct inode *)value;
 
 	if (ksize + 1 == key_size && a->pathlen < ksize &&
-		strncmp(a->path, key, a->pathlen) == 0 &&
-		ring_list_is_in_charge(key, key_size))
-		fs_add_entry(key + a->pathlen, ino, a);
+		strncmp(a->path, key, a->pathlen) == 0)
+		fs_add_entry(key + a->pathlen, ino, a,
+			!ring_list_is_in_charge(key, key_size));
 	return (0);
 }
+
+#define HASH_SIZE	16381
 
 static void
 inode_readdir(hg_handle_t h)
@@ -250,8 +294,9 @@ inode_readdir(hg_handle_t h)
 	memset(&out, 0, sizeof(out));
 	a.n = 0;
 	a.size = 1000;
+	a.hash = shash_make(HASH_SIZE);
 	a.fi = malloc(sizeof(a.fi[0]) * a.size);
-	if (a.fi == NULL) {
+	if (a.hash == NULL || a.fi == NULL) {
 		log_error("%s: no memory", diag);
 		out.err = KV_ERR_NO_MEMORY;
 		goto free_input;
@@ -269,6 +314,7 @@ inode_readdir(hg_handle_t h)
 	}
 	out.err = kv_get_all_cb(fs_readdir_cb, &a);
 	if (out.err == KV_SUCCESS) {
+		shash_operate(a.hash, fs_add_ventry, &a);
 		out.n = a.n;
 		out.fi = a.fi;
 	}
@@ -287,103 +333,6 @@ free_input:
 		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
 }
 DEFINE_MARGO_RPC_HANDLER(inode_readdir)
-
-struct fs_name_arg {
-	char *path;
-	int n, size;
-	struct {
-		void *name;
-		size_t size;
-	} *li;
-};
-
-static void
-free_fs_name_arg(struct fs_name_arg *a)
-{
-	int i;
-
-	for (i = 0; i < a->n; ++i)
-		free(a->li[i].name);
-	free(a->li);
-}
-
-static void
-fs_add_name(const char *key, size_t ksize, struct fs_name_arg *a)
-{
-	void *tli;
-	static const char diag[] = "fs_add_name";
-
-	if (a->n >= a->size) {
-		tli = realloc(a->li, sizeof(a->li[0]) * a->size * 2);
-		if (tli == NULL) {
-			log_error("%s: no memory", diag);
-			return;
-		}
-		a->li = tli;
-		a->size *= 2;
-	}
-	a->li[a->n].name = malloc(ksize);
-	if (a->li[a->n].name == NULL) {
-		log_error("%s: no memory", diag);
-		return;
-	}
-	memcpy(a->li[a->n].name, key, ksize);
-	a->li[a->n].size = ksize;
-	++a->n;
-}
-
-static int
-fs_unlink_chunk_all_cb(const char *key, size_t key_size, const char *value,
-	size_t value_size, void *arg)
-{
-	struct fs_name_arg *a = arg;
-
-	if (strcmp(a->path, key) == 0)
-		fs_add_name(key, key_size, a);
-	return (0);
-}
-
-static void
-inode_unlink_chunk_all(hg_handle_t h)
-{
-	struct fs_name_arg a;
-	hg_return_t ret;
-	int i, err;
-	static const char diag[] = "inode_unlink_chunk_all RPC";
-
-	ret = margo_get_input(h, &a.path);
-	if (ret != HG_SUCCESS) {
-		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
-		return;
-	}
-	log_debug("%s: path=%s", diag, a.path);
-
-	a.n = 0;
-	a.size = 1000;
-	a.li = malloc(sizeof(a.li[0]) * a.size);
-	if (a.li == NULL) {
-		log_error("%s: no memory", diag);
-		goto free_input;
-	}
-	kv_get_all_cb(fs_unlink_chunk_all_cb, &a);
-	for (i = 0; i < a.n; ++i)
-		kv_remove(a.li[i].name, a.li[i].size);
-free_input:
-	ret = margo_free_input(h, &a.path);
-	if (ret != HG_SUCCESS)
-		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
-	free_fs_name_arg(&a);
-
-	err = 0;
-	ret = margo_respond(h, &err);
-	if (ret != HG_SUCCESS)
-		log_error("%s (respond): %s", diag, HG_Error_to_string(ret));
-
-	ret = margo_destroy(h);
-	if (ret != HG_SUCCESS)
-		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
-}
-DEFINE_MARGO_RPC_HANDLER(inode_unlink_chunk_all)
 
 #ifdef USE_ZERO_COPY_READ_RDMA
 static int

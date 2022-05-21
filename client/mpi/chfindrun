@@ -1,0 +1,91 @@
+#!/bin/sh -f
+
+${DEBUG:="false"} && set -x
+: ${PRUN_RSH:=ssh}
+: ${CHFIND:=chfind}
+
+program=$(basename $0)
+
+usage() {
+        [ "X$*" = X ] || echo >&2 $program: $*
+	echo >&2 "usage: $program -hostfile hostfile [-output_dir dir] args ..."
+	echo >&2 ""
+	echo >&2 "options:"
+	echo >&2 "        -hostfile hostfile"
+	echo >&2 "            specifies a hostfile."
+	echo >&2 "        -output_dir directory"
+	echo >&2 "            specifies an output directory."
+	exit 1
+}
+
+err() {
+        [ "X$*" = X ] || echo >&2 $program: $*
+        exit 1
+}
+
+while [ $# -gt 0 ]; do
+	case $1 in
+	    -hostfile) shift; HOSTFILE=$1 ;;
+	    -output_dir) shift; OUTPUT_DIR=$1 ;;
+	    *) break ;;
+	esac
+	shift
+done
+
+if [ "X$HOSTFILE" = X ]; then
+	usage hostfile should be specified.
+fi
+if [ ! -f $HOSTFILE ]; then
+	err $HOSTFILE: no such hostfile
+fi
+size=`sed -e 's/#.*//' -e '/^[ 	]*$/d' $HOSTFILE | wc -l`
+
+if [ 0$size -lt 2 ]; then
+	err $HOSTFILE: should be two or more nodes
+fi
+
+if [ X$OUTPUT_DIR != X ]; then
+	[ -d $OUTPUT_DIR ] || mkdir -p $OUTPUT_DIR
+	[ -d $OUTPUT_DIR ] || err $OUTPUT_DIR: no such directory
+	CHFIND_ARG="-v -v"
+fi
+
+CMD="$PRUN_RSH -n"
+ARG="LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH\" PATH=\"$PATH\" CHFS_SERVER=\"$CHFS_SERVER\" CHFS_LOG_PRIORITY=$CHFS_LOG_PRIORITY CHFS_CHUNK_SIZE=$CHFS_CHUNK_SIZE CHFS_RDMA_THRESH=$CHFS_RDMA_THRESH CHFS_RPC_TIMEOUT_MSEC=$CHFS_RPC_TIMEOUT_MSEC CHFS_NODE_LIST_CACHE_TIMEOUT=$CHFS_NODE_LIST_CACHE_TIMEOUT CHFS_BACKEND_PATH=$CHFS_BACKEND_PATH CHFS_SUBDIR_PATH=$CHFS_SUBDIR_PATH $CHFIND $CHFIND_ARG $*"
+
+rank=0
+for host in `sed -e 's/#.*//' -e '/^[ 	]*$/d' $HOSTFILE | awk '{ print $1 }'`; do
+	if [ X$OUTPUT_DIR = X ]; then
+		$CMD $host "cd $PWD; set -f; $ARG --mpi_rank=$rank --mpi_size=$size" &
+	else
+		$CMD $host "cd $PWD; set -f; $ARG --mpi_rank=$rank --mpi_size=$size" > $OUTPUT_DIR/$rank.out &
+	fi
+	rank=$((rank + 1))
+done
+wait
+
+[ X$OUTPUT_DIR = X ] && exit 0
+
+rank=0
+found=0
+total=0
+while [ $rank -lt $size ];
+do
+	[ -s $OUTPUT_DIR/$rank.out ] || break
+	out=$(tail -1 $OUTPUT_DIR/$rank.out | cut -d " " -f 2)
+	SAVE_IFS="$IFS"
+	IFS=/
+	set $out
+	f=$1
+	t=$2
+	found=$((found + f))
+	total=$((total + t))
+	rank=$((rank + 1))
+	IFS="$SAVE_IFS"
+done
+if [ $rank -lt $size ]; then
+	err fails
+fi
+echo MATCHED $found/$total
+
+exit 0
