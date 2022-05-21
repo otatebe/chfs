@@ -12,11 +12,14 @@ chfsd - CHFS server
 **chfsd** is a file server for CHFS parallel consistent hashing file system.  When _server_ is specified, it joins the server pool.  The server address is written to a server info file specified by the -S option.
 
 # OPTIONS
+-c db_dir
+: specifies a database directory or a DAX device.  If the directory does not exist, it will be created.
+
 -d
 : enables debug mode.  In the debug mode, the server is executed in the foreground.
 
--c db_dir
-: specifies a database directory or a DAX device.  If the directory does not exist, it will be created.
+-f
+: executes in the foreground.
 
 -s db_size
 : specifies a database size.  This option is only effective when using the pmemkv and fsdax.  Default is 256 MiB.
@@ -33,11 +36,14 @@ chfsd - CHFS server
 -B subdir
 : specify a subdir that is considered to be a root directory in CHFS for the backend directory.
 
--f num_flush_threads
+-F num_flush_threads
 : specify the number of flush threads.  Default is 1.  0 means no flush.
 
 -l log_file
 : specifies a log file.
+
+-P pid_file
+: specifies a pid file.
 
 -n vname
 : specifies a vname which is used to construct a virtual name such as server_address:vname.

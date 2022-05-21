@@ -2,6 +2,7 @@
 #include <margo.h>
 #include "path.h"
 #include "ring_types.h"
+#include "ring_list.h"
 #include "kv_types.h"
 #include "kv.h"
 #include "kv_err.h"
@@ -260,6 +261,27 @@ int
 fs_inode_remove(char *key, size_t key_size)
 {
 	return (kv_remove(key, key_size));
+}
+
+int
+fs_inode_unlink_chunk_all(char *path, int i)
+{
+	char p[PATH_MAX];
+	int len, klen;
+
+	if (path == NULL)
+		return (0);
+	len = strlen(path);
+	strcpy(p, path);
+	for (;; ++i) {
+		sprintf(p + len + 1, "%d", i);
+		klen = len + 1 + strlen(p + len + 1) + 1;
+		if (!ring_list_is_in_charge(p, klen))
+			continue;
+		if (kv_remove(p, klen))
+			break;
+	}
+	return (0);
 }
 
 #include <unistd.h>

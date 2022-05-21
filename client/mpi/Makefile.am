@@ -1,5 +1,7 @@
 bin_PROGRAMS = chfind
+if !HAVE_MPI
 bin_SCRIPTS = chfindrun
+endif
 
 CC=$(MPICC)
 

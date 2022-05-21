@@ -60,6 +60,8 @@ MERCURY_GEN_PROC(fs_truncate_in_t,
 
 MERCURY_GEN_PROC(fs_file_info_t, ((hg_string_t)(name))((fs_stat_t)(sb)))
 
+MERCURY_GEN_PROC(fs_unlink_all_t, ((hg_string_t)(path))((uint32_t)(index)))
+
 typedef struct {
 	int32_t err, n;
 	fs_file_info_t *fi;
@@ -89,6 +91,12 @@ hg_proc_fs_readdir_out_t(hg_proc_t proc, void *data)
 		free(k->fi);
 	return (ret);
 }
+
+typedef struct {
+	hg_handle_t h;
+	hg_bulk_t b;
+	margo_request r;
+} fs_request_t;
 
 #define CHFS_FS_CACHE		0x1
 #define CHFS_FS_DIRTY		0x2

@@ -204,16 +204,34 @@ address_name_dup(char *address, char *name)
 	return (r);
 }
 
+static void
+write_pid(char *file)
+{
+	FILE *f;
+	static const char diag[] = "write_pid";
+
+	if (file == NULL)
+		return;
+
+	f = fopen(file, "w");
+	if (f == NULL)
+		log_fatal("%s (open): %s: %s", diag, file, strerror(errno));
+	if (fprintf(f, "%d\n", getpid()) < 0)
+		log_error("%s (write): %s: %s", diag, file, strerror(errno));
+	if (fclose(f))
+		log_error("%s (close): %s: %s", diag, file, strerror(errno));
+}
+
 void
 usage(char *prog_name)
 {
-	fprintf(stderr, "Usage: %s [-d] [-c db_dir] [-s db_size] "
-		"[-b backend_dir] [-B subdir]\n\t[-p protocol] "
-		"[-h host[:port]/device] [-n vname] [-N virtual_name]\n\t"
-		"[-f num_flush_threads] [-l log_file] [-S server_info_file]\n\t"
-		"[-t rpc_timeout_msec] [-T nthreads] [-I niothreads]\n\t"
-		"[-H heartbeat_interval] [-L log_priority] [server]\n",
-		prog_name);
+	fprintf(stderr, "Usage: %s [-d] [-f] [-c db_dir] [-s db_size] "
+		"[-b backend_dir]\n\t[-B subdir] [-f num_flush_threads] "
+		"[-p protocol]\n\t[-h host[:port]/device] "
+		"[-n vname] [-N virtual_name] [-P pid_file]\n\t[-l log_file] "
+		"[-S server_info_file] [-t rpc_timeout_msec] "
+		"[-T nthreads]\n\t[-I niothreads] [-H heartbeat_interval] "
+		"[-L log_priority] [server]\n", prog_name);
 	exit(EXIT_FAILURE);
 }
 
@@ -230,18 +248,18 @@ main(int argc, char *argv[])
 	char *protocol = "sockets", info_string[PATH_MAX];
 	char *server_info_file = NULL, *vname = NULL, *virtual_name = NULL;
 	char *addr_name = NULL, *backend_dir = NULL, *subdir = NULL;
-	int opt, debug = 0, rpc_timeout_msec = 0, nthreads = 5;
+	int opt, foreground = 0, rpc_timeout_msec = 0, nthreads = 5;
 	int heartbeat_interval = 10, log_priority = -1, niothreads = 2;
 	int nflushthreads = 1;
-	char *prog_name;
+	char *prog_name, *pid_file = NULL;
 	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&hb_mutex_mem);
 	ABT_cond stop_cond = ABT_COND_MEMORY_GET_HANDLE(&hb_stop_cond_mem);
 	ABT_cond done_cond = ABT_COND_MEMORY_GET_HANDLE(&hb_done_cond_mem);
 
 	prog_name = basename(argv[0]);
 
-	while ((opt = getopt(argc, argv, "b:B:c:df:h:H:I:l:L:n:N:p:s:S:t:T:"))
-			!= -1) {
+	while ((opt = getopt(argc, argv,
+			"b:B:c:dfF:h:H:I:l:L:n:N:p:P:s:S:t:T:")) != -1) {
 		switch (opt) {
 		case 'b':
 			backend_dir = optarg;
@@ -253,11 +271,14 @@ main(int argc, char *argv[])
 			db_dir = optarg;
 			break;
 		case 'd':
-			debug = 1;
+			foreground = 1;
 			if (log_priority == -1)
 				log_priority = LOG_DEBUG;
 			break;
 		case 'f':
+			foreground = 1;
+			break;
+		case 'F':
 			nflushthreads = atoi(optarg);
 			break;
 		case 'h':
@@ -285,6 +306,9 @@ main(int argc, char *argv[])
 			break;
 		case 'p':
 			protocol = optarg;
+			break;
+		case 'P':
+			pid_file = optarg;
 			break;
 		case 's':
 			db_size = atol(optarg);
@@ -317,15 +341,16 @@ main(int argc, char *argv[])
 	if (subdir)
 		path_set_subdir_path(subdir);
 
-	if (!debug) {
-		if (log_file) {
-			if (log_file_open(log_file) == -1)
-				log_fatal("%s: %s", log_file, strerror(errno));
-		} else
-			log_syslog_open(prog_name, LOG_PID, LOG_LOCAL0);
+	if (log_file) {
+		if (log_file_open(log_file) == -1)
+			log_fatal("%s: %s", log_file, strerror(errno));
+	} else if (!foreground)
+		log_syslog_open(prog_name, LOG_PID, LOG_LOCAL0);
+	if (!foreground) {
 		if (daemon(1, 0) == -1)
 			log_fatal("daemon");
 	}
+	write_pid(pid_file);
 
 	sigemptyset(&sigset);
 	sigaddset(&sigset, SIGINT);

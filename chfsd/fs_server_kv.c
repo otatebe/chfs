@@ -20,7 +20,6 @@
 DECLARE_MARGO_RPC_HANDLER(inode_read_rdma)
 #endif
 DECLARE_MARGO_RPC_HANDLER(inode_readdir)
-DECLARE_MARGO_RPC_HANDLER(inode_unlink_chunk_all)
 
 static char *self;
 
@@ -28,7 +27,7 @@ void
 fs_server_init_more(margo_instance_id mid, char *db_dir, size_t db_size,
 	int niothreads)
 {
-	hg_id_t read_rdma_rpc = -1, readdir_rpc, unlink_all_rpc;
+	hg_id_t read_rdma_rpc = -1, readdir_rpc;
 
 #ifdef USE_ZERO_COPY_READ_RDMA
 	read_rdma_rpc = MARGO_REGISTER(mid, "inode_read_rdma", kv_put_rdma_in_t,
@@ -36,11 +35,8 @@ fs_server_init_more(margo_instance_id mid, char *db_dir, size_t db_size,
 #endif
 	readdir_rpc = MARGO_REGISTER(mid, "inode_readdir", hg_string_t,
 		fs_readdir_out_t, inode_readdir);
-	unlink_all_rpc = MARGO_REGISTER(mid, "inode_unlink_chunk_all",
-		hg_string_t, int32_t, inode_unlink_chunk_all);
 
-	fs_client_init_more_internal(read_rdma_rpc, readdir_rpc,
-		unlink_all_rpc);
+	fs_client_init_more_internal(read_rdma_rpc, readdir_rpc);
 	kv_init(db_dir, "cmap", "kv.db", db_size);
 
 	self = ring_get_self();
@@ -338,103 +334,6 @@ free_input:
 		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
 }
 DEFINE_MARGO_RPC_HANDLER(inode_readdir)
-
-struct fs_name_arg {
-	char *path;
-	int n, size;
-	struct {
-		void *name;
-		size_t size;
-	} *li;
-};
-
-static void
-free_fs_name_arg(struct fs_name_arg *a)
-{
-	int i;
-
-	for (i = 0; i < a->n; ++i)
-		free(a->li[i].name);
-	free(a->li);
-}
-
-static void
-fs_add_name(const char *key, size_t ksize, struct fs_name_arg *a)
-{
-	void *tli;
-	static const char diag[] = "fs_add_name";
-
-	if (a->n >= a->size) {
-		tli = realloc(a->li, sizeof(a->li[0]) * a->size * 2);
-		if (tli == NULL) {
-			log_error("%s: no memory", diag);
-			return;
-		}
-		a->li = tli;
-		a->size *= 2;
-	}
-	a->li[a->n].name = malloc(ksize);
-	if (a->li[a->n].name == NULL) {
-		log_error("%s: no memory", diag);
-		return;
-	}
-	memcpy(a->li[a->n].name, key, ksize);
-	a->li[a->n].size = ksize;
-	++a->n;
-}
-
-static int
-fs_unlink_chunk_all_cb(const char *key, size_t key_size, const char *value,
-	size_t value_size, void *arg)
-{
-	struct fs_name_arg *a = arg;
-
-	if (strcmp(a->path, key) == 0)
-		fs_add_name(key, key_size, a);
-	return (0);
-}
-
-static void
-inode_unlink_chunk_all(hg_handle_t h)
-{
-	struct fs_name_arg a;
-	hg_return_t ret;
-	int i, err;
-	static const char diag[] = "inode_unlink_chunk_all RPC";
-
-	ret = margo_get_input(h, &a.path);
-	if (ret != HG_SUCCESS) {
-		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
-		return;
-	}
-	log_debug("%s: path=%s", diag, a.path);
-
-	a.n = 0;
-	a.size = 1000;
-	a.li = malloc(sizeof(a.li[0]) * a.size);
-	if (a.li == NULL) {
-		log_error("%s: no memory", diag);
-		goto free_input;
-	}
-	kv_get_all_cb(fs_unlink_chunk_all_cb, &a);
-	for (i = 0; i < a.n; ++i)
-		kv_remove(a.li[i].name, a.li[i].size);
-free_input:
-	ret = margo_free_input(h, &a.path);
-	if (ret != HG_SUCCESS)
-		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
-	free_fs_name_arg(&a);
-
-	err = 0;
-	ret = margo_respond(h, &err);
-	if (ret != HG_SUCCESS)
-		log_error("%s (respond): %s", diag, HG_Error_to_string(ret));
-
-	ret = margo_destroy(h);
-	if (ret != HG_SUCCESS)
-		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
-}
-DEFINE_MARGO_RPC_HANDLER(inode_unlink_chunk_all)
 
 #ifdef USE_ZERO_COPY_READ_RDMA
 static int

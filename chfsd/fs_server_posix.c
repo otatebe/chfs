@@ -18,24 +18,20 @@
 static char *self;
 
 DECLARE_MARGO_RPC_HANDLER(inode_readdir)
-DECLARE_MARGO_RPC_HANDLER(inode_unlink_chunk_all)
 
 void
 fs_server_init_more(margo_instance_id mid, char *db_dir, size_t db_size,
 	int niothreads)
 {
-	hg_id_t read_rdma_rpc = -1, readdir_rpc, unlink_all_rpc;
+	hg_id_t read_rdma_rpc = -1, readdir_rpc;
 
 #ifdef USE_ZERO_COPY_READ_RDMA
 #error posix backend does not support --enable-zero-copy-read-rdma
 #endif
 	readdir_rpc = MARGO_REGISTER(mid, "inode_readdir", hg_string_t,
 		fs_readdir_out_t, inode_readdir);
-	unlink_all_rpc = MARGO_REGISTER(mid, "inode_unlink_chunk_all",
-		hg_string_t, int32_t, inode_unlink_chunk_all);
 
-	fs_client_init_more_internal(read_rdma_rpc, readdir_rpc,
-		unlink_all_rpc);
+	fs_client_init_more_internal(read_rdma_rpc, readdir_rpc);
 	fs_inode_init(db_dir, niothreads);
 
 	self = ring_get_self();
@@ -157,35 +153,3 @@ free_input:
 		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
 }
 DEFINE_MARGO_RPC_HANDLER(inode_readdir)
-
-static void
-inode_unlink_chunk_all(hg_handle_t h)
-{
-	hg_string_t path;
-	hg_return_t ret;
-	int err;
-	static const char diag[] = "inode_unlink_chunk_all RPC";
-
-	ret = margo_get_input(h, &path);
-	if (ret != HG_SUCCESS) {
-		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
-		return;
-	}
-	log_debug("%s: path=%s", diag, path);
-
-	fs_inode_unlink_chunk_all(path);
-
-	ret = margo_free_input(h, &path);
-	if (ret != HG_SUCCESS)
-		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
-
-	err = 0;
-	ret = margo_respond(h, &err);
-	if (ret != HG_SUCCESS)
-		log_error("%s (respond): %s", diag, HG_Error_to_string(ret));
-
-	ret = margo_destroy(h);
-	if (ret != HG_SUCCESS)
-		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
-}
-DEFINE_MARGO_RPC_HANDLER(inode_unlink_chunk_all)

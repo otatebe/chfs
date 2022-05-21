@@ -7,7 +7,7 @@ CHFS is a parallel consistent hashing file system created instantly using node-l
 1. Install development kits
 
        # apt install build-essential
-       # apt install cmake libtool pkg-config
+       # apt install cmake libtool pkgconf
 
 1. Install Spack
 
@@ -22,7 +22,7 @@ CHFS is a parallel consistent hashing file system created instantly using node-l
 
    Or, more recommended way to include verbs as follows;
 
-       % spack external find automake autoconf libtool cmake m4
+       % spack external find automake autoconf libtool cmake m4 pkgconf
        % spack config edit packages
        manually add rdma-core
        % spack spec mochi-margo ^mercury~boostsys ^libfabric fabrics=rxm,sockets,tcp,udp,verbs
@@ -46,12 +46,16 @@ CHFS is a parallel consistent hashing file system created instantly using node-l
 
        # apt install pandoc
 
+1. (Optional) Install OpenMPI for parallel find in MPI
+
+       # apt install libopenmpi-dev
+
 1. Install CHFS
 
+       % spack load mochi-margo
        % git clone https://github.com/otatebe/chfs.git
        % cd chfs
        % autoreconf -i
-       % spack load mochi-margo
        % ./configure [--prefix=PREFIX] [--with-pmemkv] [--enable-zero-copy-read-rdma]
        % make
        # make install
@@ -108,10 +112,10 @@ When you use pmemkv, devdax is desirable.  When you use fsdax, the following env
 
 1. Installation
 
-       % git clone https://github.com/otatebe/ior.git -b feature/chfs
+       % spack load mochi-margo
+       % git clone https://github.com/hpc/ior.git
        % cd ior
        % ./bootstrap
-       % spack load mochi-margo
        % ./configure --with-chfs=PREFIX [--prefix=PREFIX]
        % make
        # make install
