@@ -52,10 +52,10 @@ CHFS is a parallel consistent hashing file system created instantly using node-l
 
 1. Install CHFS
 
+       % spack load mochi-margo
        % git clone https://github.com/otatebe/chfs.git
        % cd chfs
        % autoreconf -i
-       % spack load mochi-margo
        % ./configure [--prefix=PREFIX] [--with-pmemkv] [--enable-zero-copy-read-rdma]
        % make
        # make install
@@ -112,7 +112,7 @@ When you use pmemkv, devdax is desirable.  When you use fsdax, the following env
 1. Installation
 
        % spack load mochi-margo
-       % git clone https://github.com/otatebe/ior.git -b feature/chfs
+       % git clone https://github.com/hpc/ior.git
        % cd ior
        % ./bootstrap
        % ./configure --with-chfs=PREFIX [--prefix=PREFIX]
