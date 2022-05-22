@@ -50,9 +50,10 @@ RUN cd \
  && spack load mochi-margo \
  && cd chfs \
  && autoreconf -i \
- && ./configure --prefix=/home/$USERNAME \
+ && ./configure \
  && make \
- && make install \
+ && sudo make install \
+ && sudo ldconfig \
  && make clean
 
 RUN cd \
@@ -61,9 +62,9 @@ RUN cd \
  && git clone https://github.com/otatebe/ior.git -b feature/chfs \
  && cd ior \
  && ./bootstrap \
- && ./configure --prefix=/home/$USERNAME --with-chfs=/home/$USERNAME \
+ && ./configure \
  && make \
- && make install \
+ && sudo make install \
  && make clean
 
 COPY --chown=$USERNAME:$USERNAME dev/test.sh /home/$USERNAME/test.sh
