@@ -9,7 +9,6 @@ client/mpi/chfind
 client/murmur3sum
 lib/config.h
 lib/config.h.in
-lib/config.h.in~
 lib/stamp-h1
 libtool
 .libs
@@ -21,6 +20,7 @@ doc/chmkdir.1
 doc/chrmdir.1
 doc/chstagein.1
 pkgconfig/chfs.pc
+*~
 
 ## spack
 removed_la_files.txt
