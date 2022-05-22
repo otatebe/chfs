@@ -42,10 +42,6 @@ RUN cd \
  && echo ". spack/share/spack/setup-env.sh" >> .bashrc \
  && echo "spack load mochi-margo" >> .bashrc
 
-RUN cd \
- && echo "export LD_LIBRARY_PATH=\$HOME/lib:\$LD_LIBRARY_PATH" >> .bashrc \
- && echo "export PKG_CONFIG_PATH=\$HOME/lib/pkgconfig:\$PKG_CONFIG_PATH" >> .bashrc
-
 COPY --chown=$USERNAME:$USERNAME . /home/$USERNAME/chfs
 COPY --chown=$USERNAME:$USERNAME dev/hosts /home/$USERNAME/hosts
 
@@ -54,21 +50,21 @@ RUN cd \
  && spack load mochi-margo \
  && cd chfs \
  && autoreconf -i \
- && ./configure --prefix=/home/$USERNAME \
+ && ./configure \
  && make \
- && make install \
+ && sudo make install \
+ && sudo ldconfig \
  && make clean
 
 RUN cd \
- && export PKG_CONFIG_PATH=/home/$USERNAME/lib/pkgconfig \
  && . spack/share/spack/setup-env.sh \
  && spack load mochi-margo \
  && git clone https://github.com/otatebe/ior.git -b feature/chfs \
  && cd ior \
  && ./bootstrap \
- && ./configure --prefix=/home/$USERNAME \
+ && ./configure \
  && make \
- && make install \
+ && sudo make install \
  && make clean
 
 COPY --chown=$USERNAME:$USERNAME dev/test.sh /home/$USERNAME/test.sh
