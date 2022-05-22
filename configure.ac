@@ -71,8 +71,9 @@ AC_ARG_ENABLE([digest-md5],
 AC_MSG_RESULT([$enableval])
 if test x$enableval != xno; then
   AC_DEFINE([USE_DIGEST_MD5], [1], [Use md5 digest])
-  PKG_CHECK_MODULES([OPENSSL], [openssl])
+  PKG_CHECK_MODULES([OPENSSL], [openssl], [md5_req=openssl])
 fi
+AC_SUBST(md5_req)
 
 AC_MSG_CHECKING([pmemkv])
 AC_ARG_WITH([pmemkv],
