@@ -223,7 +223,7 @@ do
 	nservers=$((nservers + 1))
 
 	if $NO_SERVER; then
-		timeout=10
+		timeout=30
 		while [ $timeout -gt 0 ]; do
 			if does_exist $host $SERVER_INFO_FILE; then
 				break
@@ -248,7 +248,7 @@ do
 	fi
 done
 if $NO_SERVER; then err no server executed; fi
-timeout=10
+timeout=30
 while [ $timeout -gt 0 -a $(chlist | wc -l) -lt $nservers ]; do
 	timeout=$((timeout - 1))
 	sleep 1;
