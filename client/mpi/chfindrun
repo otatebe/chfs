@@ -5,14 +5,17 @@ ${DEBUG:="false"} && set -x
 : ${CHFIND:=chfind}
 
 program=$(basename $0)
+PPN=1
 
 usage() {
         [ "X$*" = X ] || echo >&2 $program: $*
-	echo >&2 "usage: $program -hostfile hostfile [-output_dir dir] args ..."
+	echo >&2 "usage: $program -hostfile hostfile [-ppn num] [-output_dir dir] args ..."
 	echo >&2 ""
 	echo >&2 "options:"
 	echo >&2 "        -hostfile hostfile"
 	echo >&2 "            specifies a hostfile."
+	echo >&2 "        -ppn num"
+	echo >&2 "            specifies the number of processes per node."
 	echo >&2 "        -output_dir directory"
 	echo >&2 "            specifies an output directory."
 	exit 1
@@ -27,6 +30,7 @@ while [ $# -gt 0 ]; do
 	case $1 in
 	    -hostfile) shift; HOSTFILE=$1 ;;
 	    -output_dir) shift; OUTPUT_DIR=$1 ;;
+	    -ppn) shift; PPN=$1 ;;
 	    *) break ;;
 	esac
 	shift
@@ -39,6 +43,7 @@ if [ ! -f $HOSTFILE ]; then
 	err $HOSTFILE: no such hostfile
 fi
 size=`sed -e 's/#.*//' -e '/^[ 	]*$/d' $HOSTFILE | wc -l`
+size=$((size * PPN))
 
 if [ 0$size -lt 2 ]; then
 	err $HOSTFILE: should be two or more nodes
@@ -55,12 +60,16 @@ ARG="LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH\" PATH=\"$PATH\" CHFS_SERVER=\"$CHFS_SER
 
 rank=0
 for host in `sed -e 's/#.*//' -e '/^[ 	]*$/d' $HOSTFILE | awk '{ print $1 }'`; do
-	if [ X$OUTPUT_DIR = X ]; then
-		$CMD $host "cd $PWD; set -f; $ARG --mpi_rank=$rank --mpi_size=$size" &
-	else
-		$CMD $host "cd $PWD; set -f; $ARG --mpi_rank=$rank --mpi_size=$size" > $OUTPUT_DIR/$rank.out &
-	fi
-	rank=$((rank + 1))
+	p=0
+	while [ $p -lt $PPN ]; do
+		if [ X$OUTPUT_DIR = X ]; then
+			$CMD $host "cd $PWD; set -f; $ARG --mpi_rank=$rank --mpi_size=$size" &
+		else
+			$CMD $host "cd $PWD; set -f; $ARG --mpi_rank=$rank --mpi_size=$size" > $OUTPUT_DIR/$rank.out &
+		fi
+		rank=$((rank + 1))
+		p=$((p + 1))
+	done
 done
 wait
 
