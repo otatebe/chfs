@@ -1044,7 +1044,7 @@ chfs_seek(int fd, off_t off, int whence)
 		break;
 	case SEEK_END:
 	default:
-		/* fall through */
+		break;
 	}
 	if (pos < 0)
 		errno = EINVAL;
