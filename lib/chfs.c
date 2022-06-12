@@ -874,6 +874,8 @@ chfs_write(int fd, const void *buf, size_t size)
 	struct fd_table *tab = get_fd_table(fd);
 	ssize_t s;
 
+	if (tab == NULL)
+		return (-1);
 	s = chfs_pwrite(fd, buf, size, tab->pos);
 	if (s > 0)
 		tab->pos += s;
@@ -1016,11 +1018,40 @@ chfs_read(int fd, void *buf, size_t size)
 	struct fd_table *tab = get_fd_table(fd);
 	ssize_t s;
 
+	if (tab == NULL)
+		return (-1);
 	s = chfs_pread(fd, buf, size, tab->pos);
 	if (s > 0)
 		tab->pos += s;
 	release_fd_table(tab);
 	return (s);
+}
+
+off_t
+chfs_seek(int fd, off_t off, int whence)
+{
+	struct fd_table *tab = get_fd_table(fd);
+	off_t pos = -1;
+
+	if (tab == NULL)
+		return (-1);
+	switch (whence) {
+	case SEEK_SET:
+		pos = off;
+		break;
+	case SEEK_CUR:
+		pos = tab->pos + off;
+		break;
+	case SEEK_END:
+	default:
+		/* fall through */
+	}
+	if (pos < 0)
+		errno = EINVAL;
+	else
+		tab->pos = pos;
+	release_fd_table(tab);
+	return (pos);
 }
 
 static int
