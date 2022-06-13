@@ -147,6 +147,7 @@ The following APIs are supported.
     ssize_t chfs_write(int fd, const void *buf, size_t size);
     ssize_t chfs_pread(int fd, void *buf, size_t size, off_t offset);
     ssize_t chfs_read(int fd, void *buf, size_t size);
+    off_t chfs_seek(int fd, off_t off, int whence);
     int chfs_fsync(int fd);
     int chfs_truncate(const char *path, off_t len);
     int chfs_unlink(const char *path);
@@ -154,6 +155,8 @@ The following APIs are supported.
     int chfs_rmdir(const char *path);
     int chfs_stat(const char *path, struct stat *st);
     int chfs_readdir(const char *path, void *buf,
+            int (*filler)(void *, const char *, const struct stat *, off_t));
+    int chfs_readdir_index(const char *path, int index, void *buf,
             int (*filler)(void *, const char *, const struct stat *, off_t));
     int chfs_symlink(const char *target, const char *path);
     int chfs_readlink(const char *path, char *buf, size_t size);
