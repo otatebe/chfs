@@ -31,6 +31,37 @@ static struct {
 	size_t size;
 	struct hash_entry entry;
 } saved_entry;
+ABT_mutex saved_entry_mutex;
+
+int
+saved_entry_enter(char *key, size_t key_size, mode_t mode, size_t chunk_size)
+{
+	int r;
+
+	ABT_mutex_lock(saved_entry_mutex);
+	r = (saved_entry.size != key_size ||
+		memcmp(saved_entry.key, key, key_size) != 0);
+	if (r) {
+		saved_entry.size = key_size;
+		memcpy(saved_entry.key, key, key_size);
+		saved_entry.entry.mode = mode;
+		saved_entry.entry.chunk_size = chunk_size;
+	}
+	ABT_mutex_unlock(saved_entry_mutex);
+	return (r);
+}
+
+int
+saved_entry_same(struct hash_entry *data)
+{
+	int r;
+
+	ABT_mutex_lock(saved_entry_mutex);
+	r = (saved_entry.entry.mode == data->mode
+		&& saved_entry.entry.chunk_size == data->chunk_size);
+	ABT_mutex_unlock(saved_entry_mutex);
+	return (r);
+}
 
 DECLARE_MARGO_RPC_HANDLER(inode_create)
 DECLARE_MARGO_RPC_HANDLER(inode_stat)
@@ -85,6 +116,7 @@ fs_server_init(margo_instance_id mid, char *db_dir, size_t db_size, int timeout,
 
 	env.self = ring_get_self();
 	stat_hash = hash_make(HASH_SIZE);
+	ABT_mutex_create(&saved_entry_mutex);
 	saved_entry.size = 0;
 }
 
@@ -124,15 +156,11 @@ inode_create(hg_handle_t h)
 	log_debug("%s: key=%s", diag, (char *)in.key.v);
 
 	if (stat_hash && in.key.s <= MAX_KEY_SIZE) {
-		if (saved_entry.size != in.key.s || memcmp(saved_entry.key,
-		    in.key.v, in.key.s) != 0) {
-			saved_entry.size = in.key.s;
-			memcpy(saved_entry.key, in.key.v, in.key.s);
-			saved_entry.entry.mode = in.mode;
-			saved_entry.entry.chunk_size = in.chunk_size;
+		if (saved_entry_enter(in.key.v, in.key.s, in.mode,
+			in.chunk_size))
 			hash_data = (struct hash_entry **)hash_find(stat_hash,
 				in.key.v, in.key.s);
-		} else
+		else
 			hash_data = (struct hash_entry **)hash_get(stat_hash,
 				in.key.v, in.key.s);
 		if (hash_data) {
@@ -150,11 +178,8 @@ inode_create(hg_handle_t h)
 					(*hash_data)->chunk_size =
 						in.chunk_size;
 				}
-				if (saved_entry.entry.mode == (*hash_data)->mode
-				    && saved_entry.entry.chunk_size ==
-					(*hash_data)->chunk_size) {
+				if (saved_entry_same(*hash_data))
 					err = KV_SUCCESS;
-				}
 				log_debug("%s: insert %s (%d)", diag,
 					(char *)in.key.v, err);
 			}
