@@ -17,6 +17,7 @@ ssize_t chfs_pwrite(int fd, const void *buf, size_t size, off_t offset);
 ssize_t chfs_write(int fd, const void *buf, size_t size);
 ssize_t chfs_pread(int fd, void *buf, size_t size, off_t offset);
 ssize_t chfs_read(int fd, void *buf, size_t size);
+off_t chfs_seek(int fd, off_t off, int whence);
 int chfs_fsync(int fd);
 int chfs_truncate(const char *path, off_t len);
 int chfs_unlink(const char *path);
