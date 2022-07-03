@@ -10,6 +10,7 @@
 #include "kv.h"
 #include "fs_types.h"
 #include "fs_rpc.h"
+#include "fs_hook.h"
 #include "fs.h"
 #include "log.h"
 
@@ -88,9 +89,11 @@ inode_create(hg_handle_t h)
 	char *target;
 	static const char diag[] = "inode_create RPC";
 
+	fs_server_rpc_begin((void *)inode_create, diag);
 	ret = margo_get_input(h, &in);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		fs_server_rpc_end((void *)inode_create, diag);
 		return;
 	}
 	log_debug("%s: key=%s", diag, (char *)in.key.v);
@@ -120,6 +123,7 @@ inode_create(hg_handle_t h)
 
 	if (err == KV_ERR_SERVER_DOWN)
 		ring_start_election();
+	fs_server_rpc_end((void *)inode_create, diag);
 }
 DEFINE_MARGO_RPC_HANDLER(inode_create)
 
@@ -133,9 +137,11 @@ inode_stat(hg_handle_t h)
 	char *target;
 	static const char diag[] = "inode_stat RPC";
 
+	fs_server_rpc_begin((void *)inode_stat, diag);
 	ret = margo_get_input(h, &in);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		fs_server_rpc_end((void *)inode_stat, diag);
 		return;
 	}
 	log_debug("%s: key=%s", diag, (char *)in.v);
@@ -167,6 +173,7 @@ inode_stat(hg_handle_t h)
 
 	if (out.err == KV_ERR_SERVER_DOWN)
 		ring_start_election();
+	fs_server_rpc_end((void *)inode_stat, diag);
 }
 DEFINE_MARGO_RPC_HANDLER(inode_stat)
 
@@ -179,9 +186,11 @@ inode_write(hg_handle_t h)
 	char *target;
 	static const char diag[] = "inode_write RPC";
 
+	fs_server_rpc_begin((void *)inode_write, diag);
 	ret = margo_get_input(h, &in);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		fs_server_rpc_end((void *)inode_write, diag);
 		return;
 	}
 	log_debug("%s: key=%s", diag, (char *)in.key.v);
@@ -212,6 +221,7 @@ inode_write(hg_handle_t h)
 
 	if (out.err == KV_ERR_SERVER_DOWN)
 		ring_start_election();
+	fs_server_rpc_end((void *)inode_write, diag);
 }
 DEFINE_MARGO_RPC_HANDLER(inode_write)
 
@@ -228,9 +238,11 @@ inode_write_rdma(hg_handle_t h)
 	void *buf;
 	static const char diag[] = "inode_write_rdma RPC";
 
+	fs_server_rpc_begin((void *)inode_write_rdma, diag);
 	ret = margo_get_input(h, &in);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		fs_server_rpc_end((void *)inode_write_rdma, diag);
 		return;
 	}
 	log_debug("%s: key=%s", diag, (char *)in.key.v);
@@ -308,6 +320,7 @@ free_input:
 
 	if (out.err == KV_ERR_SERVER_DOWN)
 		ring_start_election();
+	fs_server_rpc_end((void *)inode_write_rdma, diag);
 }
 DEFINE_MARGO_RPC_HANDLER(inode_write_rdma)
 
@@ -320,9 +333,11 @@ inode_read(hg_handle_t h)
 	char *target;
 	static const char diag[] = "inode_read RPC";
 
+	fs_server_rpc_begin((void *)inode_read, diag);
 	ret = margo_get_input(h, &in);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		fs_server_rpc_end((void *)inode_read, diag);
 		return;
 	}
 	log_debug("%s: key=%s", diag, (char *)in.key.v);
@@ -364,6 +379,7 @@ free_input:
 
 	if (out.err == KV_ERR_SERVER_DOWN)
 		ring_start_election();
+	fs_server_rpc_end((void *)inode_read, diag);
 }
 DEFINE_MARGO_RPC_HANDLER(inode_read)
 
@@ -381,9 +397,11 @@ inode_read_rdma(hg_handle_t h)
 	void *buf;
 	static const char diag[] = "inode_read_rdma RPC";
 
+	fs_server_rpc_begin((void *)inode_read_rdma, diag);
 	ret = margo_get_input(h, &in);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		fs_server_rpc_end((void *)inode_read_rdma, diag);
 		return;
 	}
 	log_debug("%s: key=%s", diag, (char *)in.key.v);
@@ -462,6 +480,7 @@ free_input:
 
 	if (out.err == KV_ERR_SERVER_DOWN)
 		ring_start_election();
+	fs_server_rpc_end((void *)inode_read_rdma, diag);
 }
 DEFINE_MARGO_RPC_HANDLER(inode_read_rdma)
 #endif
@@ -479,9 +498,11 @@ inode_copy_rdma(hg_handle_t h)
 	void *buf;
 	static const char diag[] = "inode_copy_rdma RPC";
 
+	fs_server_rpc_begin((void *)inode_copy_rdma, diag);
 	ret = margo_get_input(h, &in);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		fs_server_rpc_end((void *)inode_copy_rdma, diag);
 		return;
 	}
 	log_debug("%s: key=%s", diag, (char *)in.key.v);
@@ -557,6 +578,7 @@ free_input:
 
 	if (out == KV_ERR_SERVER_DOWN)
 		ring_start_election();
+	fs_server_rpc_end((void *)inode_copy_rdma, diag);
 }
 DEFINE_MARGO_RPC_HANDLER(inode_copy_rdma)
 
@@ -569,9 +591,11 @@ inode_truncate(hg_handle_t h)
 	char *target;
 	static const char diag[] = "inode_truncate RPC";
 
+	fs_server_rpc_begin((void *)inode_truncate, diag);
 	ret = margo_get_input(h, &in);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		fs_server_rpc_end((void *)inode_truncate, diag);
 		return;
 	}
 	log_debug("%s: key=%s, len=%ld", diag, (char *)in.key.v, in.len);
@@ -599,6 +623,7 @@ inode_truncate(hg_handle_t h)
 
 	if (err == KV_ERR_SERVER_DOWN)
 		ring_start_election();
+	fs_server_rpc_end((void *)inode_truncate, diag);
 }
 DEFINE_MARGO_RPC_HANDLER(inode_truncate)
 
@@ -611,9 +636,11 @@ inode_remove(hg_handle_t h)
 	char *target;
 	static const char diag[] = "inode_remove RPC";
 
+	fs_server_rpc_begin((void *)inode_remove, diag);
 	ret = margo_get_input(h, &key);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		fs_server_rpc_end((void *)inode_remove, diag);
 		return;
 	}
 	log_debug("%s: key=%s", diag, (char *)key.v);
@@ -640,6 +667,7 @@ inode_remove(hg_handle_t h)
 
 	if (err == KV_ERR_SERVER_DOWN)
 		ring_start_election();
+	fs_server_rpc_end((void *)inode_remove, diag);
 }
 DEFINE_MARGO_RPC_HANDLER(inode_remove)
 
@@ -650,9 +678,11 @@ inode_unlink_chunk_all(hg_handle_t h)
 	fs_unlink_all_t in;
 	static const char diag[] = "inode_unlink_chunk_all RPC";
 
+	fs_server_rpc_begin((void *)inode_unlink_chunk_all, diag);
 	ret = margo_get_input(h, &in);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		fs_server_rpc_end((void *)inode_unlink_chunk_all, diag);
 		return;
 	}
 	log_debug("%s: path=%s index=%d", diag, in.path, in.index);
@@ -666,6 +696,7 @@ inode_unlink_chunk_all(hg_handle_t h)
 	ret = margo_destroy(h);
 	if (ret != HG_SUCCESS)
 		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
+	fs_server_rpc_end((void *)inode_unlink_chunk_all, diag);
 }
 DEFINE_MARGO_RPC_HANDLER(inode_unlink_chunk_all)
 

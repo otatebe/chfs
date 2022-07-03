@@ -12,6 +12,7 @@
 #include "kv.h"
 #include "fs_types.h"
 #include "fs_rpc.h"
+#include "fs_hook.h"
 #include "fs.h"
 #include "log.h"
 
@@ -106,9 +107,11 @@ inode_readdir(hg_handle_t h)
 	hg_return_t ret;
 	static const char diag[] = "inode_readdir RPC";
 
+	fs_server_rpc_begin((void *)inode_readdir, diag);
 	ret = margo_get_input(h, &path);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		fs_server_rpc_end((void *)inode_readdir, diag);
 		return;
 	}
 	log_debug("%s: path=%s", diag, path);
@@ -151,5 +154,6 @@ free_input:
 	ret = margo_destroy(h);
 	if (ret != HG_SUCCESS)
 		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
+	fs_server_rpc_end((void *)inode_readdir, diag);
 }
 DEFINE_MARGO_RPC_HANDLER(inode_readdir)

@@ -39,6 +39,9 @@ chfsd - CHFS server
 -F num_flush_threads
 : specify the number of flush threads.  Default is 1.  0 means no flush.
 
+-U flush_interval
+: specify the flush interval in seconds.  If it is negative, dirty files are flushed immediately.  If it is zero or larger, dirty files are flushed after the interval from the last I/O activity.  Default is 5.
+
 -l log_file
 : specifies a log file.
 

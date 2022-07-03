@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <pthread.h>
+#include "fs_hook.h"
 #include "fs.h"
 #include "log.h"
 
@@ -153,6 +154,8 @@ flush_thread(void *a)
 
 	while (1) {
 		e = fs_inode_flush_deq();
+		if (fs_server_get_rpc_last_interval() >= 0)
+			fs_server_rpc_wait();
 		fs_inode_flush(e->key, e->size);
 		free(e->key);
 		free(e);
