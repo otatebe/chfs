@@ -226,7 +226,7 @@ void
 usage(char *prog_name)
 {
 	fprintf(stderr, "Usage: %s [-d] [-f] [-c db_dir] [-s db_size] "
-		"[-b backend_dir]\n\t[-B subdir] [-f num_flush_threads] "
+		"[-b backend_dir]\n\t[-B subdir] [-F num_flush_threads] "
 		"[-p protocol]\n\t[-h host[:port]/device] "
 		"[-n vname] [-N virtual_name] [-P pid_file]\n\t[-l log_file] "
 		"[-S server_info_file] [-t rpc_timeout_msec] "
