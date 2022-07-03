@@ -35,6 +35,7 @@ CHFS is a parallel consistent hashing file system created instantly using node-l
 
        # apt install libpmemkv-dev
        # apt install libpmemobj-cpp-dev libmemkind-dev libtbb-dev
+       # apt install rapidjson-dev
 
    For details, see https://pmem.io/pmemkv/
 
