@@ -4,7 +4,7 @@
 #include "fs_hook.h"
 
 static int rpc_count = 0;
-static int rpc_last_time;
+static struct timespec rpc_last_time;
 static int rpc_last_interval = 5;
 static ABT_mutex_memory mutex_mem = ABT_MUTEX_INITIALIZER;
 static ABT_cond_memory begin_cond_mem = ABT_COND_INITIALIZER;
@@ -36,7 +36,12 @@ fs_server_get_rpc_last_interval(void)
 static int
 rpc_last_interval_past()
 {
-	return ((time(NULL) - rpc_last_time) > rpc_last_interval);
+	struct timespec ts;
+
+	clock_gettime(CLOCK_REALTIME, &ts);
+	return ((ts.tv_sec - rpc_last_time.tv_sec) > rpc_last_interval
+		|| ((ts.tv_sec - rpc_last_time.tv_sec) == rpc_last_interval
+		    && ts.tv_nsec >= rpc_last_time.tv_nsec));
 }
 
 void
@@ -60,7 +65,7 @@ fs_server_rpc_end(void *func, const char *diag)
 	ABT_mutex_lock(mutex);
 	--rpc_count;
 	if (rpc_count <= 0) {
-		rpc_last_time = time(NULL);
+		clock_gettime(CLOCK_REALTIME, &rpc_last_time);
 		ABT_cond_signal(end_cond);
 	}
 	ABT_mutex_unlock(mutex);
@@ -79,8 +84,8 @@ fs_server_rpc_wait(void)
 		if (rpc_count > 0)
 			ABT_cond_wait(end_cond, mutex);
 
-		clock_gettime(CLOCK_REALTIME, &ts);
-		ts.tv_sec += rpc_last_interval;
+		ts.tv_sec = rpc_last_time.tv_sec + rpc_last_interval;
+		ts.tv_nsec = rpc_last_time.tv_nsec;
 		if (!rpc_last_interval_past())
 			ABT_cond_timedwait(begin_cond, mutex, &ts);
 	}
