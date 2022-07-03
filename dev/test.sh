@@ -21,6 +21,6 @@ chfsctl -h hosts -m $MDIR stop
 
 ls -l backend
 rm backend/configure
-rm backend/test
+rm -f backend/test
 
 echo OK
