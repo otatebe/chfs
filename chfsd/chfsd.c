@@ -134,10 +134,12 @@ handle_sig(void *arg)
 	ABT_cond done_cond = ABT_COND_MEMORY_GET_HANDLE(&hb_done_cond_mem);
 
 	sigwait(a, &sig);
+
 	ABT_mutex_lock(mutex);
 	heartbeat_stop = 1;
 	ABT_mutex_unlock(mutex);
 	ABT_cond_signal(stop_cond);
+
 	ABT_mutex_lock(mutex);
 	while (!heartbeat_done)
 		ABT_cond_wait(done_cond, mutex);
