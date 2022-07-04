@@ -108,14 +108,14 @@ inode_read_rdma(hg_handle_t h)
 	struct read_rdma_cb_arg a;
 	static const char diag[] = "inode_read_rdma RPC";
 
+	memset(&out, 0, sizeof(out));
 	ret = margo_get_input(h, &in);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
-		return;
+		goto destroy;
 	}
 	log_debug("%s: key=%s", diag, (char *)in.key.v);
 
-	memset(&out, 0, sizeof(out));
 	ret = margo_addr_lookup(mid, in.client, &client_addr);
 	if (ret != HG_SUCCESS) {
 		out.err = KV_ERR_LOOKUP;
@@ -150,6 +150,7 @@ err_free_input:
 	ret = margo_respond(h, &out);
 	if (ret != HG_SUCCESS)
 		log_error("%s (respond): %s", diag, HG_Error_to_string(ret));
+destroy:
 	ret = margo_destroy(h);
 	if (ret != HG_SUCCESS)
 		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
@@ -287,7 +288,7 @@ inode_readdir(hg_handle_t h)
 	ret = margo_get_input(h, &path);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
-		return;
+		goto destroy;
 	}
 	log_debug("%s: path=%s", diag, path);
 
@@ -327,7 +328,7 @@ free_input:
 	if (ret != HG_SUCCESS)
 		log_error("%s (respond): %s", diag, HG_Error_to_string(ret));
 	free_fs_readdir_arg(&a);
-
+destroy:
 	ret = margo_destroy(h);
 	if (ret != HG_SUCCESS)
 		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
