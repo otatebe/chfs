@@ -111,8 +111,7 @@ inode_readdir(hg_handle_t h)
 	ret = margo_get_input(h, &path);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
-		fs_server_rpc_end((void *)inode_readdir, diag);
-		return;
+		goto destroy;
 	}
 	log_debug("%s: path=%s", diag, path);
 
@@ -150,7 +149,7 @@ free_input:
 	if (ret != HG_SUCCESS)
 		log_error("%s (respond): %s", diag, HG_Error_to_string(ret));
 	free_fs_readdir_arg(&a);
-
+destroy:
 	ret = margo_destroy(h);
 	if (ret != HG_SUCCESS)
 		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
