@@ -264,7 +264,7 @@ join(hg_handle_t h)
 	ret = margo_get_input(h, &in);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
-		return;
+		goto destroy;
 	}
 	ABT_mutex_lock(join_mutex);
 	prev = ring_get_prev();
@@ -296,7 +296,7 @@ join(hg_handle_t h)
 		ring_release_prev();
 	else
 		ring_release_prev_prev();
-
+destroy:
 	ret = margo_destroy(h);
 	if (ret != HG_SUCCESS)
 		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
@@ -408,6 +408,7 @@ set_next(hg_handle_t h)
 	ret = margo_get_input(h, &in);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		margo_destroy(h);
 		return;
 	}
 	ring_set_next(in);
@@ -435,14 +436,14 @@ set_prev(hg_handle_t h)
 	ret = margo_get_input(h, &in);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
-		return;
+		goto destroy;
 	}
 	ring_set_prev(in);
 
 	ret = margo_free_input(h, &in);
 	if (ret != HG_SUCCESS)
 		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
-
+destroy:
 	ret = margo_destroy(h);
 	if (ret != HG_SUCCESS)
 		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
@@ -463,7 +464,7 @@ list(hg_handle_t h)
 	ret = margo_get_input(h, &in);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
-		return;
+		goto destroy;
 	}
 	for (i = 0; i < in.n; ++i)
 		log_debug("[%d] %s %s", i, in.s[i].address, in.s[i].name);
@@ -487,7 +488,7 @@ list(hg_handle_t h)
 	ret = margo_free_input(h, &in);
 	if (ret != HG_SUCCESS)
 		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
-
+destroy:
 	ret = margo_destroy(h);
 	if (ret != HG_SUCCESS)
 		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
@@ -528,7 +529,7 @@ election(hg_handle_t h)
 	ret = margo_get_input(h, &in);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
-		return;
+		goto destroy;
 	}
 	for (i = 0; i < in.n; ++i)
 		if (strcmp(in.s[i].address, self) == 0)
@@ -566,7 +567,7 @@ election(hg_handle_t h)
 	ret = margo_free_input(h, &in);
 	if (ret != HG_SUCCESS)
 		log_error("%s (free_input): %s", diag, HG_Error_to_string(ret));
-
+destroy:
 	ret = margo_destroy(h);
 	if (ret != HG_SUCCESS)
 		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
@@ -605,6 +606,7 @@ coordinator(hg_handle_t h)
 	ret = margo_get_input(h, &in);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
+		margo_destroy(h);
 		return;
 	}
 	for (i = 0; i < in.list.n; ++i)
