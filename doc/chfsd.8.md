@@ -34,13 +34,13 @@ chfsd - CHFS server
 : specify a backend directory to flush.
 
 -B subdir
-: specify a subdir that is considered to be a root directory in CHFS for the backend directory.
+: specify a subdir that is considered to be a root directory in CHFS for the backend directory.  This option is effective with -b option.
 
 -F num_flush_threads
-: specify the number of flush threads.  Default is 1.  0 means no flush.
+: specify the number of flush threads.  Default is 1.  0 means no flush.  This option is effective with -b option.
 
 -U flush_interval
-: specify the flush interval in seconds.  If it is negative, dirty files are flushed immediately.  If it is zero or larger, dirty files are flushed after the interval from the last I/O activity.  Default is 5.
+: specify the flush interval in seconds.  If it is negative, dirty files are flushed immediately.  If it is zero or larger, dirty files are flushed after the interval from the last I/O activity.  Default is 5.  This option is effective with -b option.
 
 -l log_file
 : specifies a log file.

@@ -343,9 +343,10 @@ main(int argc, char *argv[])
 	if (backend_dir) {
 		check_directory(backend_dir);
 		path_set_backend_path(backend_dir);
-	}
-	if (subdir)
-		path_set_subdir_path(subdir);
+		if (subdir)
+			path_set_subdir_path(subdir);
+	} else
+		nflushthreads = 0; /* do not start flush threads */
 
 	if (log_file) {
 		if (log_file_open(log_file) == -1)
