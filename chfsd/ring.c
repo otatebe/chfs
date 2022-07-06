@@ -9,6 +9,7 @@ typedef struct {
 	char *host[2];
 	int ref_count;
 	ABT_mutex mutex;
+	ABT_cond cond;
 } ring_node_t;
 
 static ring_node_t next, prev;
@@ -41,6 +42,7 @@ ring_init_node(const char *host, ring_node_t *node, const char *diag)
 	node->host[1] = NULL;
 	node->ref_count = 0;
 	ABT_mutex_create(&node->mutex);
+	ABT_cond_create(&node->cond);
 	if (diag)
 		ring_print_node(node, diag);
 }
@@ -69,6 +71,8 @@ ring_host(ring_node_t *node)
 	char *r;
 
 	ABT_mutex_lock(node->mutex);
+	while (node->ref_count > 0 && node->host[1])
+		ABT_cond_wait(node->cond, node->mutex);
 	++node->ref_count;
 	r = node->host[0];
 	ABT_mutex_unlock(node->mutex);
@@ -80,12 +84,11 @@ ring_release_node(ring_node_t *node)
 {
 	ABT_mutex_lock(node->mutex);
 	--node->ref_count;
-	if (node->ref_count == 0) {
-		if (node->host[1]) {
-			free(node->host[0]);
-			node->host[0] = node->host[1];
-			node->host[1] = NULL;
-		}
+	if (node->ref_count == 0 && node->host[1]) {
+		free(node->host[0]);
+		node->host[0] = node->host[1];
+		node->host[1] = NULL;
+		ABT_cond_signal(node->cond);
 	}
 	ABT_mutex_unlock(node->mutex);
 }
