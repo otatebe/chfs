@@ -5,7 +5,6 @@ ${DEBUG:="false"} && set -x
 : ${CHFIND:=chfind}
 
 program=$(basename $0)
-PPN=1
 
 usage() {
         [ "X$*" = X ] || echo >&2 $program: $*
