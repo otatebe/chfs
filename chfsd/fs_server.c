@@ -33,7 +33,7 @@ static struct {
 } saved_entry;
 ABT_mutex saved_entry_mutex;
 
-int
+static int
 saved_entry_enter(char *key, size_t key_size, mode_t mode, size_t chunk_size)
 {
 	int r;
@@ -47,18 +47,6 @@ saved_entry_enter(char *key, size_t key_size, mode_t mode, size_t chunk_size)
 		saved_entry.entry.mode = mode;
 		saved_entry.entry.chunk_size = chunk_size;
 	}
-	ABT_mutex_unlock(saved_entry_mutex);
-	return (r);
-}
-
-int
-saved_entry_same(struct hash_entry *data)
-{
-	int r;
-
-	ABT_mutex_lock(saved_entry_mutex);
-	r = (saved_entry.entry.mode == data->mode
-		&& saved_entry.entry.chunk_size == data->chunk_size);
 	ABT_mutex_unlock(saved_entry_mutex);
 	return (r);
 }
@@ -159,9 +147,11 @@ inode_create(hg_handle_t h)
 	if (stat_hash && in.key.s <= MAX_KEY_SIZE) {
 		if (saved_entry_enter(in.key.v, in.key.s, in.mode,
 			in.chunk_size))
+			/* new entry, but check hash just in case */
 			hash_data = (struct hash_entry **)hash_find(stat_hash,
 				in.key.v, in.key.s);
 		else
+			/* enter entry into hash */
 			hash_data = (struct hash_entry **)hash_get(stat_hash,
 				in.key.v, in.key.s);
 		if (hash_data) {
@@ -173,16 +163,16 @@ inode_create(hg_handle_t h)
 					err = KV_SUCCESS;
 				}
 			} else {
+				/* new entry */
 				*hash_data = malloc(sizeof(**hash_data));
 				if (*hash_data) {
 					(*hash_data)->mode = in.mode;
 					(*hash_data)->chunk_size =
 						in.chunk_size;
-				}
-				if (saved_entry_same(*hash_data))
 					err = KV_SUCCESS;
-				log_debug("%s: insert %s (%d)", diag,
-					(char *)in.key.v, err);
+					log_debug("%s: insert %s (%d)", diag,
+						(char *)in.key.v, err);
+				}
 			}
 			hash_release(stat_hash, (void **)hash_data);
 		}
