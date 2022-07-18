@@ -25,6 +25,7 @@ static int chfs_chunk_size = 4096;
 static int chfs_rdma_thresh = 2048;
 static int chfs_rpc_timeout_msec = 0;		/* no timeout */
 static int chfs_node_list_cache_timeout = 120;	/* 120 seconds */
+static int chfs_buf_size = 0;
 
 static ABT_mutex fd_mutex;
 static int fd_table_size;
@@ -33,14 +34,26 @@ static struct fd_table {
 	mode_t mode;
 	int chunk_size;
 	off_t pos;
+	char *buf;
+	off_t buf_off, buf_pos;
+	int buf_dirty;
 	ABT_mutex mutex;
 } *fd_table;
 
 void
 chfs_set_chunk_size(int chunk_size)
 {
+	if (chunk_size <= 0)
+		return;
 	log_info("chfs_set_chunk_size: %d", chunk_size);
 	chfs_chunk_size = chunk_size;
+}
+
+void
+chfs_set_buf_size(int buf_size)
+{
+	log_info("chfs_set_buf_size: %d", buf_size);
+	chfs_buf_size = buf_size;
 }
 
 void
@@ -76,6 +89,7 @@ fd_table_init()
 
 	for (i = 0; i < fd_table_size; ++i) {
 		fd_table[i].path = NULL;
+		fd_table[i].buf = NULL;
 		ABT_mutex_create(&fd_table[i].mutex);
 	}
 	ABT_mutex_create(&fd_mutex);
@@ -89,6 +103,8 @@ fd_table_term()
 	for (i = 0; i < fd_table_size; ++i) {
 		free(fd_table[i].path);
 		fd_table[i].path = NULL;
+		free(fd_table[i].buf);
+		fd_table[i].buf = NULL;
 		ABT_mutex_free(&fd_table[i].mutex);
 	}
 	fd_table_size = 0;
@@ -186,7 +202,7 @@ chfs_init(const char *server)
 	margo_instance_id mid;
 	size_t client_size = sizeof(chfs_client);
 	hg_addr_t client_addr;
-	char *chunk_size, *rdma_thresh, *timeout, *proto;
+	char *size, *rdma_thresh, *timeout, *proto;
 	char *log_priority;
 	int max_log_level;
 	hg_return_t ret;
@@ -206,9 +222,13 @@ chfs_init(const char *server)
 		log_fatal("chfs_init: no server");
 	log_info("chfs_init: server %s", server);
 
-	chunk_size = getenv("CHFS_CHUNK_SIZE");
-	if (!IS_NULL_STRING(chunk_size))
-		chfs_set_chunk_size(atoi(chunk_size));
+	size = getenv("CHFS_CHUNK_SIZE");
+	if (!IS_NULL_STRING(size))
+		chfs_set_chunk_size(atoi(size));
+
+	size = getenv("CHFS_BUF_SIZE");
+	if (!IS_NULL_STRING(size))
+		chfs_set_buf_size(atoi(size));
 
 	rdma_thresh = getenv("CHFS_RDMA_THRESH");
 	if (!IS_NULL_STRING(rdma_thresh))
@@ -296,6 +316,7 @@ create_fd_unlocked(const char *path, mode_t mode, int chunk_size)
 		fd_table_size *= 2;
 		for (i = fd; i < fd_table_size; ++i) {
 			fd_table[i].path = NULL;
+			fd_table[i].buf = NULL;
 			ABT_mutex_create(&fd_table[i].mutex);
 		}
 	}
@@ -304,9 +325,20 @@ create_fd_unlocked(const char *path, mode_t mode, int chunk_size)
 		log_error("create_fd: %s, no memory", path);
 		return (-1);
 	}
+	if (chfs_buf_size > 0) {
+		fd_table[fd].buf = malloc(chfs_buf_size);
+		if (fd_table[fd].buf == NULL) {
+			free(fd_table[fd].path);
+			fd_table[fd].path = NULL;
+			log_error("create_fd: %s, no memory", path);
+			return (-1);
+		}
+	}
 	fd_table[fd].mode = mode;
 	fd_table[fd].chunk_size = chunk_size;
 	fd_table[fd].pos = 0;
+	fd_table[fd].buf_pos = 0;
+	fd_table[fd].buf_dirty = 0;
 	return (fd);
 }
 
@@ -322,10 +354,12 @@ create_fd(const char *path, mode_t mode, int chunk_size)
 }
 
 static void
-clear_fd_table_unlocked(struct fd_table *tab)
+clear_fd_table(struct fd_table *tab)
 {
 	free(tab->path);
 	tab->path = NULL;
+	free(tab->buf);
+	tab->buf = NULL;
 }
 
 static int
@@ -358,7 +392,7 @@ clear_fd_unlocked(int fd)
 {
 	if (check_fd_unlocked(fd))
 		return (-1);
-	clear_fd_table_unlocked(&fd_table[fd]);
+	clear_fd_table(&fd_table[fd]);
 	return (0);
 }
 
@@ -382,17 +416,151 @@ get_fd_table(int fd)
 }
 
 static off_t
-fd_pos_fetch_and_add(int fd, size_t size)
+fd_pos_set(int fd, off_t pos)
 {
+	struct fd_table *tab = get_fd_table(fd);
+
+	if (tab == NULL)
+		return (0); /* EBADF */
+	ABT_mutex_lock(tab->mutex);
+	tab->pos = pos;
+	ABT_mutex_unlock(tab->mutex);
+	return (pos);
+}
+
+static off_t
+fd_pos_get(int fd)
+{
+	struct fd_table *tab = get_fd_table(fd);
 	off_t pos;
 
-	if (check_fd(fd))
+	if (tab == NULL)
 		return (0); /* EBADF */
-	ABT_mutex_lock(fd_table[fd].mutex);
-	pos = fd_table[fd].pos;
-	fd_table[fd].pos = pos + size;
-	ABT_mutex_unlock(fd_table[fd].mutex);
+	ABT_mutex_lock(tab->mutex);
+	pos = tab->pos;
+	ABT_mutex_unlock(tab->mutex);
 	return (pos);
+}
+
+static off_t
+fd_pos_fetch_and_add(int fd, size_t size)
+{
+	struct fd_table *tab = get_fd_table(fd);
+	off_t pos;
+
+	if (tab == NULL)
+		return (0); /* EBADF */
+	ABT_mutex_lock(tab->mutex);
+	pos = tab->pos;
+	tab->pos = pos + size;
+	ABT_mutex_unlock(tab->mutex);
+	return (pos);
+}
+
+static ssize_t
+chfs_pwrite_internal(int fd, const void *buf, size_t size, off_t offset);
+
+static void
+fd_flush_unlocked(int fd)
+{
+	struct fd_table *tab = get_fd_table(fd);
+
+	if (tab->buf_pos > 0 && tab->buf_dirty == 1)
+		chfs_pwrite_internal(fd, tab->buf, tab->buf_pos, tab->buf_off);
+	tab->buf_pos = tab->buf_dirty = 0;
+}
+
+static void
+fd_flush(int fd)
+{
+	struct fd_table *tab = get_fd_table(fd);
+
+	ABT_mutex_lock(tab->mutex);
+	fd_flush_unlocked(fd);
+	ABT_mutex_unlock(tab->mutex);
+}
+
+static int
+fd_write(int fd, const void *buf, size_t size, off_t offset)
+{
+	struct fd_table *tab = get_fd_table(fd);
+	size_t ss = 0, s;
+	ssize_t buf_off;
+
+	if (tab == NULL)
+		return (0); /* EBADF */
+	if (tab->buf == NULL || size > chfs_buf_size) {
+		/* large message, skip buffering */
+		return (0);
+	}
+	ABT_mutex_lock(tab->mutex);
+	while (size > ss) {
+		if (tab->buf_pos == 0)
+			tab->buf_off = offset;
+		buf_off = offset - tab->buf_off;
+		if (buf_off >= 0 && buf_off <= tab->buf_pos) {
+			s = chfs_buf_size - buf_off;
+			if (s > size - ss)
+				s = size - ss;
+			if (s > 0) {
+				memcpy(&tab->buf[buf_off], buf + ss, s);
+				tab->buf_dirty = 1;
+				offset += s;
+				if (tab->buf_pos < buf_off + s)
+					tab->buf_pos = buf_off + s;
+				ss += s;
+			}
+			if (tab->buf_pos == chfs_buf_size)
+				fd_flush_unlocked(fd);
+		} else
+			fd_flush_unlocked(fd);
+	}
+	ABT_mutex_unlock(tab->mutex);
+	return (ss);
+}
+
+static ssize_t
+chfs_pread_internal(int fd, void *buf, size_t size, off_t offset);
+
+static ssize_t
+fd_read(int fd, void *buf, size_t size, off_t offset)
+{
+	struct fd_table *tab = get_fd_table(fd);
+	size_t ss = 0;
+	ssize_t s, buf_off;
+
+	if (tab == NULL)
+		return (0); /* EBADF */
+	if (tab->buf == NULL || size > chfs_buf_size) {
+		/* large message, skip buffering */
+		return (0);
+	}
+	ABT_mutex_lock(tab->mutex);
+	while (size > ss) {
+		if (tab->buf_pos == 0) {
+			tab->buf_off = offset;
+			s = chfs_pread_internal(fd, tab->buf, chfs_buf_size,
+				tab->buf_off);
+			if (s > 0)
+				tab->buf_pos = s;
+			else
+				break;
+		}
+		buf_off = offset - tab->buf_off;
+		if (buf_off >= 0 && buf_off < tab->buf_pos) {
+			s = tab->buf_pos - buf_off;
+			if (s > size - ss)
+				s = size - ss;
+			memcpy(buf + ss, &tab->buf[buf_off], s);
+			offset += s;
+			ss += s;
+			if (buf_off + s == tab->buf_pos)
+				fd_flush_unlocked(fd);
+		} else
+			fd_flush_unlocked(fd);
+	}
+	ABT_mutex_unlock(tab->mutex);
+	return (ss);
 }
 
 static hg_return_t
@@ -716,18 +884,20 @@ path_index(const char *path, int index, size_t *size)
 int
 chfs_fsync(int fd)
 {
+	fd_flush(fd);
 	return (0);
 }
 
 int
 chfs_close(int fd)
 {
+	fd_flush(fd);
 	return (clear_fd(fd));
 }
 
 #ifndef ASYNC_ACCESS
-ssize_t
-chfs_pwrite(int fd, const void *buf, size_t size, off_t offset)
+static ssize_t
+chfs_pwrite_internal(int fd, const void *buf, size_t size, off_t offset)
 {
 	struct fd_table *tab = get_fd_table(fd);
 	void *path;
@@ -739,6 +909,8 @@ chfs_pwrite(int fd, const void *buf, size_t size, off_t offset)
 
 	if (tab == NULL)
 		return (-1);
+	if (size == 0)
+		return (0);
 
 	chunk_size = tab->chunk_size;
 	mode = tab->mode;
@@ -759,7 +931,7 @@ chfs_pwrite(int fd, const void *buf, size_t size, off_t offset)
 		return (-1);
 	}
 	if (size - s > 0) {
-		ss = chfs_pwrite(fd, buf + s, size - s, offset + s);
+		ss = chfs_pwrite_internal(fd, buf + s, size - s, offset + s);
 		if (ss < 0)
 			return (-1);
 	}
@@ -768,8 +940,8 @@ chfs_pwrite(int fd, const void *buf, size_t size, off_t offset)
 
 #else
 
-ssize_t
-chfs_pwrite(int fd, const void *buf, size_t size, off_t offset)
+static ssize_t
+chfs_pwrite_internal(int fd, const void *buf, size_t size, off_t offset)
 {
 	struct fd_table *tab = get_fd_table(fd);
 	void *path, *p;
@@ -858,6 +1030,17 @@ chfs_pwrite(int fd, const void *buf, size_t size, off_t offset)
 #endif
 
 ssize_t
+chfs_pwrite(int fd, const void *buf, size_t size, off_t offset)
+{
+	ssize_t s;
+
+	s = fd_write(fd, buf, size, offset);
+	if (s > 0)
+		return (s);
+	return (chfs_pwrite_internal(fd, buf, size, offset));
+}
+
+ssize_t
 chfs_write(int fd, const void *buf, size_t size)
 {
 	off_t pos;
@@ -869,7 +1052,7 @@ chfs_write(int fd, const void *buf, size_t size)
 
 #ifndef ASYNC_ACCESS
 ssize_t
-chfs_pread(int fd, void *buf, size_t size, off_t offset)
+chfs_pread_internal(int fd, void *buf, size_t size, off_t offset)
 {
 	struct fd_table *tab = get_fd_table(fd);
 	void *path;
@@ -899,7 +1082,7 @@ chfs_pread(int fd, void *buf, size_t size, off_t offset)
 	if (local_pos + s < chunk_size)
 		return (s);
 	if (size - s > 0) {
-		ss = chfs_pread(fd, buf + s, size - s, offset + s);
+		ss = chfs_pread_internal(fd, buf + s, size - s, offset + s);
 		if (ss < 0)
 			ss = 0;
 	}
@@ -909,7 +1092,7 @@ chfs_pread(int fd, void *buf, size_t size, off_t offset)
 #else
 
 ssize_t
-chfs_pread(int fd, void *buf, size_t size, off_t offset)
+chfs_pread_internal(int fd, void *buf, size_t size, off_t offset)
 {
 	struct fd_table *tab = get_fd_table(fd);
 	void *path, *p;
@@ -995,6 +1178,17 @@ chfs_pread(int fd, void *buf, size_t size, off_t offset)
 #endif
 
 ssize_t
+chfs_pread(int fd, void *buf, size_t size, off_t offset)
+{
+	ssize_t s;
+
+	s = fd_read(fd, buf, size, offset);
+	if (s > 0)
+		return (s);
+	return (chfs_pread_internal(fd, buf, size, offset));
+}
+
+ssize_t
 chfs_read(int fd, void *buf, size_t size)
 {
 	off_t pos, pos1;
@@ -1026,10 +1220,11 @@ chfs_seek(int fd, off_t off, int whence)
 		return (-1);
 	switch (whence) {
 	case SEEK_SET:
-		pos = off;
+		pos = fd_pos_set(fd, off);
 		break;
 	case SEEK_CUR:
-		pos = tab->pos + off;
+		fd_pos_fetch_and_add(fd, off);
+		pos = fd_pos_get(fd);
 		break;
 	case SEEK_END:
 	default:
@@ -1037,8 +1232,6 @@ chfs_seek(int fd, off_t off, int whence)
 	}
 	if (pos < 0)
 		errno = EINVAL;
-	else
-		tab->pos = pos;
 	return (pos);
 }
 
