@@ -63,7 +63,7 @@ static __thread int __r;
 #endif
 
 static int
-fs_err(int err)
+fs_err(int err, const char *diag)
 {
 	if (err >= 0)
 		return (KV_SUCCESS);
@@ -78,7 +78,7 @@ fs_err(int err)
 	case ENOTSUP:
 		return (KV_ERR_NOT_SUPPORTED);
 	default:
-		log_notice("fs_err: %s", strerror(-err));
+		log_notice("fs_err (%s): %s", diag, strerror(-err));
 		return (KV_ERR_UNKNOWN);
 	}
 }
@@ -161,13 +161,13 @@ set_chunk_size(const char *path, size_t size)
 	r = setxattr(path, FS_XATTR_CHUNK_SIZE, &size, sizeof(size), 0);
 	if (r == -1) {
 		r = -errno;
-		log_error("%s: %s", diag, strerror(errno));
+		log_error("%s: %s: %s", diag, path, strerror(errno));
 	}
 #else
 	fd = open(path, O_WRONLY, 0);
 	if (fd == -1) {
 		r = -errno;
-		log_error("%s: %s", diag, strerror(errno));
+		log_error("%s: %s: %s", diag, path, strerror(errno));
 	} else {
 		mdata.chunk_size = size;
 		r = write(fd, &mdata, msize);
@@ -199,13 +199,13 @@ get_chunk_size(const char *path, size_t *size)
 	r = getxattr(path, FS_XATTR_CHUNK_SIZE, size, sizeof(*size));
 	if (r == -1) {
 		r = -errno;
-		log_info("%s: %s", diag, strerror(errno));
+		log_info("%s: %s: %s", diag, path, strerror(errno));
 	}
 #else
 	fd = open(path, O_RDONLY, 0);
 	if (fd == -1) {
 		r = -errno;
-		log_info("%s: %s", diag, strerror(errno));
+		log_info("%s: %s: %s", diag, path, strerror(errno));
 	} else {
 		r = read(fd, &mdata, msize);
 		if (r == -1) {
@@ -288,9 +288,9 @@ fs_inode_create(char *key, size_t key_size, uint32_t uid, uint32_t gid,
 	} else
 		r = -ENOTSUP;
 	if (r < 0)
-		log_error("%s: %s", diag, strerror(-r));
+		log_error("%s: %s (%o): %s", diag, p, mode, strerror(-r));
 
-	return (fs_err(r));
+	return (fs_err(r, diag));
 }
 
 int
@@ -358,7 +358,7 @@ fs_inode_stat(char *key, size_t key_size, struct fs_stat *st)
 	st->ctime = sb.st_ctim;
 err:
 	log_debug("%s: %d", diag, r);
-	return (fs_err(r));
+	return (fs_err(r, diag));
 }
 
 int
@@ -390,10 +390,10 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 		*size = r;
 err:
 	if (r < 0)
-		log_error("%s: %s", diag, strerror(-r));
+		log_error("%s: %s: %s", diag, p, strerror(-r));
 	else
-		log_debug("%s: ret %d", diag, r);
-	return (fs_err(r));
+		log_debug("%s: %s: ret %d", diag, p, r);
+	return (fs_err(r, diag));
 }
 
 int
@@ -440,7 +440,7 @@ fs_inode_read(char *key, size_t key_size, void *buf, size_t *size,
 	*size = r;
 done:
 	log_debug("%s: ret %d", diag, r);
-	return (fs_err(r));
+	return (fs_err(r, diag));
 }
 
 static char *
@@ -513,12 +513,13 @@ fs_inode_truncate(char *key, size_t key_size, off_t len)
 {
 	char *p = key_to_path(key, key_size);
 	int r;
+	static const char diag[] = "fs_inode_truncate";
 
-	log_debug("fs_inode_truncate: %s len %ld", p, len);
+	log_debug("%s: %s len %ld", diag, p, len);
 	r = truncate(p, len + msize);
 	if (r == -1)
 		r = -errno;
-	return (fs_err(r));
+	return (fs_err(r, diag));
 }
 
 int
@@ -527,10 +528,11 @@ fs_inode_remove(char *key, size_t key_size)
 	char *p = key_to_path(key, key_size);
 	struct stat sb;
 	int r;
+	static const char diag[] = "fs_inode_remove";
 
-	log_debug("fs_inode_remove: %s", p);
+	log_debug("%s: %s", diag, p);
 	if (lstat(p, &sb) == -1)
-		return (fs_err(-errno));
+		return (fs_err(-errno, diag));
 
 	if (S_ISDIR(sb.st_mode))
 		r = rmdir_r(p);
@@ -538,7 +540,7 @@ fs_inode_remove(char *key, size_t key_size)
 		r = unlink(p);
 	if (r == -1)
 		r = -errno;
-	return (fs_err(r));
+	return (fs_err(r, diag));
 }
 
 int
@@ -550,8 +552,9 @@ fs_inode_readdir(char *path, void (*cb)(struct dirent *, struct stat *, void *),
 	DIR *dp;
 	struct stat sb;
 	int r;
+	static const char diag[] = "fs_inode_readdir";
 
-	log_debug("fs_inode_readdir: %s", p);
+	log_debug("%s: %s", diag, p);
 	dp = opendir(p);
 	if (dp != NULL) {
 		r = 0;
@@ -569,7 +572,7 @@ fs_inode_readdir(char *path, void (*cb)(struct dirent *, struct stat *, void *),
 	} else
 		r = -errno;
 
-	return (fs_err(r));
+	return (fs_err(r, diag));
 }
 
 int
