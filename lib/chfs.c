@@ -1213,6 +1213,7 @@ chfs_seek(int fd, off_t off, int whence)
 {
 	struct fd_table *tab = get_fd_table(fd);
 	off_t pos = -1;
+	struct stat sb;
 
 	if (tab == NULL)
 		return (-1);
@@ -1225,6 +1226,8 @@ chfs_seek(int fd, off_t off, int whence)
 		pos = fd_pos_get(fd);
 		break;
 	case SEEK_END:
+		if (chfs_stat(tab->path, &sb) == 0)
+			pos = fd_pos_set(fd, sb.st_size + off);
 	default:
 		break;
 	}
