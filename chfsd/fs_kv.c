@@ -77,7 +77,7 @@ fs_inode_create_data(char *key, size_t key_size, uint32_t uid, uint32_t gid,
 	r = kv_put(key, key_size, inode, fs_msize + chunk_size);
 	free(inode);
 	if (r != KV_SUCCESS)
-		log_error("%s: %s", diag, kv_err_string(r));
+		log_error("%s: %s: %s", diag, key, kv_err_string(r));
 	return (r);
 }
 
@@ -98,7 +98,7 @@ fs_inode_create_stat(char *key, size_t key_size, struct fs_stat *st,
 
 	r = kv_put(key, key_size, (void *)buf, size);
 	if (r != KV_SUCCESS)
-		log_error("%s: %s", diag, kv_err_string(r));
+		log_error("%s: %s: %s", diag, key, kv_err_string(r));
 	return (r);
 }
 
@@ -135,7 +135,7 @@ fs_inode_update_size(char *key, size_t key_size, size_t size)
 	ss = sizeof(size);
 	r = kv_update(key, key_size, offsetof(struct inode, size), &size, &ss);
 	if (r != KV_SUCCESS)
-		log_error("%s: %s", diag, kv_err_string(r));
+		log_error("%s: %s: %s", diag, key, kv_err_string(r));
 	return (r);
 }
 
@@ -153,7 +153,7 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 		r = fs_inode_create_data(key, key_size, 0, 0, mode, chunk_size,
 			buf, *size, offset);
 		if (r != KV_SUCCESS)
-			log_error("%s: %s", diag, kv_err_string(r));
+			log_error("%s: %s: %s", diag, key, kv_err_string(r));
 		return (r);
 	}
 	r = kv_update(key, key_size, fs_msize + offset, (void *)buf, size);
@@ -163,7 +163,7 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 			r = fs_inode_update_size(key, key_size, s);
 	}
 	if (r != KV_SUCCESS)
-		log_error("%s: %s", diag, kv_err_string(r));
+		log_error("%s: %s: %s", diag, key, kv_err_string(r));
 	return (r);
 }
 
@@ -201,18 +201,18 @@ fs_inode_truncate(char *key, size_t key_size, off_t len)
 
 	r = kv_pget(key, key_size, 0, &inode, &s);
 	if (r != KV_SUCCESS) {
-		log_error("%s: %s", diag, kv_err_string(r));
+		log_error("%s: %s: %s", diag, key, kv_err_string(r));
 		return (r);
 	}
 	if (inode.chunk_size < len || len < 0) {
 		r = KV_ERR_OUT_OF_RANGE;
-		log_error("%s: %s", diag, kv_err_string(r));
+		log_error("%s: %s: %s", diag, key, kv_err_string(r));
 		return (r);
 	}
 	if (inode.size != len)
 		r = fs_inode_update_size(key, key_size, len);
 	if (r != KV_SUCCESS)
-		log_error("%s: %s", diag, kv_err_string(r));
+		log_error("%s: %s: %s", diag, key, kv_err_string(r));
 	return (r);
 }
 
