@@ -554,8 +554,6 @@ fd_read(int fd, void *buf, size_t size, off_t offset)
 			memcpy(buf + ss, &tab->buf[buf_off], s);
 			offset += s;
 			ss += s;
-			if (buf_off + s == tab->buf_pos)
-				fd_flush_unlocked(fd);
 		} else
 			fd_flush_unlocked(fd);
 	}
