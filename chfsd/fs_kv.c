@@ -424,7 +424,9 @@ fs_inode_flush(void *key, size_t key_size)
 		free(arg);
 	}
 	free(dst);
-	if (r != KV_SUCCESS)
+	if (r == KV_ERR_NO_ENTRY)
+		log_info("%s: %s", diag, kv_err_string(r));
+	else if (r != KV_SUCCESS)
 		log_error("%s: %s", diag, kv_err_string(r));
 	return (r);
 }
