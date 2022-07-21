@@ -100,6 +100,7 @@ CHFS is a parallel consistent hashing file system created instantly using node-l
 - CHFS_SERVER - server addresses separated by ','
 - CHFS_BACKEND_PATH - backend path
 - CHFS_CHUNK_SIZE - chunk size
+- CHFS_BUF_SIZE - buffer size
 - CHFS_RDMA_THRESH - RDMA transfer is used when the size is larger than or equal to CHFS_RDMA_THRESH
 - CHFS_RPC_TIMEOUT_MSEC - RPC timeout in milliseconds
 - CHFS_NODE_LIST_CACHE_TIMEOUT - node list cache timeout in seconds
@@ -136,6 +137,7 @@ The following APIs are supported.
     int chfs_term();
     const char *chfs_version();
     void chfs_set_chunk_size(int chunk_size);
+    void chfs_set_buf_size(int buf_size);
     void chfs_set_rdma_thresh(int thresh);
     void chfs_set_rpc_timeout_msec(int timeout_msec);
     void chfs_set_node_list_cache_timeout(int timeout_sec);

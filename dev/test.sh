@@ -5,7 +5,7 @@ set -eux
 LANG=C
 MDIR=/tmp/a
 
-eval $(chfsctl -h hosts -m $MDIR -b $PWD/backend start)
+eval $(chfsctl -h hosts -m $MDIR -b $PWD/backend -L log start)
 chlist
 cp chfs/configure backend
 diff chfs/configure $MDIR/configure

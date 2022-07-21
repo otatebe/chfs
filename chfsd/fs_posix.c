@@ -66,7 +66,7 @@ static __thread int __r;
 #endif
 
 static int
-fs_err(int err)
+fs_err(int err, const char *diag)
 {
 	if (err >= 0)
 		return (KV_SUCCESS);
@@ -81,7 +81,7 @@ fs_err(int err)
 	case ENOTSUP:
 		return (KV_ERR_NOT_SUPPORTED);
 	default:
-		log_notice("fs_err: %s", strerror(-err));
+		log_notice("fs_err (%s): %s", diag, strerror(-err));
 		return (KV_ERR_UNKNOWN);
 	}
 }
@@ -344,11 +344,11 @@ fs_inode_create(char *key, size_t key_size, uint32_t uid, uint32_t gid,
 	} else
 		r = -ENOTSUP;
 	if (r < 0)
-		log_error("%s: %s", diag, strerror(-r));
+		log_error("%s: %s (%o): %s", diag, p, mode, strerror(-r));
 	else if (!(flags & CHFS_FS_CACHE))
 		fs_inode_flush_enq(key_save, key_size);
 	free(key_save);
-	return (fs_err(r));
+	return (fs_err(r, diag));
 }
 
 int
@@ -419,7 +419,7 @@ fs_inode_stat(char *key, size_t key_size, struct fs_stat *st)
 	st->ctime = sb.st_ctim;
 err:
 	log_debug("%s: %d", diag, r);
-	return (fs_err(r));
+	return (fs_err(r, diag));
 }
 
 int
@@ -467,11 +467,11 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 		*size = r;
 err:
 	if (r < 0)
-		log_error("%s: %s", diag, strerror(-r));
+		log_error("%s: %s: %s", diag, p, strerror(-r));
 	else
-		log_debug("%s: ret %d", diag, r);
+		log_debug("%s: %s: ret %d", diag, p, r);
 	free(key_save);
-	return (fs_err(r));
+	return (fs_err(r, diag));
 }
 
 int
@@ -519,7 +519,7 @@ fs_inode_read(char *key, size_t key_size, void *buf, size_t *size,
 	*size = r;
 done:
 	log_debug("%s: ret %d", diag, r);
-	return (fs_err(r));
+	return (fs_err(r, diag));
 }
 
 static char *
@@ -592,6 +592,7 @@ fs_inode_truncate(char *key, size_t key_size, off_t len)
 {
 	char *p, *key_save;
 	int r, fd;
+	static const char diag[] = "fs_inode_truncate";
 
 	key_save = malloc(key_size);
 	if (key_save == NULL)
@@ -599,7 +600,7 @@ fs_inode_truncate(char *key, size_t key_size, off_t len)
 	memcpy(key_save, key, key_size);
 
 	p = key_to_path(key, key_size);
-	log_debug("fs_inode_truncate: %s len %ld", p, len);
+	log_debug("%s: %s len %ld", diag, p, len);
 	r = truncate(p, len + msize);
 	if (r == -1)
 		r = -errno;
@@ -613,7 +614,7 @@ fs_inode_truncate(char *key, size_t key_size, off_t len)
 			r = -errno;
 	}
 	free(key_save);
-	return (fs_err(r));
+	return (fs_err(r, diag));
 }
 
 int
@@ -622,10 +623,11 @@ fs_inode_remove(char *key, size_t key_size)
 	char *p = key_to_path(key, key_size);
 	struct stat sb;
 	int r;
+	static const char diag[] = "fs_inode_remove";
 
-	log_debug("fs_inode_remove: %s", p);
+	log_debug("%s: %s", diag, p);
 	if (lstat(p, &sb) == -1)
-		return (fs_err(-errno));
+		return (fs_err(-errno, diag));
 
 	if (S_ISDIR(sb.st_mode))
 		r = rmdir_r(p);
@@ -633,7 +635,7 @@ fs_inode_remove(char *key, size_t key_size)
 		r = unlink(p);
 	if (r == -1)
 		r = -errno;
-	return (fs_err(r));
+	return (fs_err(r, diag));
 }
 
 int
@@ -647,8 +649,9 @@ fs_inode_readdir(char *path, void (*cb)(struct dirent *, struct stat *, void *),
 	int16_t flags;
 	struct stat sb;
 	int r, r2;
+	static const char diag[] = "fs_inode_readdir";
 
-	log_debug("fs_inode_readdir: %s", p);
+	log_debug("%s: %s", diag, p);
 	dp = opendir(p);
 	if (dp != NULL) {
 		r = 0;
@@ -673,7 +676,7 @@ fs_inode_readdir(char *path, void (*cb)(struct dirent *, struct stat *, void *),
 	} else
 		r = -errno;
 
-	return (fs_err(r));
+	return (fs_err(r, diag));
 }
 
 int
@@ -725,7 +728,7 @@ fs_inode_flush(void *key, size_t key_size)
 
 	p = key_to_path(key, key_size);
 	if (lstat(p, &sb) == -1) {
-		r = fs_err(-errno);
+		r = fs_err(-errno, diag);
 		goto free_dst;
 	}
 	if (S_ISREG(sb.st_mode))
@@ -748,7 +751,7 @@ fs_inode_flush(void *key, size_t key_size)
 		goto free_dst;
 	}
 	if (r == -1)
-		r = fs_err(-errno);
+		r = fs_err(-errno, diag);
 	else
 		r = KV_SUCCESS;
 	goto free_dst;
@@ -757,7 +760,7 @@ regular_file:
 	src_fd = r = fs_open(p, O_RDONLY, sb.st_mode, &chunk_size,
 		&cache_flags, NULL);
 	if (r < 0) {
-		r = fs_err(r);
+		r = fs_err(r, diag);
 		goto free_dst;
 	}
 	if (!(cache_flags & CHFS_FS_DIRTY)) {
@@ -777,11 +780,11 @@ regular_file:
 		flags |= O_CREAT;
 
 	if ((dst_fd = open(dst, flags, sb.st_mode)) == -1)
-		r = fs_err(-errno);
+		r = fs_err(-errno, diag);
 	else {
 		r = pread(src_fd, buf, sb.st_size - msize, msize);
 		if (r == -1)
-			r = fs_err(-errno);
+			r = fs_err(-errno, diag);
 		else if (r != sb.st_size - msize) {
 			log_error("%s: %d of %ld bytes read", diag, r,
 				sb.st_size - msize);
@@ -789,7 +792,7 @@ regular_file:
 		} else {
 			r = pwrite(dst_fd, buf, r, index * chunk_size);
 			if (r == -1)
-				r = fs_err(-errno);
+				r = fs_err(-errno, diag);
 			else if (r != sb.st_size - msize) {
 				log_error("%s: %d of %ld bytes written", diag,
 					r, sb.st_size - msize);
@@ -797,7 +800,7 @@ regular_file:
 			} else if (r < chunk_size) {
 				r = ftruncate(dst_fd, index * chunk_size + r);
 				if (r == -1)
-					r = fs_err(-errno);
+					r = fs_err(-errno, diag);
 			} else
 				r = KV_SUCCESS;
 		}
@@ -810,7 +813,7 @@ free_dst:
 	if (r == KV_SUCCESS && S_ISREG(sb.st_mode)) {
 		r = set_metadata(p, chunk_size,
 		    (cache_flags & ~CHFS_FS_DIRTY) | CHFS_FS_CACHE);
-		r = fs_err(r);
+		r = fs_err(r, diag);
 	}
 	if (r != KV_SUCCESS)
 		log_error("%s: %s", diag, kv_err_string(r));

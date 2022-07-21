@@ -25,6 +25,9 @@ CHFS_BACKEND_PATH
 CHFS_CHUNK_SIZE
 : chunk size.  Default is 4 KiB.
 
+CHFS_BUF_SIZE
+: buffer size.  Default is 0.
+
 CHFS_RDMA_THRESH
 : RDMA transfer is used when the size is larger than or equal to CHFS_RDMA_THRESH.  Default is 2 KiB.
 
