@@ -421,7 +421,11 @@ fd_pos_set(int fd, off_t pos)
 	struct fd_table *tab = get_fd_table(fd);
 
 	if (tab == NULL)
-		return (0); /* EBADF */
+		return (-1); /* EBADF */
+	if (pos < 0) {
+		errno = EINVAL;
+		return (-1);
+	}
 	ABT_mutex_lock(tab->mutex);
 	tab->pos = pos;
 	ABT_mutex_unlock(tab->mutex);
@@ -435,7 +439,7 @@ fd_pos_get(int fd)
 	off_t pos;
 
 	if (tab == NULL)
-		return (0); /* EBADF */
+		return (-1); /* EBADF */
 	ABT_mutex_lock(tab->mutex);
 	pos = tab->pos;
 	ABT_mutex_unlock(tab->mutex);
@@ -443,16 +447,21 @@ fd_pos_get(int fd)
 }
 
 static off_t
-fd_pos_fetch_and_add(int fd, size_t size)
+fd_pos_fetch_and_add(int fd, off_t size)
 {
 	struct fd_table *tab = get_fd_table(fd);
 	off_t pos;
 
 	if (tab == NULL)
-		return (0); /* EBADF */
+		return (-1); /* EBADF */
 	ABT_mutex_lock(tab->mutex);
 	pos = tab->pos;
-	tab->pos = pos + size;
+	if (pos + size >= 0)
+		tab->pos = pos + size;
+	else {
+		errno = EINVAL;
+		pos = -1;
+	}
 	ABT_mutex_unlock(tab->mutex);
 	return (pos);
 }
@@ -1192,7 +1201,7 @@ chfs_read(int fd, void *buf, size_t size)
 	off_t pos, pos1;
 	ssize_t s;
 
-	pos = fd_pos_fetch_and_add(fd, 0);
+	pos = fd_pos_get(fd);
 	/* dont care even if EBADF */
 	s = chfs_pread(fd, buf, size, pos);
 	if (s > 0) {
@@ -1222,12 +1231,17 @@ chfs_seek(int fd, off_t off, int whence)
 		pos = fd_pos_set(fd, off);
 		break;
 	case SEEK_CUR:
-		fd_pos_fetch_and_add(fd, off);
-		pos = fd_pos_get(fd);
+		pos = fd_pos_fetch_and_add(fd, off);
+		if (pos >= 0)
+			pos = fd_pos_get(fd);
 		break;
 	case SEEK_END:
-		if (chfs_stat(tab->path, &sb) == 0)
-			pos = fd_pos_set(fd, sb.st_size + off);
+		pos = fd_pos_get(fd);
+		if (chfs_stat(tab->path, &sb) == 0) {
+			if (pos < sb.st_size)
+				pos = sb.st_size;
+			pos = fd_pos_set(fd, pos + off);
+		}
 	default:
 		break;
 	}
