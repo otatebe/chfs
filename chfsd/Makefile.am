@@ -13,7 +13,7 @@ chfsd_SOURCES += fs_server_posix.c fs_posix.c
 endif
 
 AM_CPPFLAGS = -Wall -pthread -I$(top_srcdir)/lib @MARGO_CFLAGS@ @OPENSSL_CFLAGS@
-AM_LDFLAGS = -pthread
+AM_LDFLAGS = -pthread @MARGO_RPATH@
 LDADD = $(top_builddir)/lib/libchfs.la @MARGO_LIBS@ @OPENSSL_LIBS@
 if USE_PMEMKV
 AM_CPPFLAGS += @LIBPMEMKV_CFLAGS@

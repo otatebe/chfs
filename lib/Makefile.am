@@ -8,4 +8,4 @@ libchfs_la_SOURCES = chfs.c chfs_err.c ring_list.c ring_list_rpc.c \
 
 AM_CPPFLAGS = -Wall -pthread
 AM_CFLAGS = @MARGO_CFLAGS@ @OPENSSL_CFLAGS@
-AM_LDFLAGS = -pthread
+AM_LDFLAGS = -pthread @MARGO_RPATH@
