@@ -16,7 +16,7 @@ s1=$(ls -l chfs/configure | awk '{ print $4 }')
 s2=$(ls -l $MDIR/configure | awk '{ print $4 }')
 [ $s1 = $s2 ]
 chfind
-mpirun -x LD_LIBRARY_PATH -x CHFS_SERVER -x CHFS_BACKEND_PATH -x CHFS_SUBDIR_PATH -np 4 -hostfile hosts -map-by node ior -a CHFS -o /tmp/a/test -g
+mpirun -x CHFS_SERVER -x CHFS_BACKEND_PATH -x CHFS_SUBDIR_PATH -np 4 -hostfile hosts -map-by node ior -a CHFS -o /tmp/a/test -g
 chfsctl -h hosts -m $MDIR stop
 
 ls -l backend

@@ -61,6 +61,8 @@ fi
 
 # Checks for libraries.
 PKG_CHECK_MODULES([MARGO], [margo])
+MARGO_RPATH=$(pkg-config --libs-only-L margo | sed 's/-L/-R/g')
+AC_SUBST(MARGO_RPATH)
 PKG_CHECK_MODULES([FUSE], [fuse])
 
 AC_MSG_CHECKING([whether MD5 digest is used])

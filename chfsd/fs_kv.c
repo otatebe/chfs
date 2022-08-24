@@ -11,6 +11,7 @@
 #include "file.h"
 #include "log.h"
 #include "fs_kv.h"
+#include "lock.h"
 
 static struct inode *
 create_inode_all(uint32_t uid, uint32_t gid, uint32_t mode, size_t chunk_size,
@@ -177,11 +178,12 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 	int r;
 	static const char diag[] = "fs_inode_write";
 
-	/* lock chunk */
+	kv_lock(key, key_size);
 	r = kv_pget(key, key_size, 0, &inode, &s);
 	if (r != KV_SUCCESS) {
 		r = fs_inode_create_data(key, key_size, 0, 0, mode, chunk_size,
 			buf, *size, offset);
+		kv_unlock(key, key_size);
 		if (r != KV_SUCCESS)
 			log_error("%s: %s: %s", diag, key, kv_err_string(r));
 		return (r);
@@ -190,12 +192,14 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 	if (r == KV_SUCCESS && !IS_MODE_CACHE(mode))
 		r = fs_inode_dirty(key, key_size, inode.flags);
 	if (r != KV_SUCCESS) {
+		kv_unlock(key, key_size);
 		log_error("%s: %s", diag, kv_err_string(r));
 		return (r);
 	}
 	s = offset + *size;
 	if (inode.size < s)
 		r = fs_inode_update_size(key, key_size, s);
+	kv_unlock(key, key_size);
 	if (r != KV_SUCCESS)
 		log_error("%s: %s: %s", diag, key, kv_err_string(r));
 	else if (!IS_MODE_CACHE(mode))
@@ -235,12 +239,15 @@ fs_inode_truncate(char *key, size_t key_size, off_t len)
 	int r;
 	static const char diag[] = "fs_inode_truncate";
 
+	kv_lock(key, key_size);
 	r = kv_pget(key, key_size, 0, &inode, &s);
 	if (r != KV_SUCCESS) {
+		kv_unlock(key, key_size);
 		log_error("%s: %s: %s", diag, key, kv_err_string(r));
 		return (r);
 	}
 	if (inode.chunk_size < len || len < 0) {
+		kv_unlock(key, key_size);
 		r = KV_ERR_OUT_OF_RANGE;
 		log_error("%s: %s: %s", diag, key, kv_err_string(r));
 		return (r);
@@ -249,11 +256,13 @@ fs_inode_truncate(char *key, size_t key_size, off_t len)
 		r = fs_inode_update_size(key, key_size, len);
 		if (r == KV_SUCCESS)
 			r = fs_inode_dirty(key, key_size, inode.flags);
+		kv_unlock(key, key_size);
 		if (r != KV_SUCCESS)
 			log_error("%s: %s: %s", diag, key, kv_err_string(r));
 		else
 			fs_inode_flush_enq(key, key_size);
-	}
+	} else
+		kv_unlock(key, key_size);
 	return (r);
 }
 
