@@ -7,8 +7,9 @@ typedef uint32_t HASH_T[1];
 
 #define LOCK_TABLE_SIZE	1024
 
-static ABT_mutex_memory kv_lock_mutex[LOCK_TABLE_SIZE] =
-	{ [ 0 ... LOCK_TABLE_SIZE - 1 ] = ABT_MUTEX_INITIALIZER };
+static ABT_mutex_memory kv_lock_mutex[LOCK_TABLE_SIZE] = {
+	[0 ... LOCK_TABLE_SIZE - 1] = ABT_MUTEX_INITIALIZER
+};
 
 void
 kv_lock(char *key, size_t key_size)
