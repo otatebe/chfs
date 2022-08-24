@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <string.h>
 #include <errno.h>
 #include <margo.h>
 #include "config.h"
@@ -1104,7 +1105,7 @@ chfs_pread_internal(int fd, void *buf, size_t size, off_t offset)
 	struct fd_table *tab = get_fd_table(fd);
 	void *path, *p;
 	int index, local_pos, pos, chunk_size, nchunks, i, err;
-	size_t psize, ss = 0;
+	size_t psize, s, ss = 0, sss, may_hole;
 	struct {
 		size_t s;
 		fs_request_t r;
@@ -1165,14 +1166,23 @@ chfs_pread_internal(int fd, void *buf, size_t size, off_t offset)
 		return (-1);
 	}
 
-	ss = 0;
+	ss = sss = may_hole = 0;
 	for (i = 0; i < nchunks; ++i) {
-		ret = chfs_async_rpc_inode_read_wait(buf + ss, &req[i].s, &err,
+		s = req[i].s;
+		ret = chfs_async_rpc_inode_read_wait(buf + ss, &s, &err,
 			&req[i].r);
 		if (ret != HG_SUCCESS)
 			save_ret = ret;
-		else if (err != KV_SUCCESS)
-			continue;
+		else if (err == KV_ERR_NO_ENTRY)
+			may_hole += req[i].s;
+		else if (err == KV_SUCCESS) {
+			if (may_hole > 0) {
+				memset(buf + ss - may_hole, 0, may_hole);
+				sss += may_hole;
+			}
+			sss += s;
+			may_hole = req[i].s - s;
+		}
 		ss += req[i].s;
 	}
 	free(req);
@@ -1180,7 +1190,7 @@ chfs_pread_internal(int fd, void *buf, size_t size, off_t offset)
 		chfs_set_errno(save_ret, KV_SUCCESS);
 		return (-1);
 	}
-	return (ss);
+	return (sss);
 }
 #endif
 
