@@ -100,6 +100,8 @@ if test x$with_abt_io != xno; then
   AC_DEFINE([USE_ABT_IO], [1], [Use abt-io])
   PKG_CHECK_MODULES([ABT_IO], [abt-io])
   AC_CHECK_FUNCS([abt_io_truncate])
+  ABT_IO_RPATH=$(pkg-config --libs-only-L abt-io | sed 's/-L/-R/g')
+  AC_SUBST(ABT_IO_RPATH)
 fi
 
 # Checks for header files.
