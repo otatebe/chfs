@@ -117,14 +117,13 @@ When you use pmemkv, devdax is desirable.  When you use fsdax, the following env
        % git clone https://github.com/hpc/ior.git
        % cd ior
        % ./bootstrap
-       % ./configure --with-chfs=PREFIX [--prefix=PREFIX]
+       % ./configure [--prefix=PREFIX]
        % make
        # make install
 
 1. How to use
 
-       % spack load mochi-margo
-       % mpirun -x PATH -x LD_LIBRARY_PATH -x CHFS_SERVER ior -a CHFS [--chfs.chunk_size=SIZE]
+       % mpirun -x CHFS_SERVER ior -a CHFS [--chfs.chunk_size=SIZE]
 
    Large chunk size, i.e. 1 MiB, should be specified for best performance.
 
