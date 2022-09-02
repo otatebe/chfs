@@ -497,10 +497,11 @@ fd_write(int fd, const void *buf, size_t size, off_t offset)
 	size_t ss = 0, s;
 	ssize_t buf_off;
 
-	if (tab == NULL)
-		return (0); /* EBADF */
-	if (tab->buf == NULL || size > chfs_buf_size) {
+	if (tab == NULL || tab->buf == NULL)
+		return (0);
+	if (size > chfs_buf_size) {
 		/* large message, skip buffering */
+		fd_flush(fd);
 		return (0);
 	}
 	ABT_mutex_lock(tab->mutex);
