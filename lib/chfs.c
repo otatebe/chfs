@@ -1018,7 +1018,7 @@ chfs_pwrite_internal(int fd, const void *buf, size_t size, off_t offset)
 	struct fd_table *tab = get_fd_table(fd);
 	void *path, *p;
 	int index, local_pos, pos, chunk_size, nchunks, i, err, save_errno = 0;
-	mode_t mode;
+	uint32_t emode;
 	size_t psize, ss = 0;
 	struct {
 		size_t s;
@@ -1029,7 +1029,7 @@ chfs_pwrite_internal(int fd, const void *buf, size_t size, off_t offset)
 	if (tab == NULL)
 		return (-1);
 	chunk_size = tab->chunk_size;
-	mode = tab->mode;
+	emode = MODE_FLAGS(tab->mode, tab->cache_flags);
 	p = strdup(tab->path);
 	if (p == NULL)
 		return (-1);
@@ -1058,7 +1058,7 @@ chfs_pwrite_internal(int fd, const void *buf, size_t size, off_t offset)
 		if (path == NULL)
 			break;
 		ret = chfs_async_rpc_inode_write(path, psize, buf + ss,
-			req[i].s, pos, mode, chunk_size, &req[i].r);
+			req[i].s, pos, emode, chunk_size, &req[i].r);
 		free(path);
 		if (ret != HG_SUCCESS)
 			break;
