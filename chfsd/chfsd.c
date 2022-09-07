@@ -242,7 +242,7 @@ int
 main(int argc, char *argv[])
 {
 	char addr_str[PATH_MAX], *host_addr;
-	size_t addr_str_size = sizeof(addr_str), db_size = 256 * 1024 * 1024;
+	size_t addr_str_size = sizeof(addr_str), db_size = 1024 * 1024 * 1024;
 	hg_addr_t my_address;
 	pthread_t t;
 	static sigset_t sigset;
@@ -251,8 +251,8 @@ main(int argc, char *argv[])
 	char *protocol = "sockets", info_string[PATH_MAX];
 	char *server_info_file = NULL, *vname = NULL, *virtual_name = NULL;
 	char *addr_name = NULL, *backend_dir = NULL, *subdir = NULL;
-	int opt, foreground = 0, rpc_timeout_msec = 0, nthreads = 5;
-	int heartbeat_interval = 10, log_priority = -1, niothreads = 2;
+	int opt, foreground = 0, rpc_timeout_msec = 0, nthreads = 4;
+	int heartbeat_interval = 60, log_priority = -1, niothreads = 2;
 	int nflushthreads = 1;
 	char *prog_name, *pid_file = NULL;
 	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&hb_mutex_mem);

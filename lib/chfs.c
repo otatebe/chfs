@@ -23,8 +23,8 @@
 
 static char chfs_client[PATH_MAX];
 static uint32_t chfs_uid, chfs_gid;
-static int chfs_chunk_size = 4096;
-static int chfs_rdma_thresh = 2048;
+static int chfs_chunk_size = 65536;
+static int chfs_rdma_thresh = 32768;
 static int chfs_rpc_timeout_msec = 0;		/* no timeout */
 static int chfs_node_list_cache_timeout = 120;	/* 120 seconds */
 static int chfs_buf_size = 0;

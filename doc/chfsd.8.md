@@ -22,7 +22,7 @@ chfsd - CHFS server
 : executes in the foreground.
 
 -s db_size
-: specifies a database size.  This option is only effective when using the pmemkv and fsdax.  Default is 256 MiB.
+: specifies a database size.  This option is only effective when using the pmemkv and fsdax.  Default is 1 GiB.
 
 -p protocol
 : specifies a protocol like sm, sockets, tcp, and verbs.  Default is sockets.
@@ -61,13 +61,13 @@ chfsd - CHFS server
 : specifies a timeout for RPC in milliseconds.  Default is 0 (no timeout).
 
 -T nthreads
-: specifies the number of threads of the chfsd.  Default is 5.
+: specifies the number of threads of the chfsd.  Default is 4.
 
 -I niothreads
 : specifies the number of I/O threads of the chfsd.  This option is effective with ABT-IO.  Default is 2.
 
 -H heartbeat_interval
-: specifies the interval of heartbeat in second.  Default is 10 seconds.
+: specifies the interval of heartbeat in second.  Default is 60 seconds.
 
 -L log_priority
 : specifies the maximum log priority to report.  Default is notice.
