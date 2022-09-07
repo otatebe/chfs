@@ -20,13 +20,13 @@ CHFS_SERVER
 : server addresses separated by ','
 
 CHFS_CHUNK_SIZE
-: chunk size.  Default is 4 KiB.
+: chunk size.  Default is 64 KiB.
 
 CHFS_BUF_SIZE
 : buffer size.  Default is 0.
 
 CHFS_RDMA_THRESH
-: RDMA transfer is used when the size is larger than or equal to CHFS_RDMA_THRESH.  Default is 2 KiB.
+: RDMA transfer is used when the size is larger than or equal to CHFS_RDMA_THRESH.  Default is 32 KiB.
 
 CHFS_RPC_TIMEOUT_MSEC
 : RPC timeout in milliseconds.  Default is 0 (no timeout).
