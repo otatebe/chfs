@@ -101,6 +101,15 @@ SERVER_INFO_FILE=/tmp/server-info-file-$USER
 
 MAX_JOBS=8
 
+wait_chfsd_shutdown() {
+	CHFS_RPC_TIMEOUT_MSEC=1000
+	export CHFS_RPC_TIMEOUT_MSEC
+	while chlist > /dev/null 2>&1
+	do
+		sleep 1
+	done
+}
+
 stop_chfs() {
 	$SUDO rm -f $SERVER_INFO_FILE
 
@@ -128,6 +137,7 @@ stop_chfs() {
 		fi
 	done
 	wait
+	wait_chfsd_shutdown
 }
 
 clean_chfs() {
@@ -149,6 +159,7 @@ clean_chfs() {
 		fi
 	done
 	wait
+	wait_chfsd_shutdown
 }
 
 status_chfs() {
