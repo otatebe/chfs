@@ -1026,8 +1026,8 @@ chfs_pwrite_internal(int fd, const void *buf, size_t size, off_t offset)
 			chfs_set_errno(ret, err);
 			if (save_errno == 0)
 				save_errno = errno;
-		}
-		ss += req[i].s;
+		} else
+			ss += req[i].s;
 	}
 	free(req);
 	if (save_errno) {
@@ -1172,9 +1172,10 @@ chfs_pread_internal(int fd, void *buf, size_t size, off_t offset)
 		s = req[i].s;
 		ret = chfs_async_rpc_inode_read_wait(buf + ss, &s, &err,
 			&req[i].r);
-		if (ret != HG_SUCCESS)
-			save_ret = ret;
-		else if (err == KV_ERR_NO_ENTRY)
+		if (ret != HG_SUCCESS) {
+			if (save_ret == HG_SUCCESS)
+				save_ret = ret;
+		} else if (err == KV_ERR_NO_ENTRY)
 			may_hole += req[i].s;
 		else if (err == KV_SUCCESS) {
 			if (may_hole > 0) {
