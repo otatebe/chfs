@@ -111,8 +111,6 @@ wait_chfsd_shutdown() {
 }
 
 stop_chfs() {
-	$SUDO rm -f $SERVER_INFO_FILE
-
 	if [ "X$HOSTS" = Xlocalhost ]; then
 		$SUDO pkill $PKILL_FLAG chfsd
 		[ "$mode" = kill ] && pkill $PKILL_FLAG chfuse
@@ -138,6 +136,8 @@ stop_chfs() {
 	done
 	wait
 	wait_chfsd_shutdown
+
+	$SUDO rm -f $SERVER_INFO_FILE
 }
 
 clean_chfs() {
