@@ -18,14 +18,13 @@
 #include "chfs.h"
 #include "chfs_err.h"
 
-#define ASYNC_ACCESS
-
 static char chfs_client[PATH_MAX];
 static uint32_t chfs_uid, chfs_gid;
 static int chfs_chunk_size = 65536;
 static int chfs_rdma_thresh = 32768;
 static int chfs_rpc_timeout_msec = 0;		/* no timeout */
 static int chfs_node_list_cache_timeout = 120;	/* 120 seconds */
+static int chfs_async_access = 0;
 static int chfs_buf_size = 0;
 
 static ABT_mutex fd_mutex;
@@ -48,6 +47,13 @@ chfs_set_chunk_size(int chunk_size)
 		return;
 	log_info("chfs_set_chunk_size: %d", chunk_size);
 	chfs_chunk_size = chunk_size;
+}
+
+void
+chfs_set_async_access(int enable)
+{
+	log_info("chfs_set_async_access: %d", enable);
+	chfs_async_access = enable;
 }
 
 void
@@ -203,7 +209,7 @@ chfs_init(const char *server)
 	margo_instance_id mid;
 	size_t client_size = sizeof(chfs_client);
 	hg_addr_t client_addr;
-	char *size, *rdma_thresh, *timeout, *proto;
+	char *size, *enable, *rdma_thresh, *timeout, *proto;
 	char *log_priority;
 	int max_log_level;
 	hg_return_t ret;
@@ -226,6 +232,10 @@ chfs_init(const char *server)
 	size = getenv("CHFS_CHUNK_SIZE");
 	if (!IS_NULL_STRING(size))
 		chfs_set_chunk_size(atoi(size));
+
+	enable = getenv("CHFS_ASYNC_ACCESS");
+	if (!IS_NULL_STRING(enable))
+		chfs_set_async_access(atoi(enable));
 
 	size = getenv("CHFS_BUF_SIZE");
 	if (!IS_NULL_STRING(size))
@@ -651,7 +661,6 @@ chfs_async_rpc_inode_write_wait(size_t *size, int *errp, fs_request_t *rp)
 		return (fs_async_rpc_inode_write_rdma_wait(size, errp, rp));
 }
 
-#ifndef ASYNC_ACCESS
 static hg_return_t
 chfs_rpc_inode_write(void *key, size_t key_size, const void *buf, size_t *size,
 	size_t offset, mode_t mode, int chunk_size, int *errp)
@@ -668,7 +677,6 @@ chfs_rpc_inode_write(void *key, size_t key_size, const void *buf, size_t *size,
 	}
 	return (chfs_async_rpc_inode_write_wait(size, errp, &req));
 }
-#endif
 
 static hg_return_t
 chfs_async_rpc_inode_read(void *key, size_t key_size, void *buf, size_t size,
@@ -904,9 +912,8 @@ chfs_close(int fd)
 	return (clear_fd(fd));
 }
 
-#ifndef ASYNC_ACCESS
 static ssize_t
-chfs_pwrite_internal(int fd, const void *buf, size_t size, off_t offset)
+chfs_pwrite_internal_sync(int fd, const void *buf, size_t size, off_t offset)
 {
 	struct fd_table *tab = get_fd_table(fd);
 	void *path;
@@ -940,17 +947,16 @@ chfs_pwrite_internal(int fd, const void *buf, size_t size, off_t offset)
 		return (-1);
 	}
 	if (size - s > 0) {
-		ss = chfs_pwrite_internal(fd, buf + s, size - s, offset + s);
+		ss = chfs_pwrite_internal_sync(fd, buf + s, size - s,
+			offset + s);
 		if (ss < 0)
 			return (-1);
 	}
 	return (s + ss);
 }
 
-#else
-
 static ssize_t
-chfs_pwrite_internal(int fd, const void *buf, size_t size, off_t offset)
+chfs_pwrite_internal_async(int fd, const void *buf, size_t size, off_t offset)
 {
 	struct fd_table *tab = get_fd_table(fd);
 	void *path, *p;
@@ -1036,7 +1042,14 @@ chfs_pwrite_internal(int fd, const void *buf, size_t size, off_t offset)
 	}
 	return (ss);
 }
-#endif
+
+ssize_t
+chfs_pwrite_internal(int fd, const void *buf, size_t size, off_t offset)
+{
+	if (chfs_async_access)
+		return (chfs_pwrite_internal_async(fd, buf, size, offset));
+	return (chfs_pwrite_internal_sync(fd, buf, size, offset));
+}
 
 ssize_t
 chfs_pwrite(int fd, const void *buf, size_t size, off_t offset)
@@ -1059,9 +1072,8 @@ chfs_write(int fd, const void *buf, size_t size)
 	return (chfs_pwrite(fd, buf, size, pos));
 }
 
-#ifndef ASYNC_ACCESS
 ssize_t
-chfs_pread_internal(int fd, void *buf, size_t size, off_t offset)
+chfs_pread_internal_sync(int fd, void *buf, size_t size, off_t offset)
 {
 	struct fd_table *tab = get_fd_table(fd);
 	void *path;
@@ -1091,17 +1103,16 @@ chfs_pread_internal(int fd, void *buf, size_t size, off_t offset)
 	if (local_pos + s < chunk_size)
 		return (s);
 	if (size - s > 0) {
-		ss = chfs_pread_internal(fd, buf + s, size - s, offset + s);
+		ss = chfs_pread_internal_sync(fd, buf + s, size - s,
+			offset + s);
 		if (ss < 0)
 			ss = 0;
 	}
 	return (s + ss);
 }
 
-#else
-
 ssize_t
-chfs_pread_internal(int fd, void *buf, size_t size, off_t offset)
+chfs_pread_internal_async(int fd, void *buf, size_t size, off_t offset)
 {
 	struct fd_table *tab = get_fd_table(fd);
 	void *path, *p;
@@ -1194,7 +1205,14 @@ chfs_pread_internal(int fd, void *buf, size_t size, off_t offset)
 	}
 	return (sss);
 }
-#endif
+
+ssize_t
+chfs_pread_internal(int fd, void *buf, size_t size, off_t offset)
+{
+	if (chfs_async_access)
+		return (chfs_pread_internal_async(fd, buf, size, offset));
+	return (chfs_pread_internal_sync(fd, buf, size, offset));
+}
 
 ssize_t
 chfs_pread(int fd, void *buf, size_t size, off_t offset)

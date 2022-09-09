@@ -22,6 +22,9 @@ CHFS_SERVER
 CHFS_CHUNK_SIZE
 : chunk size.  Default is 64 KiB.
 
+CHFS_ASYNC_ACCESS
+: set 1 to enable asynchronous accesses.  Default is 0.
+
 CHFS_BUF_SIZE
 : buffer size.  Default is 0.
 
