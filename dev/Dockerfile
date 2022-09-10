@@ -73,3 +73,4 @@ RUN cd \
  && make clean
 
 COPY --chown=$USERNAME:$USERNAME dev/test.sh /home/$USERNAME/test.sh
+COPY --chown=$USERNAME:$USERNAME dev/config-test.sh /home/$USERNAME/config-test.sh
