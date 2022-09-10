@@ -129,8 +129,8 @@ handle_sig(void *arg)
 
 	ABT_mutex_lock(mutex);
 	heartbeat_stop = 1;
-	ABT_mutex_unlock(mutex);
 	ABT_cond_signal(stop_cond);
+	ABT_mutex_unlock(mutex);
 
 	ABT_mutex_lock(mutex);
 	while (!heartbeat_done)
@@ -408,8 +408,9 @@ main(int argc, char *argv[])
 	}
 	ABT_mutex_lock(mutex);
 	heartbeat_done = 1;
-	ABT_mutex_unlock(mutex);
 	ABT_cond_signal(done_cond);
+	ABT_mutex_unlock(mutex);
+
 	margo_wait_for_finalize(mid);
 
 	return (0);
