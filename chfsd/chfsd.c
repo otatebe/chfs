@@ -120,20 +120,28 @@ leave:
 
 static int heartbeat_stop = 0;
 static int heartbeat_done = 0;
+static int leave_done = 0;
 static ABT_mutex_memory hb_mutex_mem = ABT_MUTEX_INITIALIZER;
 static ABT_cond_memory hb_stop_cond_mem = ABT_COND_INITIALIZER;
 static ABT_cond_memory hb_done_cond_mem = ABT_COND_INITIALIZER;
+static ABT_cond_memory lv_done_cond_mem = ABT_COND_INITIALIZER;
 
 void *
 handle_sig(void *arg)
 {
 	sigset_t *a = arg;
-	int sig;
+	int ret, sig;
 	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&hb_mutex_mem);
 	ABT_cond stop_cond = ABT_COND_MEMORY_GET_HANDLE(&hb_stop_cond_mem);
 	ABT_cond done_cond = ABT_COND_MEMORY_GET_HANDLE(&hb_done_cond_mem);
+	ABT_cond leave_cond = ABT_COND_MEMORY_GET_HANDLE(&lv_done_cond_mem);
+	static const char diag[] = "handle_sig";
 
-	sigwait(a, &sig);
+	ret = sigwait(a, &sig);
+	if (ret < 0)
+		log_error("%s: sigwait: %s", diag, strerror(errno));
+	else
+		log_info("%s: signal %d caught", diag, sig);
 
 	ABT_mutex_lock(mutex);
 	heartbeat_stop = 1;
@@ -144,7 +152,14 @@ handle_sig(void *arg)
 	while (!heartbeat_done)
 		ABT_cond_wait(done_cond, mutex);
 	ABT_mutex_unlock(mutex);
+
 	leave();
+
+	ABT_mutex_lock(mutex);
+	leave_done = 1;
+	ABT_cond_signal(leave_cond);
+	ABT_mutex_unlock(mutex);
+
 	return (NULL);
 }
 
@@ -258,6 +273,7 @@ main(int argc, char *argv[])
 	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&hb_mutex_mem);
 	ABT_cond stop_cond = ABT_COND_MEMORY_GET_HANDLE(&hb_stop_cond_mem);
 	ABT_cond done_cond = ABT_COND_MEMORY_GET_HANDLE(&hb_done_cond_mem);
+	ABT_cond leave_cond = ABT_COND_MEMORY_GET_HANDLE(&lv_done_cond_mem);
 
 	prog_name = basename(argv[0]);
 
@@ -441,6 +457,11 @@ main(int argc, char *argv[])
 	ABT_mutex_lock(mutex);
 	heartbeat_done = 1;
 	ABT_cond_signal(done_cond);
+	ABT_mutex_unlock(mutex);
+
+	ABT_mutex_lock(mutex);
+	while (!leave_done)
+		ABT_cond_wait(leave_cond, mutex);
 	ABT_mutex_unlock(mutex);
 
 	margo_wait_for_finalize(mid);
