@@ -14,10 +14,15 @@ do
 	do
 		for zero in " " --enable-zero-copy-read-rdma
 		do
-			echo ./configure --with-pmemkv $hashing $port $zero
-			./configure --with-pmemkv $hashing $port $zero > /dev/null
-			make clean > /dev/null
-			make > /dev/null
+			for md5 in " " --enable-digest-md5
+			do
+				echo ./configure --with-pmemkv \
+					$hashing $port $zero $md5
+				./configure --with-pmemkv \
+					$hashing $port $zero $md5 > /dev/null
+				make clean > /dev/null
+				make > /dev/null
+			done
 		done
 	done
 done
@@ -31,10 +36,15 @@ do
 		do
 			for abtio in " " --with-abt-io
 			do
-				echo ./configure $hashing $port $xattr $abtio
-				./configure $hashing $port $xattr $abtio > /dev/null
-				make clean > /dev/null
-				make > /dev/null
+				for md5 in " " --enable-digest-md5
+				do
+					echo ./configure $hashing $port \
+						$xattr $abtio $md5
+					./configure $hashing $port \
+						$xattr $abtio $md5 > /dev/null
+					make clean > /dev/null
+					make > /dev/null
+				done
 			done
 		done
 	done
