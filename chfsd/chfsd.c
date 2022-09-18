@@ -248,7 +248,7 @@ main(int argc, char *argv[])
 	char *protocol = "sockets", info_string[PATH_MAX];
 	char *server_info_file = NULL, *vname = NULL, *virtual_name = NULL;
 	char *addr_name = NULL, *backend_dir = NULL, *subdir = NULL;
-	int opt, foreground = 0, rpc_timeout_msec = 0, nthreads = 4;
+	int opt, foreground = 0, rpc_timeout_msec = 30000, nthreads = 4;
 	int heartbeat_interval = 60, log_priority = -1, niothreads = 2;
 	int nflushthreads = 1;
 	char *prog_name, *pid_file = NULL;
