@@ -32,7 +32,7 @@ CHFS_RDMA_THRESH
 : RDMA transfer is used when the size is larger than or equal to CHFS_RDMA_THRESH.  Default is 32 KiB.
 
 CHFS_RPC_TIMEOUT_MSEC
-: RPC timeout in milliseconds.  Default is 0 (no timeout).
+: RPC timeout in milliseconds.  Zero means no timeout.  Default is 30000 milliseconds (30 seconds).
 
 CHFS_NODE_LIST_CACHE_TIMEOUT
 : node list cache timeout in seconds.  Default is 120 seconds.

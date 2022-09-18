@@ -249,7 +249,7 @@ main(int argc, char *argv[])
 	char *protocol = "sockets", info_string[PATH_MAX];
 	char *server_info_file = NULL, *vname = NULL, *virtual_name = NULL;
 	char *addr_name = NULL;
-	int opt, foreground = 0, rpc_timeout_msec = 0, nthreads = 4;
+	int opt, foreground = 0, rpc_timeout_msec = 30000, nthreads = 4;
 	int heartbeat_interval = 60, log_priority = -1, niothreads = 2;
 	char *prog_name, *pid_file = NULL;
 	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&hb_mutex_mem);

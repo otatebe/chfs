@@ -46,7 +46,7 @@ chfsd - CHFS server
 : specifies a server info file where the server address will be written.
 
 -t RPC_timeout_msec
-: specifies a timeout for RPC in milliseconds.  Default is 0 (no timeout).
+: specifies a timeout for RPC in milliseconds.  Zero means no timeout.  Default is 300000 milliseconds (30 seconds).
 
 -T nthreads
 : specifies the number of threads of the chfsd.  Default is 4.
