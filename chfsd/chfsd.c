@@ -55,12 +55,6 @@ join_ring(margo_instance_id mid, const char *server)
 }
 
 static void
-move_all_data()
-{
-	inode_copy_all();
-}
-
-static void
 leave()
 {
 	char *next, *prev;
