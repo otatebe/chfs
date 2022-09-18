@@ -717,7 +717,7 @@ fs_inode_flush(void *key, size_t key_size)
 		index = 0;
 	else
 		index = atoi(key + keylen);
-	log_debug("%s: key=%s, index=%d", diag, (char *)key, index);
+	log_info("%s: %s:%d", diag, (char *)key, index);
 
 	dst = path_backend(key);
 	if (dst == NULL) {
@@ -815,9 +815,9 @@ free_dst:
 		    (cache_flags & ~CHFS_FS_DIRTY) | CHFS_FS_CACHE);
 		r = fs_err(r, diag);
 	}
-	if (r == KV_ERR_NO_ENTRY)
-		log_info("%s: %s", diag, kv_err_string(r));
-	else if (r != KV_SUCCESS)
-		log_error("%s: %s", diag, kv_err_string(r));
+	if (r == KV_ERR_NO_ENTRY || r == KV_SUCCESS)
+		log_info("%s: %s: %s", diag, p, kv_err_string(r));
+	else
+		log_error("%s: %s: %s", diag, p, kv_err_string(r));
 	return (r);
 }
