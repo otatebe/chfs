@@ -101,19 +101,15 @@ leave()
 		ring_release_next_next();
 	}
 	ring_list_remove(self);
-	log_debug("move_all_data");
-	if (ret == HG_SUCCESS)
-		move_all_data();
-	log_debug("move_all_data: done");
 leave_prev:
 	ring_release_prev();
 	if (prev_prev == 1)
 		ring_release_prev_prev();
 leave:
 	ring_release_next();
-	log_debug("flush_wait");
+	log_info("flush_wait");
 	fs_inode_flush_wait();
-	log_debug("flush_wait: done");
+	log_info("flush_wait: done");
 	fs_server_term();
 	log_term();
 }
