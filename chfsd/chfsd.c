@@ -61,6 +61,10 @@ leave()
 	int prev_prev = 0;
 	hg_return_t ret;
 
+	log_info("flush_wait");
+	fs_inode_flush_wait();
+	log_info("flush_wait: done");
+
 	log_debug("leave");
 	next = ring_get_next();
 	if (strcmp(self, next) == 0)
@@ -101,9 +105,6 @@ leave_prev:
 		ring_release_prev_prev();
 leave:
 	ring_release_next();
-	log_info("flush_wait");
-	fs_inode_flush_wait();
-	log_info("flush_wait: done");
 	fs_server_term();
 	log_term();
 }
