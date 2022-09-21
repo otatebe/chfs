@@ -1408,6 +1408,9 @@ root_stat(struct stat *st)
 	st->st_mode = S_IFDIR | 0755;
 }
 
+/* Number of 512B blocks */
+#define NUM_BLOCKS(size) ((size + 511) / 512)
+
 int
 chfs_stat(const char *path, struct stat *st)
 {
@@ -1438,6 +1441,8 @@ chfs_stat(const char *path, struct stat *st)
 	st->st_mtim = sb.mtime;
 	st->st_ctim = sb.ctime;
 	st->st_nlink = 1;
+	st->st_blksize = sb.chunk_size;
+	st->st_blocks = NUM_BLOCKS(st->st_size);
 	if (!S_ISREG(sb.mode) || sb.size < sb.chunk_size) {
 		free(p);
 		return (0);
@@ -1465,6 +1470,7 @@ chfs_stat(const char *path, struct stat *st)
 		}
 		i *= 2;
 	}
+	st->st_blocks = NUM_BLOCKS(st->st_size);
 	free(p);
 	return (0);
 }
