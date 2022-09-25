@@ -43,7 +43,7 @@ RUN cd \
  && spack external find automake autoconf libtool cmake m4 pkgconf \
  && spack install mochi-margo ^mercury~boostsys ^libfabric fabrics=rxm,sockets,tcp,udp \
  && spack install mochi-abt-io \
- && echo ". spack/share/spack/setup-env.sh" >> .bashrc
+ && echo ". ~/spack/share/spack/setup-env.sh" >> .bashrc
 
 COPY --chown=$USERNAME:$USERNAME . /home/$USERNAME/chfs
 COPY --chown=$USERNAME:$USERNAME dev/hosts /home/$USERNAME/hosts
