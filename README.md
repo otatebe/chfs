@@ -22,7 +22,7 @@ CHFS is a parallel consistent hashing file system created instantly using node-l
 
    Or, more recommended way to include verbs as follows;
 
-       % spack external find automake autoconf libtool cmake m4 pkgconf
+       % spack external find automake autoconf libtool cmake m4 pkgconf bison
        % spack config edit packages
        manually add rdma-core
        % spack spec mochi-margo ^mercury~boostsys ^libfabric fabrics=rxm,sockets,tcp,udp,verbs
@@ -33,8 +33,7 @@ CHFS is a parallel consistent hashing file system created instantly using node-l
 
 1. (Optional) Install pmemkv for a pmemkv backend
 
-       # apt install libpmemkv-dev
-       # apt install libpmemobj-cpp-dev libmemkind-dev libtbb-dev
+       # apt install libpmemkv-dev libmemkind-dev libtbb-dev
        # apt install rapidjson-dev
 
    For details, see https://pmem.io/pmemkv/

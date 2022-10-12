@@ -6,7 +6,7 @@
 
       $ docker compose build
 
-  This creates a docker image using the current source files of CHFS.  For details, see Dockerfile.
+  This creates a docker image to build CHFS.  For details, see Dockerfile.
 
 - execute containers
 
@@ -16,23 +16,33 @@
 
 - login to a container
 
-      $ ssh 172.30.0.2
+      $ ssh $(docker exec chfs-c1 hostname -i)
+
+- install CHFS (in a container)
+
+      c1$ cd ~/chfs/dev
+      c1$ sh install.sh
 
 - execute a test script (in a container)
 
+      c1$ cd ~/chfs/dev
       c1$ sh test.sh
 
 - explore CHFS (in a container)
 
+      c1$ cd ~/chfs/dev
       c1$ eval $(chfsctl -h hosts -m /tmp/a start)
       c1$ chlist
 
 - IOR (in a container)
 
-      c1$ mpirun -hostfile hosts -x PATH -x LD_LIBRARY_PATH -x CHFS_SERVER ior -a CHFS --chfs.chunk_size=1048576 -o /tmp/a/testfile
+      c1$ cd ~/chfs/dev
+      c1$ sh install-ior.sh
+      c1$ mpirun -hostfile hosts -x PATH -x CHFS_SERVER ior -a CHFS --chfs.chunk_size=1048576 -o /tmp/a/testfile
 
 - stop CHFS (in a container)
 
+      c1$ cd ~/chfs/dev
       c1$ chfsctl -h hosts -m /tmp/a stop
 
 - shutdown containers

@@ -4,9 +4,9 @@ ARG USERNAME=foo
 
 RUN apt-get update \
  && apt-get -y upgrade \
- && apt-get -y install build-essential \
+ && apt-get -y install gcc automake \
  && apt-get -y install cmake libtool pkgconf \
- && apt-get -y install git python3 fuse sudo vim curl \
+ && apt-get -y install git python3 bison fuse sudo vim curl \
  && apt-get -y install libpmemkv-dev libmemkind-dev libtbb-dev \
  && apt-get -y install rapidjson-dev \
  && apt-get -y install libfuse-dev pandoc \
@@ -32,45 +32,20 @@ RUN \
 RUN useradd -m -s /bin/bash $USERNAME \
  && echo "$USERNAME ALL=(ALL:ALL) NOPASSWD: ALL" >> /etc/sudoers.d/$USERNAME \
  # delete passwd
- && passwd -d $USERNAME
+ && passwd -d $USERNAME \
+ && printf '%s\n' \
+    '. $HOME/spack/share/spack/setup-env.sh' \
+    'PATH=$HOME/local/bin:$PATH; export PATH' \
+    'LD_LIBRARY_PATH=$HOME/local/lib:$LD_LIBRARY_PATH; export LD_LIBRARY_PATH' \
+    'PKG_CONFIG_PATH=$HOME/local/lib/pkgconfig:$PKG_CONFIG_PATH; export PKG_CONFIG_PATH' \
+    >> /etc/profile.d/chfs.sh
 
 USER $USERNAME
 RUN cd \
  && git clone -c feature.manyFiles=true --depth 1 https://github.com/spack/spack.git \
  && . spack/share/spack/setup-env.sh \
- && git clone https://github.com/mochi-hpc/mochi-spack-packages.git \
- && spack repo add mochi-spack-packages \
- && spack external find automake autoconf libtool cmake m4 pkgconf \
+# && git clone https://github.com/mochi-hpc/mochi-spack-packages.git \
+# && spack repo add mochi-spack-packages \
+ && spack external find automake autoconf libtool cmake m4 pkgconf bison \
  && spack install mochi-margo ^mercury~boostsys ^libfabric fabrics=rxm,sockets,tcp,udp \
- && spack install mochi-abt-io \
- && echo ". ~/spack/share/spack/setup-env.sh" >> .bashrc
-
-COPY --chown=$USERNAME:$USERNAME . /home/$USERNAME/chfs
-COPY --chown=$USERNAME:$USERNAME dev/hosts /home/$USERNAME/hosts
-
-RUN cd \
- && . spack/share/spack/setup-env.sh \
- && spack load mochi-margo mochi-abt-io \
- && cd chfs \
- && autoreconf -i \
- && ./configure \
- && make \
- && sudo make install \
- && sudo ldconfig \
- && make clean
-
-#COPY --chown=$USERNAME:$USERNAME ior /home/$USERNAME/ior
-
-RUN cd \
- && . spack/share/spack/setup-env.sh \
- && spack load mochi-margo \
- && git clone https://github.com/otatebe/ior.git -b feature/chfs \
- && cd ior \
- && ./bootstrap \
- && ./configure \
- && make \
- && sudo make install \
- && make clean
-
-COPY --chown=$USERNAME:$USERNAME dev/test.sh /home/$USERNAME/test.sh
-COPY --chown=$USERNAME:$USERNAME dev/config-test.sh /home/$USERNAME/config-test.sh
+# && spack install mochi-abt-io \

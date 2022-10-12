@@ -6,7 +6,20 @@
 #include "log.h"
 
 #ifdef USE_DIGEST_MD5
+#include <openssl/evp.h>
 #include <openssl/md5.h>
+
+static void calc_md5(const uint8_t *buf, uint8_t size, uint8_t *digest)
+{
+	EVP_MD_CTX *ctx;
+	unsigned int len = MD5_DIGEST_LENGTH;
+
+	ctx = EVP_MD_CTX_new();
+	EVP_DigestInit_ex(ctx, EVP_md5(), NULL);
+	EVP_DigestUpdate(ctx, buf, size);
+	EVP_DigestFinal_ex(ctx, digest, &len);
+	EVP_MD_CTX_free(ctx);
+}
 
 typedef union {
 	uint8_t c[MD5_DIGEST_LENGTH];
@@ -14,7 +27,7 @@ typedef union {
 	unsigned __int128 l;
 #endif
 } HASH_T;
-#define HASH(data, len, hash) MD5(data, len, hash.c)
+#define HASH(data, len, hash) calc_md5(data, len, hash.c)
 #define HASH_CMP(a, b) memcmp(a.c, b.c, MD5_DIGEST_LENGTH)
 #ifdef USE_MODULAR_HASHING
 #define HASH_MODULO(a, b) (a.l % (b))	/* XXX - ignore endian */

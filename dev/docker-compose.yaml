@@ -6,12 +6,9 @@ x-common:
     args:
       USERNAME: $USER
   volumes:
-    - type: bind
-      source: backend
-      target: /home/$USER/backend
+    - ..:/home/$USER/chfs:cached
+    - local:/home/$USER/local:cached
   init: true
-  networks:
-    chfs_net:
   cap_add:
     - SYS_ADMIN
     - SYS_PTRACE
@@ -23,43 +20,24 @@ x-common:
   privileged: false
   command: >
     bash -c "sudo service ssh restart && sleep infinity"
-  extra_hosts:
-    - c1:172.30.0.2
-    - c2:172.30.0.3
-    - c3:172.30.0.4
-    - c4:172.30.0.5
 
 services:
   c1:
     <<: *x-common
     hostname: c1
-    networks:
-      chfs_net:
-        ipv4_address: 172.30.0.2
+    container_name: chfs-c1
   c2:
     <<: *x-common
     hostname: c2
-    networks:
-      chfs_net:
-        ipv4_address: 172.30.0.3
+    container_name: chfs-c2
   c3:
     <<: *x-common
     hostname: c3
-    networks:
-      chfs_net:
-        ipv4_address: 172.30.0.4
+    container_name: chfs-c3
   c4:
     <<: *x-common
     hostname: c4
-    networks:
-      chfs_net:
-        ipv4_address: 172.30.0.5
+    container_name: chfs-c4
 
-networks:
-  chfs_net:
-    name: chfs_net
-    driver: bridge
-    ipam:
-      driver: default
-      config:
-        - subnet: 172.30.0.0/24
+volumes:
+  local:
