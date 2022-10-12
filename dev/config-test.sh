@@ -2,10 +2,10 @@
 
 set -e
 
-. spack/share/spack/setup-env.sh
-spack load mochi-margo mochi-abt-io
+. $HOME/spack/share/spack/setup-env.sh
+spack load mochi-margo #mochi-abt-io
 
-cd chfs
+cd $HOME/chfs
 
 echo PMEMKV backend
 for hashing in " " --enable-modular-hashing
@@ -34,8 +34,8 @@ do
 	do
 		for xattr in " " --enable-xattr
 		do
-			for abtio in " " --with-abt-io
-			do
+#			for abtio in " " --with-abt-io
+#			do
 				for md5 in " " --enable-digest-md5
 				do
 					echo ./configure $hashing $port \
@@ -45,7 +45,7 @@ do
 					make clean > /dev/null
 					make > /dev/null
 				done
-			done
+#			done
 		done
 	done
 done
