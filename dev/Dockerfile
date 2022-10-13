@@ -48,5 +48,5 @@ RUN cd \
 # && git clone https://github.com/mochi-hpc/mochi-spack-packages.git \
 # && spack repo add mochi-spack-packages \
  && spack external find automake autoconf libtool cmake m4 pkgconf bison \
- && spack install mochi-margo ^mercury~boostsys ^libfabric fabrics=rxm,sockets,tcp,udp \
-# && spack install mochi-abt-io \
+ && spack install mochi-margo ^mercury~boostsys ^libfabric fabrics=rxm,sockets,tcp,udp
+# && spack install mochi-abt-io
