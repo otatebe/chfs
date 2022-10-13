@@ -42,6 +42,7 @@ RUN useradd -m -s /bin/bash $USERNAME \
 
 USER $USERNAME
 RUN cd \
+ && mkdir local \
  && git clone -c feature.manyFiles=true --depth 1 https://github.com/spack/spack.git \
  && . spack/share/spack/setup-env.sh \
 # && git clone https://github.com/mochi-hpc/mochi-spack-packages.git \
