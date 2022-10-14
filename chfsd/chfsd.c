@@ -418,7 +418,5 @@ main(int argc, char *argv[])
 		ABT_cond_wait(leave_cond, mutex);
 	ABT_mutex_unlock(mutex);
 
-	margo_wait_for_finalize(mid);
-
 	return (0);
 }
