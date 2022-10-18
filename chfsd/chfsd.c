@@ -106,15 +106,13 @@ leave_prev:
 		ring_release_prev_prev();
 leave:
 	ring_release_next();
-	fs_server_term();
 	log_term();
+	fs_server_term();
 }
 
 static int heartbeat_stop = 0;
-static int leave_done = 0;
 static ABT_mutex_memory hb_mutex_mem = ABT_MUTEX_INITIALIZER;
 static ABT_cond_memory hb_stop_cond_mem = ABT_COND_INITIALIZER;
-static ABT_cond_memory lv_done_cond_mem = ABT_COND_INITIALIZER;
 
 void *
 handle_sig(void *arg)
@@ -123,7 +121,6 @@ handle_sig(void *arg)
 	int ret, sig;
 	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&hb_mutex_mem);
 	ABT_cond stop_cond = ABT_COND_MEMORY_GET_HANDLE(&hb_stop_cond_mem);
-	ABT_cond leave_cond = ABT_COND_MEMORY_GET_HANDLE(&lv_done_cond_mem);
 	static const char diag[] = "handle_sig";
 
 	ret = sigwait(a, &sig);
@@ -138,11 +135,6 @@ handle_sig(void *arg)
 	ABT_mutex_unlock(mutex);
 
 	leave();
-
-	ABT_mutex_lock(mutex);
-	leave_done = 1;
-	ABT_cond_signal(leave_cond);
-	ABT_mutex_unlock(mutex);
 
 	return (NULL);
 }
@@ -254,7 +246,6 @@ main(int argc, char *argv[])
 	char *prog_name, *pid_file = NULL;
 	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&hb_mutex_mem);
 	ABT_cond stop_cond = ABT_COND_MEMORY_GET_HANDLE(&hb_stop_cond_mem);
-	ABT_cond leave_cond = ABT_COND_MEMORY_GET_HANDLE(&lv_done_cond_mem);
 
 	prog_name = basename(argv[0]);
 
@@ -413,10 +404,7 @@ main(int argc, char *argv[])
 		if (stop)
 			break;
 	}
-	ABT_mutex_lock(mutex);
-	while (!leave_done)
-		ABT_cond_wait(leave_cond, mutex);
-	ABT_mutex_unlock(mutex);
+	margo_wait_for_finalize(mid);
 
 	return (0);
 }
