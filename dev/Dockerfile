@@ -1,6 +1,7 @@
 FROM ubuntu
 
 ARG USERNAME=foo
+ARG UID=1000
 
 RUN apt-get update \
  && apt-get -y upgrade \
@@ -18,7 +19,6 @@ RUN \
     openssh-server \
   # sshd_config
   && printf '%s\n' \
-    'PermitRootLogin yes' \
     'PasswordAuthentication yes' \
     'PermitEmptyPasswords yes' \
     'UsePAM no' \
@@ -29,7 +29,7 @@ RUN \
     '    StrictHostKeyChecking no' \
     > /etc/ssh/ssh_config.d/ignore-host-key.conf
 
-RUN useradd -m -s /bin/bash $USERNAME \
+RUN useradd -m -u $UID -s /bin/bash $USERNAME \
  && echo "$USERNAME ALL=(ALL:ALL) NOPASSWD: ALL" >> /etc/sudoers.d/$USERNAME \
  # delete passwd
  && passwd -d $USERNAME
