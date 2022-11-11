@@ -18,10 +18,11 @@
 
       $ ssh $(docker exec chfs-c1 hostname -i)
 
-- install CHFS (in a container)
+- install CHFS and IOR (in a container)
 
       c1$ cd ~/chfs/dev
       c1$ sh install.sh
+      c1$ sh install-ior.sh
 
 - execute a test script (in a container)
 
@@ -34,10 +35,9 @@
       c1$ eval $(chfsctl -h hosts -m /tmp/a start)
       c1$ chlist
 
-- IOR (in a container)
+- execute IOR (in a container)
 
       c1$ cd ~/chfs/dev
-      c1$ sh install-ior.sh
       c1$ mpirun -hostfile hosts -x PATH -x CHFS_SERVER ior -a CHFS --chfs.chunk_size=1048576 -o /tmp/a/testfile
 
 - stop CHFS (in a container)

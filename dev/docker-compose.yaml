@@ -9,6 +9,8 @@ x-common:
     - ..:/home/$USER/chfs:cached
     - local:/home/$USER/local:cached
   init: true
+  networks:
+    - chfs_net
   cap_add:
     - SYS_ADMIN
     - SYS_PTRACE
@@ -38,6 +40,9 @@ services:
     <<: *x-common
     hostname: c4
     container_name: chfs-c4
+
+networks:
+  chfs_net:
 
 volumes:
   local:
