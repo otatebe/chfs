@@ -315,7 +315,7 @@ main(int argc, char *argv[])
 			nthreads = atoi(optarg);
 			break;
 		case 'U':
-			fs_server_set_rpc_last_interval(atoi(optarg));
+			fs_server_set_rpc_last_interval(strtod(optarg, NULL));
 			break;
 		default:
 			usage(prog_name);

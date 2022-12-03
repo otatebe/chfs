@@ -5,13 +5,13 @@
 
 static int rpc_count = 0;
 static struct timespec rpc_wait_time;
-static int rpc_last_interval = 5;
+static double rpc_last_interval = .5;
 static ABT_mutex_memory mutex_mem = ABT_MUTEX_INITIALIZER;
 static ABT_cond_memory begin_cond_mem = ABT_COND_INITIALIZER;
 static ABT_cond_memory end_cond_mem = ABT_COND_INITIALIZER;
 
 void
-fs_server_set_rpc_last_interval(int second)
+fs_server_set_rpc_last_interval(double second)
 {
 	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&mutex_mem);
 
@@ -20,11 +20,11 @@ fs_server_set_rpc_last_interval(int second)
 	ABT_mutex_unlock(mutex);
 }
 
-int
+double
 fs_server_get_rpc_last_interval(void)
 {
 	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&mutex_mem);
-	int s;
+	double s;
 
 	ABT_mutex_lock(mutex);
 	s = rpc_last_interval;
@@ -56,6 +56,25 @@ fs_server_rpc_begin(void *func, const char *diag)
 	ABT_mutex_unlock(mutex);
 }
 
+#define NSEC	1000000000L
+
+static void
+timespec_add(struct timespec *t, double d)
+{
+	time_t d_sec = d;
+	long d_nsec = (d - d_sec) * NSEC;
+
+	t->tv_sec += d_sec;
+	t->tv_nsec += d_nsec;
+	if (t->tv_nsec >= NSEC) {
+		t->tv_nsec -= NSEC;
+		t->tv_sec++;
+	} else if (t->tv_nsec < 0) {
+		t->tv_nsec += NSEC;
+		t->tv_sec--;
+	}
+}
+
 void
 fs_server_rpc_end(void *func, const char *diag)
 {
@@ -66,7 +85,7 @@ fs_server_rpc_end(void *func, const char *diag)
 	--rpc_count;
 	if (rpc_count <= 0) {
 		clock_gettime(CLOCK_REALTIME, &rpc_wait_time);
-		rpc_wait_time.tv_sec += rpc_last_interval;
+		timespec_add(&rpc_wait_time, rpc_last_interval);
 		ABT_cond_signal(end_cond);
 	}
 	ABT_mutex_unlock(mutex);
