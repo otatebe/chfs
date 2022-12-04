@@ -381,8 +381,8 @@ regular_file:
 		if (r == -1)
 			r = fs_err(-errno);
 		else if (r != inode->size) {
-			log_error("%s: %d of %ld bytes written", diag, r,
-				inode->size);
+			log_error("%s: %s: %d of %ld bytes written", diag,
+				a->dst, r, inode->size);
 			r = KV_ERR_PARTIAL_WRITE;
 		} else if (inode->size < inode->chunk_size) {
 			r = ftruncate(fd, a->index * inode->chunk_size
@@ -395,7 +395,7 @@ regular_file:
 	}
 done:
 	if (r != KV_SUCCESS)
-		log_error("%s: %s", diag, kv_err_string(r));
+		log_error("%s: %s: %s", diag, a->dst, kv_err_string(r));
 	else
 		inode->flags = (inode->flags & ~CHFS_FS_DIRTY) | CHFS_FS_CACHE;
 		/* persist */
