@@ -5,7 +5,7 @@
 
 static int rpc_count = 0;
 static struct timespec rpc_wait_time;
-static double rpc_last_interval = .5;
+static double rpc_last_interval = 1;
 static ABT_mutex_memory mutex_mem = ABT_MUTEX_INITIALIZER;
 static ABT_cond_memory begin_cond_mem = ABT_COND_INITIALIZER;
 static ABT_cond_memory end_cond_mem = ABT_COND_INITIALIZER;
