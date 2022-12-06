@@ -225,7 +225,7 @@ get_metadata(const char *path, size_t *size, int16_t *flags)
 }
 
 static int
-fs_inode_dirty(int fd)
+fs_inode_dirty(int fd, const char *p)
 {
 	static const char diag[] = "fs_inode_dirty";
 	int r;
@@ -241,7 +241,7 @@ fs_inode_dirty(int fd)
 	}
 	if (r == -1) {
 		r = -errno;
-		log_error("%s (xattr): %s", diag, strerror(errno));
+		log_error("%s (xattr): %s: %s", diag, p, strerror(errno));
 	}
 #else
 	struct metadata mdata;
@@ -249,22 +249,24 @@ fs_inode_dirty(int fd)
 	r = pread(fd, &mdata, msize, 0);
 	if (r == -1) {
 		r = -errno;
-		log_error("%s (read): %s", diag, strerror(errno));
+		log_error("%s (read): %s: %s", diag, p, strerror(errno));
 	} else if (r != msize) {
-		log_error("%s (read): %d of %d bytes read", diag, r, msize);
+		log_error("%s (read): %s: %d of %d bytes read", diag, p, r,
+			msize);
 		r = -EIO;
 	} else if (mdata.msize != msize) {
-		log_error("%s: metadata size mismatch", diag);
+		log_error("%s: %s: metadata size mismatch", diag, p);
 		r = -EIO;
 	} else if ((mdata.flags & CHFS_FS_DIRTY) == 0) {
 		mdata.flags |= CHFS_FS_DIRTY;
 		r = pwrite(fd, &mdata, msize, 0);
 		if (r == -1) {
 			r = -errno;
-			log_error("%s (write): %s", diag, strerror(errno));
+			log_error("%s (write): %s: %s", diag, p,
+				strerror(errno));
 		} else if (r != msize) {
-			log_error("%s (write): %d of %d bytes written", diag,
-				r, msize);
+			log_error("%s (write): %s: %d of %d bytes written",
+				diag, p, r, msize);
 			r = -ENOSPC;
 		}
 	}
@@ -458,7 +460,7 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 		if (r == -1)
 			r = -errno;
 		else if (!does_create && !(flags & CHFS_FS_CACHE))
-			fs_inode_dirty(fd);
+			fs_inode_dirty(fd, p);
 		if (!(flags & CHFS_FS_CACHE))
 			fs_inode_flush_enq(key_save, key_size);
 		close(fd);
@@ -607,7 +609,7 @@ fs_inode_truncate(char *key, size_t key_size, off_t len)
 	else {
 		fd = open(p, O_RDWR, 0);
 		if (fd >= 0) {
-			r = fs_inode_dirty(fd);
+			r = fs_inode_dirty(fd, p);
 			fs_inode_flush_enq(key_save, key_size);
 			close(fd);
 		} else

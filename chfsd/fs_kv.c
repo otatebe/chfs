@@ -165,7 +165,7 @@ fs_inode_dirty(char *key, size_t key_size, uint16_t flags)
 	r = kv_update(key, key_size, offsetof(struct inode, flags),
 		&flags, &ss);
 	if (r != KV_SUCCESS)
-		log_error("%s: %s", diag, kv_err_string(r));
+		log_error("%s: %s: %s", diag, key, kv_err_string(r));
 	return (r);
 }
 
