@@ -8,6 +8,8 @@
 #include "log.h"
 
 static int num_threads = 0;
+static int stop_requested = 0;
+static int num_stopped_threads = 0;
 
 struct entry {
 	struct entry *next;
@@ -16,7 +18,7 @@ struct entry {
 };
 
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+static pthread_cond_t notempty_cond = PTHREAD_COND_INITIALIZER;
 static pthread_cond_t wait_cond = PTHREAD_COND_INITIALIZER;
 
 static struct fs_flush_list {
@@ -45,21 +47,35 @@ set_num_threads(int num)
 	pthread_mutex_unlock(&mutex);
 }
 
+static void
+flush_thread_term(void)
+{
+	pthread_mutex_lock(&mutex);
+	++num_stopped_threads;
+	if (num_stopped_threads == num_threads)
+		pthread_cond_signal(&wait_cond);
+	pthread_mutex_unlock(&mutex);
+}
+
 int
 fs_inode_flush_enq(void *key, size_t size)
 {
 	struct entry *e;
+	static const char diag[] = "fs_inode_flush_enq";
 
 	if (get_num_threads() <= 0)
 		return (0);
 
-	log_debug("fs_inode_flush_enq: %s (%ld)", (char *)key, size);
+	log_debug("%s: %s (%ld)", diag, (char *)key, size);
 	e = malloc(sizeof *e);
-	if (e == NULL)
+	if (e == NULL) {
+		log_error("%s: %s (%ld): no memory", diag, (char *)key, size);
 		return (1);
+	}
 	e->next = NULL;
 	e->key = malloc(size);
 	if (e->key == NULL) {
+		log_error("%s: %s (%ld): no memory", diag, (char *)key, size);
 		free(e);
 		return (1);
 	}
@@ -69,7 +85,7 @@ fs_inode_flush_enq(void *key, size_t size)
 	pthread_mutex_lock(&mutex);
 	*flush_list.tail = e;
 	flush_list.tail = &e->next;
-	pthread_cond_signal(&cond);
+	pthread_cond_signal(&notempty_cond);
 	pthread_mutex_unlock(&mutex);
 
 	return (0);
@@ -78,17 +94,17 @@ fs_inode_flush_enq(void *key, size_t size)
 static struct entry *
 fs_inode_flush_deq(void)
 {
-	struct entry *e;
+	struct entry *e = NULL;
 
 	pthread_mutex_lock(&mutex);
-	while (flush_list.head == NULL)
-		pthread_cond_wait(&cond, &mutex);
-	e = flush_list.head;
-	flush_list.head = e->next;
-	if (flush_list.head == NULL) {
-		flush_list.tail = &flush_list.head;
-		pthread_cond_signal(&wait_cond);
+	while (flush_list.head == NULL && !stop_requested)
+		pthread_cond_wait(&notempty_cond, &mutex);
+	if (flush_list.head) {
+		e = flush_list.head;
+		flush_list.head = e->next;
 	}
+	if (flush_list.head == NULL)
+		flush_list.tail = &flush_list.head;
 	pthread_mutex_unlock(&mutex);
 
 	return (e);
@@ -101,7 +117,12 @@ fs_inode_flush_wait(void)
 		return;
 
 	pthread_mutex_lock(&mutex);
-	while (flush_list.head)
+	stop_requested = 1;
+	pthread_cond_broadcast(&notempty_cond);
+	pthread_mutex_unlock(&mutex);
+
+	pthread_mutex_lock(&mutex);
+	while (num_stopped_threads < num_threads)
 		pthread_cond_wait(&wait_cond, &mutex);
 	pthread_mutex_unlock(&mutex);
 }
@@ -154,12 +175,15 @@ flush_thread(void *a)
 
 	while (1) {
 		e = fs_inode_flush_deq();
+		if (e == NULL)
+			break;
 		if (fs_server_get_rpc_last_interval() >= 0)
 			fs_server_rpc_wait();
 		fs_inode_flush(e->key, e->size);
 		free(e->key);
 		free(e);
 	}
+	flush_thread_term();
 	return (NULL);
 }
 
