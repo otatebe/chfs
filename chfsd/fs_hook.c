@@ -52,7 +52,7 @@ fs_server_rpc_begin(void *func, const char *diag)
 
 	ABT_mutex_lock(mutex);
 	++rpc_count;
-	ABT_cond_signal(begin_cond);
+	ABT_cond_broadcast(begin_cond);
 	ABT_mutex_unlock(mutex);
 }
 
@@ -86,7 +86,7 @@ fs_server_rpc_end(void *func, const char *diag)
 	if (rpc_count <= 0) {
 		clock_gettime(CLOCK_REALTIME, &rpc_wait_time);
 		timespec_add(&rpc_wait_time, rpc_last_interval);
-		ABT_cond_signal(end_cond);
+		ABT_cond_broadcast(end_cond);
 	}
 	ABT_mutex_unlock(mutex);
 }
