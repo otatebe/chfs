@@ -127,7 +127,7 @@ handle_sig(void *arg)
 	if (ret < 0)
 		log_error("%s: sigwait: %s", diag, strerror(errno));
 	else
-		log_info("%s: signal %d caught", diag, sig);
+		log_notice("%s: signal %d caught", diag, sig);
 
 	ABT_mutex_lock(mutex);
 	heartbeat_stop = 1;
