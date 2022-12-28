@@ -650,7 +650,7 @@ coordinator(hg_handle_t h)
 
 	ABT_mutex_lock(mutex);
 	coordinator_rpc_done = 1;
-	ABT_mutex_unlock(mutex);
 	ABT_cond_signal(cond);
+	ABT_mutex_unlock(mutex);
 }
 DEFINE_MARGO_RPC_HANDLER(coordinator)
