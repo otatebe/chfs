@@ -164,6 +164,7 @@ The following APIs are supported.
             int (*filler)(void *, const char *, const struct stat *, off_t));
     int chfs_symlink(const char *target, const char *path);
     int chfs_readlink(const char *path, char *buf, size_t size);
+    void chfs_sync();
 
 ## References
 

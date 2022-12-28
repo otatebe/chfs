@@ -309,6 +309,7 @@ chfs_init(const char *server)
 int
 chfs_term()
 {
+	chfs_sync();
 	fd_table_term();
 	fs_client_term();
 	ring_list_term();
@@ -1763,4 +1764,51 @@ chfs_unlink_chunk_all(char *p, int index)
 	}
 	ring_list_copy_free(&node_list);
 	return (0);
+}
+
+void
+chfs_sync()
+{
+	node_list_t nlist;
+	hg_return_t ret;
+	struct {
+		fs_request_t req;
+		int need_wait;
+	} *r;
+	int i;
+	static const char diag[] = "chfs_sync";
+
+	chfs_ring_list_copy(&nlist);
+	r = malloc(sizeof(*r) * nlist.n);
+	if (r == NULL) {
+		log_error("%s (malloc): no memory for %ld bytes", diag,
+			sizeof(*r) * nlist.n);
+		goto ring_list_free;
+	}
+	for (i = 0; i < nlist.n; ++i) {
+		r[i].need_wait = 0;
+		if (nlist.s[i].address == NULL)
+			continue;
+		ret = fs_async_rpc_inode_sync_request(nlist.s[i].address,
+			&r[i].req);
+		if (ret != HG_SUCCESS) {
+			log_notice("%s (sync_request): %s, %s", diag,
+				nlist.s[i].address, HG_Error_to_string(ret));
+			continue;
+		}
+		r[i].need_wait = 1;
+	}
+	for (i = 0; i < nlist.n; ++i) {
+		if (r[i].need_wait == 0)
+			continue;
+		ret = fs_async_rpc_inode_sync_wait(&r[i].req);
+		if (ret != HG_SUCCESS) {
+			log_notice("%s (sync_wait): %s, %s", diag,
+				nlist.s[i].address, HG_Error_to_string(ret));
+			continue;
+		}
+	}
+	free(r);
+ring_list_free:
+	ring_list_copy_free(&nlist);
 }

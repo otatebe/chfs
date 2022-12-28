@@ -119,12 +119,18 @@ fs_rpc_readdir_replica(const char *server, const char *path, void *buf,
 	int (*filler)(void *, const char *, const struct stat *, off_t),
 	int *errp);
 
+hg_return_t
+fs_async_rpc_inode_sync_request(const char *server, fs_request_t *rp);
+
+hg_return_t
+fs_async_rpc_inode_sync_wait(fs_request_t *rp);
+
 void
 fs_client_init_internal(margo_instance_id mid, int timeout,
 	hg_id_t create_rpc, hg_id_t stat_rpc, hg_id_t write_rpc,
 	hg_id_t write_rdma_rpc, hg_id_t read_rpc, hg_id_t read_rdma_rpc,
 	hg_id_t copy_rpc, hg_id_t truncate_rpc, hg_id_t remove_rpc,
-	hg_id_t unlink_all_rpc);
+	hg_id_t unlink_all_rpc, hg_id_t sync_rpc);
 
 void
 fs_client_init_more_internal(hg_id_t read_rdma_rpc, hg_id_t readdir_rpc);

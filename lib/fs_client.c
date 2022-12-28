@@ -15,7 +15,7 @@ static struct env {
 	hg_id_t create_rpc, stat_rpc;
 	hg_id_t write_rpc, read_rpc, write_rdma_rpc, read_rdma_rpc;
 	hg_id_t copy_rdma_rpc;
-	hg_id_t truncate_rpc, remove_rpc, readdir_rpc, unlink_all_rpc;
+	hg_id_t truncate_rpc, remove_rpc, readdir_rpc, unlink_all_rpc, sync_rpc;
 } env;
 
 static hg_return_t
@@ -774,12 +774,50 @@ fs_rpc_readdir_replica(const char *server, const char *path, void *buf,
 	return (fs_rpc_readdir_common(server, path, buf, filler, 1, errp));
 }
 
+hg_return_t
+fs_async_rpc_inode_sync_request(const char *server, fs_request_t *rp)
+{
+	hg_return_t ret;
+	static const char diag[] = "fs_async_rpc_inode_sync_request";
+
+	ret = create_rpc_handle(server, env.sync_rpc, &rp->h, diag);
+	if (ret != HG_SUCCESS)
+		return (ret);
+
+	return (margo_iforward_timed(rp->h, NULL, fs_rpc_timeout_msec, &rp->r));
+}
+
+hg_return_t
+fs_async_rpc_inode_sync_wait(fs_request_t *rp)
+{
+	hg_return_t ret, ret2;
+	int32_t out;
+	static const char diag[] = "fs_async_rpc_inode_sync_wait";
+
+	ret = margo_wait(rp->r);
+	if (ret != HG_SUCCESS) {
+		log_error("%s (wait): %s", diag, HG_Error_to_string(ret));
+		goto margo_destroy;
+	}
+	ret = margo_get_output(rp->h, &out);
+	if (ret != HG_SUCCESS) {
+		log_error("%s (get_output): %s", diag, HG_Error_to_string(ret));
+		goto margo_destroy;
+	}
+	ret = margo_free_output(rp->h, &out);
+margo_destroy:
+	ret2 = margo_destroy(rp->h);
+	if (ret == HG_SUCCESS)
+		ret = ret2;
+	return (ret);
+}
+
 void
 fs_client_init_internal(margo_instance_id mid, int timeout,
 	hg_id_t create_rpc, hg_id_t stat_rpc, hg_id_t write_rpc,
 	hg_id_t write_rdma_rpc, hg_id_t read_rpc, hg_id_t read_rdma_rpc,
 	hg_id_t copy_rdma_rpc, hg_id_t truncate_rpc, hg_id_t remove_rpc,
-	hg_id_t unlink_all_rpc)
+	hg_id_t unlink_all_rpc, hg_id_t sync_rpc)
 {
 	env.mid = mid;
 	fs_rpc_timeout_msec = timeout;
@@ -793,6 +831,7 @@ fs_client_init_internal(margo_instance_id mid, int timeout,
 	env.truncate_rpc = truncate_rpc;
 	env.remove_rpc = remove_rpc;
 	env.unlink_all_rpc = unlink_all_rpc;
+	env.sync_rpc = sync_rpc;
 }
 
 void
@@ -831,6 +870,7 @@ fs_client_init(margo_instance_id mid, int timeout)
 	env.unlink_all_rpc = MARGO_REGISTER(mid, "inode_unlink_chunk_all",
 		fs_unlink_all_t, void, NULL);
 	margo_registered_disable_response(mid, env.unlink_all_rpc, HG_TRUE);
+	env.sync_rpc = MARGO_REGISTER(mid, "inode_sync", void, int32_t, NULL);
 }
 
 void

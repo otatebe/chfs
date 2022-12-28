@@ -112,21 +112,32 @@ wait_chfsd_shutdown() {
 
 stop_chfs() {
 	if [ "X$HOSTS" = Xlocalhost ]; then
-		$SUDO pkill $PKILL_FLAG chfsd
 		[ "$mode" = kill ] && pkill $PKILL_FLAG chfuse
 		if ! $NO_MOUNT && [ X"$MDIR" != X ]; then
 			fusermount -u "$MDIR"
 		fi
+		$SUDO pkill $PKILL_FLAG chfsd
 		HOSTS=
 	fi
 	p=0
 	for host in $HOSTS
 	do
-		ssh $host $SUDO pkill $PKILL_FLAG chfsd &
 		[ "$mode" = kill ] && ssh $host pkill $PKILL_FLAG chfuse &
 		if ! $NO_MOUNT && [ X"$MDIR" != X ]; then
 			ssh $host fusermount -u "$MDIR" &
 		fi
+
+		p=$((p + 1))
+		if [ $p -ge $MAX_JOBS ]; then
+			p=0
+			wait
+		fi
+	done
+	wait
+	p=0
+	for host in $HOSTS
+	do
+		ssh $host $SUDO pkill $PKILL_FLAG chfsd &
 
 		p=$((p + 1))
 		if [ $p -ge $MAX_JOBS ]; then

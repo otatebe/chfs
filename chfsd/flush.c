@@ -20,6 +20,7 @@ struct entry {
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t notempty_cond = PTHREAD_COND_INITIALIZER;
 static pthread_cond_t wait_cond = PTHREAD_COND_INITIALIZER;
+static pthread_cond_t sync_cond = PTHREAD_COND_INITIALIZER;
 
 static struct fs_flush_list {
 	struct entry *head;
@@ -91,14 +92,21 @@ fs_inode_flush_enq(void *key, size_t size)
 	return (0);
 }
 
+static int num_deq_wait = 0;
+
 static struct entry *
 fs_inode_flush_deq(void)
 {
 	struct entry *e = NULL;
 
 	pthread_mutex_lock(&mutex);
-	while (flush_list.head == NULL && !stop_requested)
+	while (flush_list.head == NULL && !stop_requested) {
+		++num_deq_wait;
+		if (num_deq_wait == num_threads)
+			pthread_cond_broadcast(&sync_cond);
 		pthread_cond_wait(&notempty_cond, &mutex);
+		--num_deq_wait;
+	}
 	if (flush_list.head) {
 		e = flush_list.head;
 		flush_list.head = e->next;
@@ -111,6 +119,18 @@ fs_inode_flush_deq(void)
 }
 
 void
+fs_inode_flush_sync(void)
+{
+	if (get_num_threads() <= 0)
+		return;
+
+	pthread_mutex_lock(&mutex);
+	while (num_deq_wait < num_threads && !stop_requested)
+		pthread_cond_wait(&sync_cond, &mutex);
+	pthread_mutex_unlock(&mutex);
+}
+
+void
 fs_inode_flush_wait(void)
 {
 	if (get_num_threads() <= 0)
@@ -119,6 +139,7 @@ fs_inode_flush_wait(void)
 	pthread_mutex_lock(&mutex);
 	stop_requested = 1;
 	pthread_cond_broadcast(&notempty_cond);
+	pthread_cond_broadcast(&sync_cond);
 	pthread_mutex_unlock(&mutex);
 
 	pthread_mutex_lock(&mutex);

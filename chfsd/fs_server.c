@@ -12,6 +12,7 @@
 #include "fs_rpc.h"
 #include "fs_hook.h"
 #include "fs.h"
+#include "flush.h"
 #include "log.h"
 
 static struct {
@@ -31,6 +32,7 @@ DECLARE_MARGO_RPC_HANDLER(inode_copy_rdma)
 DECLARE_MARGO_RPC_HANDLER(inode_truncate)
 DECLARE_MARGO_RPC_HANDLER(inode_remove)
 DECLARE_MARGO_RPC_HANDLER(inode_unlink_chunk_all)
+DECLARE_MARGO_RPC_HANDLER(inode_sync)
 
 void
 fs_server_init(margo_instance_id mid, char *db_dir, size_t db_size, int timeout,
@@ -38,7 +40,7 @@ fs_server_init(margo_instance_id mid, char *db_dir, size_t db_size, int timeout,
 {
 	hg_id_t create_rpc, stat_rpc, remove_rpc, copy_rdma_rpc;
 	hg_id_t write_rpc, write_rdma_rpc, read_rpc, read_rdma_rpc = -1;
-	hg_id_t truncate_rpc, unlink_all_rpc;
+	hg_id_t truncate_rpc, unlink_all_rpc, sync_rpc;
 
 	env.mid = mid;
 	create_rpc = MARGO_REGISTER(mid, "inode_create", fs_create_in_t,
@@ -64,10 +66,11 @@ fs_server_init(margo_instance_id mid, char *db_dir, size_t db_size, int timeout,
 	unlink_all_rpc = MARGO_REGISTER(mid, "inode_unlink_chunk_all",
 		fs_unlink_all_t, void, inode_unlink_chunk_all);
 	margo_registered_disable_response(mid, unlink_all_rpc, HG_TRUE);
+	sync_rpc = MARGO_REGISTER(mid, "inode_sync", void, int32_t, inode_sync);
 
 	fs_client_init_internal(mid, timeout, create_rpc, stat_rpc, write_rpc,
 		write_rdma_rpc, read_rpc, read_rdma_rpc, copy_rdma_rpc,
-		truncate_rpc, remove_rpc, unlink_all_rpc);
+		truncate_rpc, remove_rpc, unlink_all_rpc, sync_rpc);
 	fs_server_init_more(mid, db_dir, db_size, niothreads);
 
 	env.self = ring_get_self();
@@ -707,3 +710,23 @@ inode_copy_all(void)
 {
 }
 #endif
+
+static void
+inode_sync(hg_handle_t h)
+{
+	hg_return_t ret;
+	int32_t err = KV_SUCCESS;
+	static const char diag[] = "inode_sync RPC";
+
+	log_debug("%s", diag);
+	fs_inode_flush_sync();
+
+	ret = margo_respond(h, &err);
+	if (ret != HG_SUCCESS)
+		log_error("%s (respond): %s", diag, HG_Error_to_string(ret));
+
+	ret = margo_destroy(h);
+	if (ret != HG_SUCCESS)
+		log_error("%s (destroy): %s", diag, HG_Error_to_string(ret));
+}
+DEFINE_MARGO_RPC_HANDLER(inode_sync)
