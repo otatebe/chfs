@@ -11,7 +11,8 @@ RUN apt-get update \
  && apt-get -y install libpmemkv-dev libmemkind-dev libtbb-dev \
  && apt-get -y install rapidjson-dev \
  && apt-get -y install libfuse-dev pandoc \
- && apt-get -y install libopenmpi-dev libssl-dev
+ && apt-get -y install libopenmpi-dev libssl-dev \
+ && apt-get -y install gdb
 
 RUN \
   # sshd
