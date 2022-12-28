@@ -88,7 +88,7 @@ ring_release_node(ring_node_t *node)
 		free(node->host[0]);
 		node->host[0] = node->host[1];
 		node->host[1] = NULL;
-		ABT_cond_signal(node->cond);
+		ABT_cond_broadcast(node->cond);
 	}
 	ABT_mutex_unlock(node->mutex);
 }
