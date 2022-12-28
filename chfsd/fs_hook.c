@@ -32,12 +32,16 @@ fs_server_get_rpc_last_interval(void)
 	return (s);
 }
 
+static int rpc_no_wait = 0;
+
 /* internal function */
 static int
 rpc_last_interval_past()
 {
 	struct timespec ts;
 
+	if (rpc_no_wait)
+		return (1);
 	clock_gettime(CLOCK_REALTIME, &ts);
 	return (ts.tv_sec > rpc_wait_time.tv_sec
 		|| (ts.tv_sec == rpc_wait_time.tv_sec
@@ -92,6 +96,30 @@ fs_server_rpc_end(void *func, const char *diag)
 }
 
 void
+fs_server_rpc_wait_disable(void)
+{
+	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&mutex_mem);
+	ABT_cond begin_cond = ABT_COND_MEMORY_GET_HANDLE(&begin_cond_mem);
+	ABT_cond end_cond = ABT_COND_MEMORY_GET_HANDLE(&end_cond_mem);
+
+	ABT_mutex_lock(mutex);
+	rpc_no_wait = 1;
+	ABT_cond_broadcast(end_cond);
+	ABT_cond_broadcast(begin_cond);
+	ABT_mutex_unlock(mutex);
+}
+
+void
+fs_server_rpc_wait_enable(void)
+{
+	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&mutex_mem);
+
+	ABT_mutex_lock(mutex);
+	rpc_no_wait = 0;
+	ABT_mutex_unlock(mutex);
+}
+
+void
 fs_server_rpc_wait(void)
 {
 	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&mutex_mem);
@@ -100,7 +128,7 @@ fs_server_rpc_wait(void)
 	struct timespec ts;
 
 	ABT_mutex_lock(mutex);
-	while (rpc_count > 0 || !rpc_last_interval_past()) {
+	while (!rpc_no_wait && (rpc_count > 0 || !rpc_last_interval_past())) {
 		if (rpc_count > 0)
 			ABT_cond_wait(end_cond, mutex);
 

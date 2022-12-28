@@ -124,10 +124,12 @@ fs_inode_flush_sync(void)
 	if (get_num_threads() <= 0)
 		return;
 
+	fs_server_rpc_wait_disable();
 	pthread_mutex_lock(&mutex);
 	while (num_deq_wait < num_threads && !stop_requested)
 		pthread_cond_wait(&sync_cond, &mutex);
 	pthread_mutex_unlock(&mutex);
+	fs_server_rpc_wait_enable();
 }
 
 void
@@ -136,6 +138,7 @@ fs_inode_flush_wait(void)
 	if (get_num_threads() <= 0)
 		return;
 
+	fs_server_rpc_wait_disable();
 	pthread_mutex_lock(&mutex);
 	stop_requested = 1;
 	pthread_cond_broadcast(&notempty_cond);
