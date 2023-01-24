@@ -170,7 +170,6 @@ clean_chfs() {
 		fi
 	done
 	wait
-	wait_chfsd_shutdown
 }
 
 status_chfs() {
