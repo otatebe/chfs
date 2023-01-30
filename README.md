@@ -138,6 +138,7 @@ The following APIs are supported.
     void chfs_set_chunk_size(int chunk_size);
     void chfs_set_async_access(int enable);
     void chfs_set_buf_size(int buf_size);
+    void chfs_stagein_set_buf_size(int buf_size);
     void chfs_set_rdma_thresh(int thresh);
     void chfs_set_rpc_timeout_msec(int timeout_msec);
     void chfs_set_node_list_cache_timeout(int timeout_sec);
@@ -165,6 +166,7 @@ The following APIs are supported.
     int chfs_symlink(const char *target, const char *path);
     int chfs_readlink(const char *path, char *buf, size_t size);
     void chfs_sync();
+    int chfs_stagein(const char *path);
 
 ## References
 

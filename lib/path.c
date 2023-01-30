@@ -145,3 +145,23 @@ path_backend(const char *path)
 
 	return (s);
 }
+
+char *
+path_subdir(const char *path)
+{
+	char *p;
+
+	if (path == NULL)
+		return (NULL);
+	if (subdir_path == NULL)
+		return (strdup(path));
+
+	p = malloc(subdir_pathlen + 1 + strlen(path) + 1);
+	if (p == NULL)
+		return (NULL);
+	strcpy(p, subdir_path);
+	strcat(p, "/");
+	strcat(p, path);
+
+	return (p);
+}

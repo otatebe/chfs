@@ -1535,9 +1535,7 @@ chfs_stat(const char *path, struct stat *st)
 		return (0);
 	}
 	ret = chfs_rpc_inode_stat(p, strlen(p) + 1, &sb, &err);
-	if (ret == HG_SUCCESS && (err == KV_ERR_NO_ENTRY ||
-		(err == KV_SUCCESS && S_ISREG(MODE_MASK(sb.mode))
-		 && sb.mode & CHFS_O_CACHE) /* XXX */)) {
+	if (ret == HG_SUCCESS && err == KV_ERR_NO_ENTRY) {
 		bp = path_backend(p);
 		if (bp != NULL) {
 			r = lstat(bp, st);
@@ -1811,4 +1809,66 @@ chfs_sync()
 	free(r);
 ring_list_free:
 	ring_list_copy_free(&nlist);
+}
+
+static int stagein_bufsize = 1024 * 1024;
+
+void
+chfs_stagein_set_buf_size(int buf_size)
+{
+	log_info("chfs_stagein_set_buf_size: %d", buf_size);
+	stagein_bufsize = buf_size;
+}
+
+int
+chfs_stagein(const char *path)
+{
+	char *src = canonical_path(path), *dst;
+	struct stat sb;
+	int s, d, r, rr, st = -1;
+	char *buf;
+	static const char diag[] = "chfs_stagein";
+
+	if (src == NULL)
+		return (-1);
+
+	dst = path_subdir(src);
+	if (dst == NULL) {
+		errno = ENOMEM;
+		goto free_src;
+	}
+	buf = malloc(stagein_bufsize);
+	if (buf == NULL) {
+		log_error("%s: no memory (%d bytes)", diag, stagein_bufsize);
+		errno = ENOMEM;
+		goto free_dst;
+	}
+	if (stat(src, &sb) == -1 || (s = open(src, O_RDONLY)) == -1)
+		goto free_buf;
+
+	d = chfs_create(dst, O_WRONLY | CHFS_O_CACHE, sb.st_mode);
+	if (d < 0)
+		goto close_s;
+
+	r = read(s, buf, stagein_bufsize);
+	while (r > 0) {
+		rr = chfs_write(d, buf, r);
+		if (rr < 0 || r != rr)
+			break;
+		r = read(s, buf, stagein_bufsize);
+	}
+	if (r == 0)
+		st = 0;
+
+	chfs_close(d);
+close_s:
+	close(s);
+free_buf:
+	free(buf);
+free_dst:
+	free(dst);
+free_src:
+	free(src);
+
+	return (st);
 }

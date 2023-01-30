@@ -33,6 +33,8 @@ int chfs_readdir_index(const char *path, int index, void *buf,
 int chfs_symlink(const char *target, const char *path);
 int chfs_readlink(const char *path, char *buf, size_t size);
 void chfs_sync();
+void chfs_stagein_set_buf_size(int buf_size);
+int chfs_stagein(const char *path);
 
 #define CHFS_O_CACHE	(1 << 28)
 #define CHFS_S_IFREP	(1 << 30)
