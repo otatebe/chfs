@@ -1644,8 +1644,8 @@ chfs_truncate(const char *path, off_t len)
 static int
 chfs_node_list_cache_is_timeout()
 {
-	return (time(NULL) - node_list_cache_time >
-		chfs_node_list_cache_timeout);
+	return (chfs_node_list_cache_timeout > 0 &&
+	    time(NULL) - node_list_cache_time > chfs_node_list_cache_timeout);
 }
 
 static void
