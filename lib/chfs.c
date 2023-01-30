@@ -1648,13 +1648,17 @@ chfs_node_list_cache_is_timeout()
 	    time(NULL) - node_list_cache_time > chfs_node_list_cache_timeout);
 }
 
+static ABT_mutex_memory rl_mutex_mem = ABT_MUTEX_INITIALIZER;
+
 static void
 chfs_ring_list_copy(node_list_t *node_list)
 {
 	int i;
 	hg_return_t ret;
+	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&rl_mutex_mem);
 
 	ring_list_copy(node_list);
+	ABT_mutex_lock(mutex);
 	if (chfs_node_list_cache_is_timeout()) {
 		log_debug("chfs_ring_list_copy: node_list cache timeout");
 		for (i = 0; i < node_list->n; ++i) {
@@ -1672,6 +1676,7 @@ chfs_ring_list_copy(node_list_t *node_list)
 		ring_list_copy(node_list);
 		node_list_cache_time = time(NULL);
 	}
+	ABT_mutex_unlock(mutex);
 }
 
 static int
