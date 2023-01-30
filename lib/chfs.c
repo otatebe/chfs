@@ -1784,7 +1784,7 @@ chfs_sync()
 		fs_request_t req;
 		int need_wait;
 	} *r;
-	int i;
+	int i, ii, di;
 	static const char diag[] = "chfs_sync";
 
 	chfs_ring_list_copy(&nlist);
@@ -1794,26 +1794,29 @@ chfs_sync()
 			sizeof(*r) * nlist.n);
 		goto ring_list_free;
 	}
+	di = random() % nlist.n;
 	for (i = 0; i < nlist.n; ++i) {
-		r[i].need_wait = 0;
-		if (nlist.s[i].address == NULL)
+		ii = (i + di) % nlist.n;
+		r[ii].need_wait = 0;
+		if (nlist.s[ii].address == NULL)
 			continue;
-		ret = fs_async_rpc_inode_sync_request(nlist.s[i].address,
-			&r[i].req);
+		ret = fs_async_rpc_inode_sync_request(nlist.s[ii].address,
+			&r[ii].req);
 		if (ret != HG_SUCCESS) {
 			log_notice("%s (sync_request): %s, %s", diag,
-				nlist.s[i].address, HG_Error_to_string(ret));
+				nlist.s[ii].address, HG_Error_to_string(ret));
 			continue;
 		}
-		r[i].need_wait = 1;
+		r[ii].need_wait = 1;
 	}
 	for (i = 0; i < nlist.n; ++i) {
-		if (r[i].need_wait == 0)
+		ii = (i + di) % nlist.n;
+		if (r[ii].need_wait == 0)
 			continue;
-		ret = fs_async_rpc_inode_sync_wait(&r[i].req);
+		ret = fs_async_rpc_inode_sync_wait(&r[ii].req);
 		if (ret != HG_SUCCESS) {
 			log_notice("%s (sync_wait): %s, %s", diag,
-				nlist.s[i].address, HG_Error_to_string(ret));
+				nlist.s[ii].address, HG_Error_to_string(ret));
 			continue;
 		}
 	}
