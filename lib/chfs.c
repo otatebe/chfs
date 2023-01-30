@@ -189,10 +189,9 @@ get_server(int next)
 	if (nservs <= 0)
 		goto err;
 
-	if (index == -1) {
-		srandom(getpid());
+	if (index == -1)
 		init_index = index = random() % nservs;
-	} else if (next) {
+	else if (next) {
 		index = (index + 1) % nservs;
 		if (index == init_index)
 			goto err;
@@ -223,6 +222,7 @@ chfs_init(const char *server)
 			log_set_priority_max_level(max_log_level);
 	}
 
+	srandom(getpid());
 	if (IS_NULL_STRING(server))
 		server = get_server(0);
 	if (IS_NULL_STRING(server))
@@ -1536,7 +1536,7 @@ static ABT_mutex_memory rl_mutex_mem = ABT_MUTEX_INITIALIZER;
 static void
 chfs_ring_list_copy(node_list_t *node_list)
 {
-	int i;
+	int i, ii, di;
 	hg_return_t ret;
 	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&rl_mutex_mem);
 
@@ -1544,13 +1544,15 @@ chfs_ring_list_copy(node_list_t *node_list)
 	ABT_mutex_lock(mutex);
 	if (chfs_node_list_cache_is_timeout()) {
 		log_debug("chfs_ring_list_copy: node_list cache timeout");
+		di = random() % node_list->n;
 		for (i = 0; i < node_list->n; ++i) {
-			if (node_list->s[i].address == NULL)
+			ii = (i + di) % node_list->n;
+			if (node_list->s[ii].address == NULL)
 				continue;
-			ret = ring_list_rpc_node_list(node_list->s[i].address);
+			ret = ring_list_rpc_node_list(node_list->s[ii].address);
 			if (ret == HG_SUCCESS)
 				break;
-			log_notice("%s: %s", node_list->s[i].address,
+			log_notice("%s: %s", node_list->s[ii].address,
 				HG_Error_to_string(ret));
 		}
 		if (i == node_list->n)
@@ -1569,15 +1571,17 @@ chfs_readdir(const char *path, void *buf,
 	char *p = canonical_path(path);
 	node_list_t node_list;
 	hg_return_t ret;
-	int err, i;
+	int err, i, ii, di;
 
 	if (p == NULL)
 		return (-1);
 	chfs_ring_list_copy(&node_list);
+	di = random() % node_list.n;
 	for (i = 0; i < node_list.n; ++i) {
-		if (node_list.s[i].address == NULL)
+		ii = (i + di) % node_list.n;
+		if (node_list.s[ii].address == NULL)
 			continue;
-		ret = fs_rpc_readdir(node_list.s[i].address, p, buf, filler,
+		ret = fs_rpc_readdir(node_list.s[ii].address, p, buf, filler,
 			&err);
 		if (ret != HG_SUCCESS || err != KV_SUCCESS)
 			continue;
@@ -1609,14 +1613,16 @@ chfs_unlink_chunk_all(char *p, int index)
 {
 	node_list_t node_list;
 	hg_return_t ret;
-	int i;
+	int i, ii, di;
 
 	chfs_ring_list_copy(&node_list);
+	di = random() % node_list.n;
 	for (i = 0; i < node_list.n; ++i) {
-		if (node_list.s[i].address == NULL)
+		ii = (i + di) % node_list.n;
+		if (node_list.s[ii].address == NULL)
 			continue;
 		ret = fs_async_rpc_inode_unlink_chunk_all(
-				node_list.s[i].address, p, index);
+				node_list.s[ii].address, p, index);
 		if (ret != HG_SUCCESS)
 			continue;
 	}
