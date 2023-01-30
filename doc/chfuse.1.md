@@ -35,7 +35,7 @@ CHFS_RPC_TIMEOUT_MSEC
 : RPC timeout in milliseconds.  Zero means no timeout.  Default is 30000 milliseconds (30 seconds).
 
 CHFS_NODE_LIST_CACHE_TIMEOUT
-: node list cache timeout in seconds.  Default is 120 seconds.
+: node list cache timeout in seconds.  Zero means no timeout. Default is 120 seconds.
 
 CHFS_LOG_PRIORITY:
 : maximum log priority to report.  Default is notice.
