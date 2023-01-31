@@ -1649,36 +1649,55 @@ chfs_node_list_cache_is_timeout()
 }
 
 static ABT_mutex_memory rl_mutex_mem = ABT_MUTEX_INITIALIZER;
+static ABT_cond_memory rl_cond_mem = ABT_COND_INITIALIZER;
+static int rl_count = 0;
+
+static void
+update_node_list(void)
+{
+	node_list_t node_list;
+	int i, ii, di;
+	hg_return_t ret;
+
+	if (chfs_node_list_cache_is_timeout()) {
+		log_debug("chfs_ring_list_copy: node_list cache timeout");
+		ring_list_copy(&node_list);
+		di = random() % node_list.n;
+		for (i = 0; i < node_list.n; ++i) {
+			ii = (i + di) % node_list.n;
+			if (node_list.s[ii].address == NULL)
+				continue;
+			ret = ring_list_rpc_node_list(node_list.s[ii].address);
+			if (ret == HG_SUCCESS)
+				break;
+			log_notice("%s: %s", node_list.s[ii].address,
+				HG_Error_to_string(ret));
+		}
+		if (i == node_list.n)
+			log_fatal("chfs_ring_list_copy: no server");
+		ring_list_copy_free(&node_list);
+		node_list_cache_time = time(NULL);
+	}
+}
 
 static void
 chfs_ring_list_copy(node_list_t *node_list)
 {
-	int i, ii, di;
-	hg_return_t ret;
 	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&rl_mutex_mem);
+	ABT_cond cond = ABT_COND_MEMORY_GET_HANDLE(&rl_cond_mem);
 
-	ring_list_copy(node_list);
 	ABT_mutex_lock(mutex);
-	if (chfs_node_list_cache_is_timeout()) {
-		log_debug("chfs_ring_list_copy: node_list cache timeout");
-		di = random() % node_list->n;
-		for (i = 0; i < node_list->n; ++i) {
-			ii = (i + di) % node_list->n;
-			if (node_list->s[ii].address == NULL)
-				continue;
-			ret = ring_list_rpc_node_list(node_list->s[ii].address);
-			if (ret == HG_SUCCESS)
-				break;
-			log_notice("%s: %s", node_list->s[ii].address,
-				HG_Error_to_string(ret));
-		}
-		if (i == node_list->n)
-			log_fatal("chfs_ring_list_copy: no server");
-		ring_list_copy_free(node_list);
-		ring_list_copy(node_list);
-		node_list_cache_time = time(NULL);
-	}
+	++rl_count;
+	if (rl_count == 1) {
+		ABT_mutex_unlock(mutex);
+		update_node_list();
+		ABT_mutex_lock(mutex);
+		rl_count = 0;
+		ABT_cond_broadcast(cond);
+	} else
+		ABT_cond_wait(cond, mutex);
 	ABT_mutex_unlock(mutex);
+	ring_list_copy(node_list);
 }
 
 static int
