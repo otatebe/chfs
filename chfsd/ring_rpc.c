@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <unistd.h>
+#include <time.h>
 #include <margo.h>
 #include "ring.h"
 #include "ring_types.h"

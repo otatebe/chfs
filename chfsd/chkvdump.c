@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <syslog.h>
+#include <time.h>
 #include <margo.h>
 #include "ring_types.h"
 #include "kv_types.h"
