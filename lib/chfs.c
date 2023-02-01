@@ -4,6 +4,7 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <string.h>
+#include <time.h>
 #include <errno.h>
 #include <margo.h>
 #include "config.h"

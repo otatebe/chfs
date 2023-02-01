@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <time.h>
 #include <margo.h>
 #include "path.h"
 #include "ring_types.h"
