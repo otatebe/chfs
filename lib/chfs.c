@@ -304,6 +304,9 @@ chfs_init(const char *server)
 		log_fatal("chfs_init: no server");
 	node_list_cache_time = time(NULL);
 
+	/* set up all connections */
+	chfs_sync();
+
 	return (0);
 }
 
