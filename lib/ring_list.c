@@ -234,7 +234,7 @@ get_local_server_unlocked()
 	int max_len = 0, min_diff = 0x7fffffff, min_i = 0;
 	int len = max_len, diff = min_diff, i;
 
-	if (ring_list_client == NULL)
+	if (ring_list_client == NULL || ring_list.n == 0)
 		return (NULL);
 
 	for (i = 0; i < ring_list.n; ++i) {
@@ -300,6 +300,8 @@ unlock:
 char *
 ring_list_get_local_server()
 {
+	if (ring_list_local_server == NULL)
+		return (NULL);
 	return (strdup(ring_list_local_server));
 }
 
@@ -320,6 +322,13 @@ ring_list_remove(char *host)
 		--ring_list.n;
 		for (; i < ring_list.n; ++i)
 			ring_list.nodes[i] = ring_list.nodes[i + 1];
+		if (ring_list_client &&
+			strcmp(host, ring_list_local_server) == 0) {
+			free(ring_list_local_server);
+			ring_list_local_server = get_local_server_unlocked();
+			log_debug("client: %s local_server: %s",
+				ring_list_client, ring_list_local_server);
+		}
 	}
 	if (ring_list.n == 0) {
 		log_warning("ring_list_remove: no server");
