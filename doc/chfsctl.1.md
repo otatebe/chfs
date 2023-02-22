@@ -57,6 +57,9 @@ chfsctl - manage CHFS servers
 -n num_servers
 : specifies the maximum number of first contact servers.  Default is 32.
 
+-x environment_variable[=value]
+: exports the specified environment variable.  This option can be specified multiple times.
+
 -O options
 : specifies options for chfsd.
 

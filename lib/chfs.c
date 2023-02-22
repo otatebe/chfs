@@ -289,6 +289,7 @@ chfs_init(const char *server)
 	margo_addr_to_string(mid, chfs_client, &client_size, client_addr);
 	margo_addr_free(mid, client_addr);
 
+	ring_list_set_client(chfs_client);
 	fd_table_init();
 	chfs_uid = getuid();
 	chfs_gid = getgid();
