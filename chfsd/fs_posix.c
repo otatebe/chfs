@@ -259,7 +259,7 @@ int
 fs_inode_create(char *key, size_t key_size, uint32_t uid, uint32_t gid,
 	mode_t mode, size_t chunk_size, const void *buf, size_t size)
 {
-	char *p = key_to_path(key, key_size);
+	char *p = key_to_path(key, key_size), *d;
 	int r, fd;
 	static const char diag[] = "fs_inode_create";
 
@@ -283,6 +283,15 @@ fs_inode_create(char *key, size_t key_size, uint32_t uid, uint32_t gid,
 			r = -errno;
 	} else if (S_ISLNK(mode)) {
 		r = symlink(buf, p);
+		if (r == -1) {
+			d = fs_dirname(p);
+			if (d != NULL) {
+				/* mkdir_p() may fail due to race condition */
+				mkdir_p(d, 0755);
+				free(d);
+			}
+			r = symlink(buf, p);
+		}
 		if (r == -1)
 			r = -errno;
 	} else
