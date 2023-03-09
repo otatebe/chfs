@@ -254,6 +254,9 @@ chfs_init(const char *server)
 	if (!IS_NULL_STRING(timeout))
 		chfs_set_node_list_cache_timeout(atoi(timeout));
 
+	if (getenv("CHFS_LOOKUP_LOCAL"))
+		ring_list_set_lookup_local();
+
 	while (server != NULL) {
 		proto = margo_protocol(server);
 		if (proto != NULL)
