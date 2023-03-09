@@ -341,6 +341,10 @@ fs_inode_create(char *key, size_t key_size, uint32_t uid, uint32_t gid,
 			r = -errno;
 	} else if (S_ISLNK(mode)) {
 		r = symlink(buf, p);
+		if (r == -1) {
+			fs_mkdir_parent(p);
+			r = symlink(buf, p);
+		}
 		if (r == -1)
 			r = -errno;
 	} else
