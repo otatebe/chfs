@@ -28,6 +28,9 @@ CHFS_ASYNC_ACCESS
 CHFS_BUF_SIZE
 : buffer size.  Default is 0.
 
+CHFS_LOOKUP_LOCAL
+: set 1 to connect to a local chfsd only.
+
 CHFS_RDMA_THRESH
 : RDMA transfer is used when the size is larger than or equal to CHFS_RDMA_THRESH.  Default is 32 KiB.
 
