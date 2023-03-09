@@ -1858,33 +1858,23 @@ chfs_stagein_set_buf_size(int buf_size)
 	stagein_bufsize = buf_size;
 }
 
-int
-chfs_stagein(const char *path)
+static int
+stagein_reg(const char *src, const char *dst, mode_t mode)
 {
-	char *src = canonical_path(path), *dst;
-	struct stat sb;
 	int s, d, r, rr, st = -1;
 	char *buf;
 	static const char diag[] = "chfs_stagein";
 
-	if (src == NULL)
-		return (-1);
-
-	dst = path_subdir(src);
-	if (dst == NULL) {
-		errno = ENOMEM;
-		goto free_src;
-	}
 	buf = malloc(stagein_bufsize);
 	if (buf == NULL) {
 		log_error("%s: no memory (%d bytes)", diag, stagein_bufsize);
 		errno = ENOMEM;
-		goto free_dst;
+		return (-1);
 	}
-	if (stat(src, &sb) == -1 || (s = open(src, O_RDONLY)) == -1)
+	if ((s = open(src, O_RDONLY)) == -1)
 		goto free_buf;
 
-	d = chfs_create(dst, O_WRONLY | CHFS_O_CACHE, sb.st_mode);
+	d = chfs_create(dst, O_WRONLY | CHFS_O_CACHE, mode);
 	if (d < 0)
 		goto close_s;
 
@@ -1903,6 +1893,42 @@ close_s:
 	close(s);
 free_buf:
 	free(buf);
+
+	return (st);
+}
+
+int
+chfs_stagein(const char *path)
+{
+	char *src = canonical_path(path), *dst;
+	char sym_buf[PATH_MAX];
+	struct stat sb;
+	int st = -1;
+
+	if (src == NULL)
+		return (-1);
+
+	dst = path_subdir(src);
+	if (dst == NULL) {
+		errno = ENOMEM;
+		goto free_src;
+	}
+	if (lstat(src, &sb) == -1)
+		goto free_dst;
+
+	if (S_ISREG(sb.st_mode))
+		st = stagein_reg(src, dst, sb.st_mode);
+	else if (S_ISDIR(sb.st_mode))
+		st = chfs_mkdir(dst, sb.st_mode | 0700);
+	else if (S_ISLNK(sb.st_mode)) {
+		st = readlink(src, sym_buf, sizeof sym_buf);
+		if (st > 0) {
+			sym_buf[st] = '\0';
+			st = chfs_symlink(sym_buf, dst);
+		}
+	} else
+		errno = ENOTSUP;
+
 free_dst:
 	free(dst);
 free_src:
