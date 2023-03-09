@@ -231,21 +231,34 @@ strdiff(const char *s1, const char *s2, int *len, int *diff)
 static char *
 get_local_server_unlocked()
 {
-	int max_len = 0, min_diff = 0x7fffffff, min_i = 0;
-	int len = max_len, diff = min_diff, i;
+	int max_len = 0, min_i = 0, max_num = 0, *c;
+	int len = max_len, i;
 
 	if (ring_list_client == NULL || ring_list.n == 0)
 		return (NULL);
 
+	c = malloc(sizeof(int) * ring_list.n);
+	if (c == NULL)
+		return (NULL);
+
 	for (i = 0; i < ring_list.n; ++i) {
 		strdiff(ring_list_client, ring_list.nodes[i].address,
-			&len, &diff);
-		if (max_len < len || (max_len == len && min_diff > diff)) {
+			&len, NULL);
+		if (max_len < len) {
+			max_num = 1;
+			c[max_num - 1] = i;
 			min_i = i;
 			max_len = len;
-			min_diff = diff;
+		} else if (max_len == len) {
+			++max_num;
+			c[max_num - 1] = i;
+			min_i = i;
 		}
 	}
+	/* there are several local candidates, choose randomly */
+	if (max_num > 1)
+		min_i = c[random() % max_num];
+	free(c);
 	return (strdup(ring_list.nodes[min_i].address));
 }
 
@@ -297,7 +310,7 @@ unlock:
 	ABT_mutex_unlock(ring_list_mutex);
 }
 
-char *
+static char *
 ring_list_get_local_server()
 {
 	if (ring_list_local_server == NULL)
@@ -466,11 +479,22 @@ ring_list_lookup_binary(const char *key, int key_size)
 
 #endif
 
+static int ring_list_lookup_local = 0;
+
+void
+ring_list_set_lookup_local()
+{
+	log_debug("ring_list_set_lookup_local");
+	ring_list_lookup_local = 1;
+}
+
 char *
 ring_list_lookup(const char *key, int key_size)
 {
 	if (ring_list.n == 0)
 		return (NULL);
+	if (ring_list_lookup_local)
+		return (ring_list_get_local_server());
 #ifdef USE_MODULAR_HASHING
 	return (ring_list_lookup_modulo(key, key_size));
 #else

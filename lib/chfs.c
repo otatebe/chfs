@@ -267,6 +267,9 @@ chfs_init(const char *server)
 	if (!IS_NULL_STRING(bpath))
 		path_set_backend_path(bpath);
 
+	if (getenv("CHFS_LOOKUP_LOCAL"))
+		ring_list_set_lookup_local();
+
 	while (server != NULL) {
 		proto = margo_protocol(server);
 		if (proto != NULL)
