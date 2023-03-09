@@ -482,10 +482,10 @@ ring_list_lookup_binary(const char *key, int key_size)
 static int ring_list_lookup_local = 0;
 
 void
-ring_list_set_lookup_local()
+ring_list_set_lookup_local(int enable)
 {
-	log_debug("ring_list_set_lookup_local");
-	ring_list_lookup_local = 1;
+	log_info("ring_list_set_lookup_local: %d", enable);
+	ring_list_lookup_local = enable;
 }
 
 char *
