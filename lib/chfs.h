@@ -6,7 +6,7 @@ const char *chfs_version();
 void chfs_set_chunk_size(int chunk_size);
 void chfs_set_buf_size(int buf_size);
 void chfs_set_async_access(int enable);
-void chfs_set_rdma_thresh(int thresh);
+void chfs_set_rdma_thresh(size_t thresh);
 void chfs_set_rpc_timeout_msec(int timeout);
 void chfs_set_node_list_cache_timeout(int timeout);
 
