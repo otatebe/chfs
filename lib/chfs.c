@@ -23,7 +23,7 @@
 static char chfs_client[PATH_MAX];
 static uint32_t chfs_uid, chfs_gid;
 static int chfs_chunk_size = 65536;
-static int chfs_rdma_thresh = 32768;
+static size_t chfs_rdma_thresh = 32768;
 static int chfs_rpc_timeout_msec = 30000;	/* 30 seconds */
 static int chfs_node_list_cache_timeout = 120;	/* 120 seconds */
 static int chfs_async_access = 0;
@@ -67,9 +67,9 @@ chfs_set_buf_size(int buf_size)
 }
 
 void
-chfs_set_rdma_thresh(int thresh)
+chfs_set_rdma_thresh(size_t thresh)
 {
-	log_info("chfs_set_rdma_thresh: %d", thresh);
+	log_info("chfs_set_rdma_thresh: %lu", thresh);
 	chfs_rdma_thresh = thresh;
 }
 
@@ -249,7 +249,7 @@ chfs_init(const char *server)
 
 	rdma_thresh = getenv("CHFS_RDMA_THRESH");
 	if (!IS_NULL_STRING(rdma_thresh))
-		chfs_set_rdma_thresh(atoi(rdma_thresh));
+		chfs_set_rdma_thresh(atol(rdma_thresh));
 
 	timeout = getenv("CHFS_RPC_TIMEOUT_MSEC");
 	if (!IS_NULL_STRING(timeout))
@@ -657,7 +657,7 @@ chfs_async_rpc_inode_write(void *key, size_t key_size, const void *buf,
 			log_error("%s: no server", diag);
 			return (HG_PROTOCOL_ERROR);
 		}
-		if (size < chfs_rdma_thresh)
+		if (size <= chfs_rdma_thresh)
 			ret = fs_async_rpc_inode_write(target, key, key_size,
 				buf, size, offset, mode, chunk_size, rp);
 		else
@@ -679,7 +679,7 @@ chfs_async_rpc_inode_write(void *key, size_t key_size, const void *buf,
 static hg_return_t
 chfs_async_rpc_inode_write_wait(size_t *size, int *errp, fs_request_t *rp)
 {
-	if (*size < chfs_rdma_thresh)
+	if (*size <= chfs_rdma_thresh)
 		return (fs_async_rpc_inode_write_wait(size, errp, rp));
 	else
 		return (fs_async_rpc_inode_write_rdma_wait(size, errp, rp));
@@ -716,7 +716,7 @@ chfs_async_rpc_inode_read(void *key, size_t key_size, void *buf, size_t size,
 			log_error("%s: no server", diag);
 			return (HG_PROTOCOL_ERROR);
 		}
-		if (size < chfs_rdma_thresh)
+		if (size <= chfs_rdma_thresh)
 			ret = fs_async_rpc_inode_read(target, key, key_size,
 				size, offset, rp);
 		else
@@ -738,7 +738,7 @@ static hg_return_t
 chfs_async_rpc_inode_read_wait(void *buf, size_t *size, int *errp,
 	fs_request_t *rp)
 {
-	if (*size < chfs_rdma_thresh)
+	if (*size <= chfs_rdma_thresh)
 		return (fs_async_rpc_inode_read_wait(buf, size, errp, rp));
 	else
 		return (fs_async_rpc_inode_read_rdma_wait(size, errp, rp));
