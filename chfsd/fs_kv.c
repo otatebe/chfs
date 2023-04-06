@@ -150,7 +150,7 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 	int r;
 	static const char diag[] = "fs_inode_write";
 
-	kv_lock(key, key_size);
+	kv_lock(key, key_size, diag, *size, offset);
 	r = kv_pget(key, key_size, 0, &inode, &s);
 	if (r != KV_SUCCESS) {
 		r = fs_inode_create_data(key, key_size, 0, 0, mode, chunk_size,
@@ -204,7 +204,7 @@ fs_inode_truncate(char *key, size_t key_size, off_t len)
 	int r;
 	static const char diag[] = "fs_inode_truncate";
 
-	kv_lock(key, key_size);
+	kv_lock(key, key_size, diag, len, 0);
 	r = kv_pget(key, key_size, 0, &inode, &s);
 	if (r != KV_SUCCESS) {
 		kv_unlock(key, key_size);
