@@ -134,6 +134,7 @@ The following APIs are supported.
 
     int chfs_init(const char *server);
     int chfs_term();
+    int chfs_term_without_sync();
     const char *chfs_version();
     void chfs_set_chunk_size(int chunk_size);
     void chfs_set_async_access(int enable);

@@ -488,6 +488,12 @@ ring_list_set_lookup_local(int enable)
 	ring_list_lookup_local = enable;
 }
 
+int
+ring_list_does_lookup_local()
+{
+	return (ring_list_lookup_local);
+}
+
 char *
 ring_list_lookup(const char *key, int key_size)
 {

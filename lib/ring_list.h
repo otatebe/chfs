@@ -14,3 +14,4 @@ char *ring_list_lookup_index(int index);
 char *ring_list_lookup(const char *key, int key_size);
 int ring_list_is_coordinator(char *self);
 void ring_list_set_lookup_local(int);
+int ring_list_does_lookup_local();

@@ -309,8 +309,18 @@ chfs_init(const char *server)
 		log_fatal("chfs_init: no server");
 	node_list_cache_time = time(NULL);
 
-	/* set up all connections */
-	chfs_sync();
+	if (!ring_list_does_lookup_local())
+		chfs_sync(); /* set up all connections */
+
+	return (0);
+}
+
+int
+chfs_term_without_sync()
+{
+	fd_table_term();
+	fs_client_term();
+	ring_list_term();
 
 	return (0);
 }
@@ -319,12 +329,9 @@ int
 chfs_term()
 {
 	chfs_sync();
-	fd_table_term();
-	fs_client_term();
-	ring_list_term();
-
-	return (0);
+	return (chfs_term_without_sync());
 }
+
 
 const char *
 chfs_version(void)
