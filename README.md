@@ -100,6 +100,7 @@ CHFS is a parallel consistent hashing file system created instantly using node-l
 - CHFS_CHUNK_SIZE - chunk size
 - CHFS_ASYNC_ACCESS - set 1 to enable asynchronous accesses
 - CHFS_BUF_SIZE - buffer size
+- CHFS_LOOKUP_LOCAL - set 1 to connect to a local chfsd only
 - CHFS_RDMA_THRESH - RDMA transfer is used when the size is larger than CHFS_RDMA_THRESH
 - CHFS_RPC_TIMEOUT_MSEC - RPC timeout in milliseconds
 - CHFS_NODE_LIST_CACHE_TIMEOUT - node list cache timeout in seconds
