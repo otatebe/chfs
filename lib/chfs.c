@@ -332,7 +332,6 @@ chfs_term()
 	return (chfs_term_without_sync());
 }
 
-
 const char *
 chfs_version(void)
 {
