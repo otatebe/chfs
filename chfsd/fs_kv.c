@@ -430,7 +430,7 @@ fs_inode_flush(void *key, size_t key_size)
 	else {
 		arg->dst = dst;
 		arg->index = index;
-		kv_lock(key, key_size);
+		kv_lock(key, key_size, diag, 0, 0);
 		r = kv_get_cb(key, key_size, flush_cb, arg);
 		kv_unlock(key, key_size);
 		free(arg);
