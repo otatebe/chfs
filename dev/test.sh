@@ -5,6 +5,10 @@ set -eux
 LANG=C
 MDIR=/tmp/a
 
+# clean up
+chfsctl -h hosts -m $MDIR stop
+chfsctl -h hosts -m $MDIR clean
+
 eval $(chfsctl -h hosts -m $MDIR -L log start)
 chlist
 cp ~/chfs/configure $MDIR
