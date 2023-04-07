@@ -65,10 +65,30 @@ flush_thread_term(void)
 	ABT_mutex_unlock(mutex);
 }
 
+static int
+key_index(char *key, size_t key_size)
+{
+	int index = 0, slen = strlen(key) + 1;
+
+	if (slen < key_size)
+		index = atoi(key + slen);
+	return (index);
+}
+
+static int
+eq_entry(struct entry *e1, struct entry *e2)
+{
+	if (e1 == NULL || e2 == NULL)
+		return (0);
+	return (e1->size == e2->size &&
+		memcmp(e1->key, e2->key, e1->size) == 0);
+}
+
 int
 fs_inode_flush_enq(void *key, size_t size)
 {
 	struct entry *e;
+	int index = key_index(key, size);
 	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&mutex_mem);
 	ABT_cond notempty_cond =
 		ABT_COND_MEMORY_GET_HANDLE(&notempty_cond_mem);
@@ -77,16 +97,16 @@ fs_inode_flush_enq(void *key, size_t size)
 	if (get_num_threads() <= 0)
 		return (0);
 
-	log_debug("%s: %s (%ld)", diag, (char *)key, size);
+	log_debug("%s: %s:%d", diag, (char *)key, index);
 	e = malloc(sizeof *e);
 	if (e == NULL) {
-		log_error("%s: %s (%ld): no memory", diag, (char *)key, size);
+		log_error("%s: %s:%d: no memory", diag, (char *)key, index);
 		return (1);
 	}
 	e->next = NULL;
 	e->key = malloc(size);
 	if (e->key == NULL) {
-		log_error("%s: %s (%ld): no memory", diag, (char *)key, size);
+		log_error("%s: %s:%d: no memory", diag, (char *)key, index);
 		free(e);
 		return (1);
 	}
@@ -94,9 +114,16 @@ fs_inode_flush_enq(void *key, size_t size)
 	e->size = size;
 
 	ABT_mutex_lock(mutex);
-	*flush_list.tail = e;
-	flush_list.tail = &e->next;
-	ABT_cond_signal(notempty_cond);
+	if (flush_list.head == NULL ||
+		!eq_entry((struct entry *)flush_list.tail, e)) {
+		*flush_list.tail = e;
+		flush_list.tail = &e->next;
+		ABT_cond_signal(notempty_cond);
+	} else {
+		log_info("%s: duplicate %s:%d", diag, (char *)key, index);
+		free(e->key);
+		free(e);
+	}
 	ABT_mutex_unlock(mutex);
 
 	return (0);
