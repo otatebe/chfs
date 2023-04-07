@@ -397,9 +397,10 @@ regular_file:
 done:
 	if (r != KV_SUCCESS)
 		log_error("%s: %s: %s", diag, a->dst, kv_err_string(r));
-	else
+	else {
 		inode->flags = (inode->flags & ~CHFS_FS_DIRTY) | CHFS_FS_CACHE;
-		/* persist */
+		kv_persist(&inode->flags, sizeof(inode->flags));
+	}
 }
 
 int
