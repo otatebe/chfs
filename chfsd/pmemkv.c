@@ -166,7 +166,7 @@ update_cb(const char *v, size_t size, void *a)
 		return;
 	value += arg->off;
 	memcpy(value, arg->value, arg->size);
-	/* XXX persist? */
+	kv_persist(value, arg->size);
 }
 
 int
@@ -199,7 +199,6 @@ pget_cb(const char *v, size_t size, void *a)
 		return;
 	value += arg->off;
 	memcpy(arg->value, value, arg->size);
-	/* XXX persist? */
 }
 
 int
