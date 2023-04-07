@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <libpmem.h>
 #include <libpmemkv.h>
 #include "kv_err.h"
 #include "kv.h"
@@ -165,7 +166,7 @@ update_cb(const char *v, size_t size, void *a)
 		return;
 	value += arg->off;
 	memcpy(value, arg->value, arg->size);
-	/* XXX persist? */
+	kv_persist(value, arg->size);
 }
 
 int
@@ -198,7 +199,6 @@ pget_cb(const char *v, size_t size, void *a)
 		return;
 	value += arg->off;
 	memcpy(arg->value, value, arg->size);
-	/* XXX persist? */
 }
 
 int
@@ -242,4 +242,10 @@ kv_get_all_cb(int (*cb)(const char *, size_t, const char *, size_t, void *),
 {
 	log_debug("local pmem get all cb");
 	return (kv_err(pmemkv_get_all(db, cb, arg)));
+}
+
+void
+kv_persist(void *addr, size_t len)
+{
+	pmem_persist(addr, len);
 }
