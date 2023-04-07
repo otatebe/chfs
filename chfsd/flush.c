@@ -88,7 +88,7 @@ int
 fs_inode_flush_enq(void *key, size_t size)
 {
 	struct entry *e;
-	int index = key_index(key, size);
+	int index = key_index(key, size), duplicate = 0;
 	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&mutex_mem);
 	ABT_cond notempty_cond =
 		ABT_COND_MEMORY_GET_HANDLE(&notempty_cond_mem);
@@ -119,12 +119,15 @@ fs_inode_flush_enq(void *key, size_t size)
 		*flush_list.tail = e;
 		flush_list.tail = &e->next;
 		ABT_cond_signal(notempty_cond);
-	} else {
+	} else
+		duplicate = 1;
+	ABT_mutex_unlock(mutex);
+
+	if (duplicate) {
 		log_info("%s: duplicate %s:%d", diag, (char *)key, index);
 		free(e->key);
 		free(e);
 	}
-	ABT_mutex_unlock(mutex);
 
 	return (0);
 }
