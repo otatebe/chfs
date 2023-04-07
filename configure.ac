@@ -86,7 +86,6 @@ AC_MSG_RESULT([$with_pmemkv])
 AM_CONDITIONAL([USE_PMEMKV], [test x$with_pmemkv != xno])
 if test x$with_pmemkv != xno; then
   AC_DEFINE([USE_PMEMKV], [1], [Use pmemkv])
-  PKG_CHECK_MODULES([LIBPMEM], [libpmem])
   PKG_CHECK_MODULES([LIBPMEMKV], [libpmemkv])
 fi
 

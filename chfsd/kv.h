@@ -20,5 +20,3 @@ int kv_remove(void *key, size_t key_size);
 int kv_get_all_cb(
 	int (*cb)(const char *, size_t, const char *, size_t, void *),
 	void *arg);
-
-void kv_persist(void *, size_t);
