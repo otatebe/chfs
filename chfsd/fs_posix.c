@@ -770,7 +770,7 @@ regular_file:
 		goto free_dst;
 	}
 	if (!(cache_flags & CHFS_FS_DIRTY)) {
-		log_debug("%s: clean", diag);
+		log_info("%s: clean", diag);
 		r = KV_SUCCESS;
 		goto close_src_fd;
 	}
