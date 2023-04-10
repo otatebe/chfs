@@ -18,6 +18,7 @@ NO_SERVER=true
 SUDO=
 NUM_SERVS=32
 TIMEOUT=30
+EXEC_INTERVAL=0
 
 program=$(basename $0)
 
@@ -30,8 +31,8 @@ usage() {
 	[ "X$*" = X ] || echo >&2 $program: $*
 	echo >&2 "usage: $program [-h hostfile] [-c scratch_dir] [-D] [-m mount_point]"
 	echo >&2 "		[-p proto] [-s db_size] [-N vname] [-I interface]"
-	echo >&2 "		[-C socket#] [-L log_dir] [-A] [-O options]"
-	echo >&2 "		[-n #servers for CHFS_SERVER] [-x env]"
+	echo >&2 "		[-i interval] [-C socket#] [-L log_dir] [-A]"
+	echo >&2 "		[-n #servers for CHFS_SERVER] [-x env] [-O options]"
 	echo >&2 "		start | stop | status | kill | clean"
 	exit 1
 }
@@ -44,6 +45,7 @@ while [ $# -gt 0 ]; do
 	    -C) shift; CPUSOCKET=$1 ;;
 	    -D) DEVDAX=true ;;
 	    -h) shift; HOSTFILE=$1 ;;
+	    -i) shift; EXEC_INTERVAL=$1 ;;
 	    -I) shift; IFACE=$1 ;;
 	    -L) shift; LOG_DIR=$1 ;;
 	    -m) shift; MDIR=$1 ;;
@@ -261,6 +263,8 @@ do
 		p=0
 		set $(chlist | awk '{ print $1 }')
 		MAX_JOBS=$#
+	else
+		sleep $EXEC_INTERVAL
 	fi
 done
 if $NO_SERVER; then err no server executed; fi
