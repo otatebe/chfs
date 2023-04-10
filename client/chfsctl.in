@@ -21,6 +21,7 @@ NUM_SERVS=32
 TIMEOUT=30
 NUM_FLUSH_THREADS=1
 NO_MOUNT=false
+EXEC_INTERVAL=0
 
 program=$(basename $0)
 
@@ -33,8 +34,8 @@ usage() {
 	[ "X$*" = X ] || echo >&2 $program: $*
 	echo >&2 "usage: $program [-h hostfile] [-c scratch_dir] [-D] [-m mount_point] [-M]"
 	echo >&2 "	[-b backend_dir] [-f #flush_threads] [-p proto] [-s db_size] [-N vname]"
-	echo >&2 "	[-I interface] [-C socket#] [-L log_dir] [-A] [-O options]"
-	echo >&2 "	[-n #servers for CHFS_SERVER] [-x env]"
+	echo >&2 "	[-I interface] [-i interval] [-C socket#] [-L log_dir] [-A]"
+	echo >&2 "	[-n #servers for CHFS_SERVER] [-x env] [-O options]"
 	echo >&2 "	start | stop | status | kill | clean"
 	exit 1
 }
@@ -49,6 +50,7 @@ while [ $# -gt 0 ]; do
 	    -D) DEVDAX=true ;;
 	    -f) shift; NUM_FLUSH_THREADS=$1 ;;
 	    -h) shift; HOSTFILE=$1 ;;
+	    -i) shift; EXEC_INTERVAL=$1 ;;
 	    -I) shift; IFACE=$1 ;;
 	    -L) shift; LOG_DIR=$1 ;;
 	    -m) shift; MDIR=$1 ;;
@@ -287,6 +289,8 @@ do
 		p=0
 		set $(chlist | awk '{ print $1 }')
 		MAX_JOBS=$#
+	else
+		sleep $EXEC_INTERVAL
 	fi
 done
 if $NO_SERVER; then err no server executed; fi

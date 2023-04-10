@@ -48,6 +48,9 @@ chfsctl - manage CHFS servers
 -N virtual_name
 : specifies a virtual name of servers.  Each server name consists of server address and virtual name.  Virtual name is useful to balance the load among servers when using consistent hashing.
 
+-i interval
+: specifies an interval to execute chfsd in seconds.  Default is 0.
+
 -I interface
 : specifies an interface to execute chfsd when there are multiple interfaces such as mlx5_0 and mlx5_1.
 
