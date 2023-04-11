@@ -263,9 +263,8 @@ do
 		p=0
 		set $(chlist | awk '{ print $1 }')
 		MAX_JOBS=$#
-	else
-		sleep $EXEC_INTERVAL
 	fi
+	sleep $EXEC_INTERVAL
 done
 if $NO_SERVER; then err no server executed; fi
 timeout=$TIMEOUT
