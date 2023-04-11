@@ -34,7 +34,8 @@ create_rpc_handle(const char *server, hg_id_t rpc_id, hg_handle_t *h,
 
 	ret = margo_addr_lookup(env.mid, server, &addr);
 	if (ret != HG_SUCCESS) {
-		log_error("%s (lookup): %s", diag, HG_Error_to_string(ret));
+		log_error("%s (lookup %s): %s", diag, server,
+			HG_Error_to_string(ret));
 		return (ret);
 	}
 	ret = margo_create(env.mid, addr, rpc_id, h);
@@ -58,16 +59,18 @@ ring_rpc_join(const char *server, char **prev)
 
 	ret = margo_forward_timed(h, &self, ring_rpc_timeout_msec);
 	if (ret != HG_SUCCESS) {
-		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
+		log_error("%s (forward to %s): %s", diag, server,
+			HG_Error_to_string(ret));
 		goto err;
 	}
 	ret = margo_get_output(h, &out);
 	if (ret != HG_SUCCESS) {
-		log_error("%s (get_output): %s", diag, HG_Error_to_string(ret));
+		log_error("%s (get_output from %s): %s", diag, server,
+			HG_Error_to_string(ret));
 		goto err;
 	}
 	if (out == NULL) {
-		log_error("%s: out is NULL", diag);
+		log_error("%s (output from %s): output is NULL", diag, server);
 		save_out = out;
 	} else
 		save_out = strdup(out);
@@ -94,7 +97,8 @@ ring_rpc_set_next(const char *server, char *host)
 
 	ret = margo_forward_timed(h, &host, ring_rpc_timeout_msec);
 	if (ret != HG_SUCCESS)
-		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
+		log_error("%s (forward to %s): %s", diag, server,
+			HG_Error_to_string(ret));
 
 	ret2 = margo_destroy(h);
 	if (ret == HG_SUCCESS)
@@ -115,7 +119,8 @@ ring_rpc_set_prev(const char *server, char *host)
 
 	ret = margo_forward_timed(h, &host, ring_rpc_timeout_msec);
 	if (ret != HG_SUCCESS)
-		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
+		log_error("%s (forward to %s): %s", diag, server,
+			HG_Error_to_string(ret));
 
 	ret2 = margo_destroy(h);
 	if (ret == HG_SUCCESS)
@@ -153,7 +158,8 @@ ring_rpc_list(const char *server, node_list_t *list)
 	}
 	ret = margo_forward_timed(h, list, ring_rpc_timeout_msec);
 	if (ret != HG_SUCCESS)
-		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
+		log_error("%s (forward to %s): %s", diag, server,
+			HG_Error_to_string(ret));
 	/* decrement required not to free 'self' above in margo_free_input */
 	--list->n;
 
@@ -193,7 +199,8 @@ ring_rpc_election(const char *server, node_list_t *list)
 	}
 	ret = margo_forward_timed(h, list, ring_rpc_timeout_msec);
 	if (ret != HG_SUCCESS)
-		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
+		log_error("%s (forward to %s): %s", diag, server,
+			HG_Error_to_string(ret));
 	--list->n;
 
 	ret2 = margo_destroy(h);
@@ -216,7 +223,8 @@ ring_rpc_coordinator(const char *server, coordinator_t *list)
 
 	ret = margo_forward_timed(h, list, ring_rpc_timeout_msec);
 	if (ret != HG_SUCCESS)
-		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));
+		log_error("%s (forward to %s): %s", diag, server,
+			HG_Error_to_string(ret));
 
 	ret2 = margo_destroy(h);
 	if (ret == HG_SUCCESS)
