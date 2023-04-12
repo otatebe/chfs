@@ -54,9 +54,14 @@ kv_lock(char *key, size_t key_size, const char *diag, size_t size, off_t off)
 		clock_gettime(CLOCK_REALTIME, &ts2);
 		index = key_index(key, key_size);
 		timespec_sub(&ts1, &ts2, &ts3);
-		log_info("kv_lock (%s): %s:%d size %lu offset %lu "
-			"wait %ld.%09ld seconds", diag, key, index, size, off,
-			ts3.tv_sec, ts3.tv_nsec);
+		if (ts3.tv_sec > 0)
+			log_notice("kv_lock (%s): %s:%d size %lu offset %lu "
+				"wait %ld.%09ld seconds", diag, key, index,
+				size, off, ts3.tv_sec, ts3.tv_nsec);
+		else
+			log_info("kv_lock (%s): %s:%d size %lu offset %lu "
+				"wait %ld.%09ld seconds", diag, key, index,
+				size, off, ts3.tv_sec, ts3.tv_nsec);
 	}
 }
 
