@@ -291,6 +291,7 @@ if [ X"$MDIR" != X ]; then
 		ssh $host PATH=\"$PATH\" $XENV CHFS_SERVER=\"$CHFS_SERVER\" CHFS_LOG_PRIORITY=$CHFS_LOG_PRIORITY CHFS_CHUNK_SIZE=$CHFS_CHUNK_SIZE CHFS_BUF_SIZE=$CHFS_BUF_SIZE CHFS_LOOKUP_LOCAL=$CHFS_LOOKUP_LOCAL CHFS_RDMA_THRESH=$CHFS_RDMA_THRESH CHFS_RPC_TIMEOUT_MSEC=$CHFS_RPC_TIMEOUT_MSEC CHFS_NODE_LIST_CACHE_TIMEOUT=$CHFS_NODE_LIST_CACHE_TIMEOUT chfuse -o direct_io,modules=subdir,subdir="$MDIR" "$MDIR"
 	done
 fi
+[ $(chlist | wc -l) -lt $nservers ] && echo >&2 $program: warning: $(chlist | wc -l) out of $nservers servers running
 }
 
 case $mode in
