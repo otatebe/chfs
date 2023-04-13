@@ -9,7 +9,7 @@ typedef uint32_t HASH_T[1];
 #define HASH(data, len, hash) MurmurHash3_x86_32(data, len, 1234, hash)
 #define HASH_MODULO(a, b) (a[0] % (b))
 
-#define LOCK_TABLE_SIZE	16384
+#define LOCK_TABLE_SIZE	16381
 
 static ABT_mutex_memory kv_lock_mutex[LOCK_TABLE_SIZE] = {
 	[0 ... LOCK_TABLE_SIZE - 1] = ABT_MUTEX_INITIALIZER
