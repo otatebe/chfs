@@ -22,7 +22,7 @@ static struct {
 	const char *diag;
 	char key[KEYBUF_SIZE];
 	size_t key_size;
-	struct timespec ts;
+	struct timespec lock, unlock;
 } holder[LOCK_TABLE_SIZE];
 
 static int
@@ -35,15 +35,12 @@ key_index(char *key, size_t key_size)
 	return (index);
 }
 
-#define TIMEBUF_SIZE 256
-
 void
 kv_lock(char *key, size_t key_size, const char *diag, size_t size, off_t off)
 {
 	HASH_T hash;
 	int n, r, index1, index2;
-	struct timespec ts1, ts2, ts3, ts4;
-	char time_str[TIMEBUF_SIZE];
+	struct timespec ts1, ts2, ts3, ts4, ts5;
 	ABT_mutex mutex;
 
 	HASH(key, key_size, hash);
@@ -57,31 +54,35 @@ kv_lock(char *key, size_t key_size, const char *diag, size_t size, off_t off)
 		index1 = key_index(key, key_size);
 		index2 = key_index(holder[n].key, holder[n].key_size);
 		timespec_sub(&ts1, &ts2, &ts3);
-		timespec_sub(&holder[n].ts, &ts2, &ts4);
-		timespec_str(&holder[n].ts, time_str, TIMEBUF_SIZE);
+		timespec_sub(&holder[n].lock, &holder[n].unlock, &ts4);
+		timespec_sub(&holder[n].unlock, &ts2, &ts5);
 		if (ts3.tv_sec > 0)
 			log_notice("kv_lock (%s): %s:%d size %lu offset %lu "
-				"wait %ld.%09ld seconds for lock of %s:%d (%s) "
-				"at %s (%ld.%09ld seconds)", diag, key, index1,
-				size, off, ts3.tv_sec, ts3.tv_nsec,
-				holder[n].key, index2, holder[n].diag, time_str,
-				ts4.tv_sec, ts4.tv_nsec);
+				"wait %ld.%09ld sec for lock of %s:%d (%s) "
+				"hold %ld.%09ld sec before %ld.%09ld sec",
+				diag, key, index1, size, off,
+				ts3.tv_sec, ts3.tv_nsec,
+				holder[n].key, index2, holder[n].diag,
+				ts4.tv_sec, ts4.tv_nsec,
+				ts5.tv_sec, ts5.tv_nsec);
 		else
 			log_info("kv_lock (%s): %s:%d size %lu offset %lu "
-				"wait %ld.%09ld seconds for lock of %s:%d (%s) "
-				"at %s (%ld.%09ld seconds)", diag, key, index1,
-				size, off, ts3.tv_sec, ts3.tv_nsec,
-				holder[n].key, index2, holder[n].diag, time_str,
-				ts4.tv_sec, ts4.tv_nsec);
+				"wait %ld.%09ld sec for lock of %s:%d (%s) "
+				"hold %ld.%09ld sec before %ld.%09ld sec",
+				diag, key, index1, size, off,
+				ts3.tv_sec, ts3.tv_nsec,
+				holder[n].key, index2, holder[n].diag,
+				ts4.tv_sec, ts4.tv_nsec,
+				ts5.tv_sec, ts5.tv_nsec);
 	}
 	holder[n].diag = diag;
 	if (key_size > KEYBUF_SIZE)
 		key_size = KEYBUF_SIZE;
 	memcpy(holder[n].key, key, key_size);
 	if (key_size == KEYBUF_SIZE)
-		holer[n].key[key_size - 1] = '\0';
+		holder[n].key[key_size - 1] = '\0';
 	holder[n].key_size = key_size;
-	clock_gettime(CLOCK_REALTIME, &holder[n].ts);
+	clock_gettime(CLOCK_REALTIME, &holder[n].lock);
 }
 
 void
@@ -94,5 +95,6 @@ kv_unlock(char *key, size_t key_size)
 	HASH(key, key_size, hash);
 	n = HASH_MODULO(hash, LOCK_TABLE_SIZE);
 	mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&kv_lock_mutex[n]);
+	clock_gettime(CLOCK_REALTIME, &holder[n].unlock);
 	ABT_mutex_unlock(mutex);
 }
