@@ -4,6 +4,7 @@
 #include <string.h>
 #include <syslog.h>
 #include <time.h>
+#include "timespec.h"
 #include "log.h"
 
 static FILE *log_file = NULL;
@@ -59,14 +60,9 @@ static void
 log_time(char *s, int size)
 {
 	struct timespec ts;
-	struct tm *tm;
-	size_t s0, s1;
 
 	clock_gettime(CLOCK_REALTIME, &ts);
-	tm = localtime(&ts.tv_sec);
-	s0 = strftime(s, size, "%Y-%m-%d %H:%M:%S", tm);
-	s1 = snprintf(s + s0, size - s0, ".%09ld ", ts.tv_nsec);
-	strftime(s + s0 + s1, size - s0 - s1, "%z", tm);
+	timespec_str(&ts, s, size);
 }
 
 static void
