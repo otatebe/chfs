@@ -334,7 +334,7 @@ flush_cb(const char *value, size_t value_size, void *arg)
 	struct flush_cb_arg *a = arg;
 	struct inode *inode = (void *)value;
 	mode_t mode = MODE_MASK(inode->mode);
-	int r, fd, flags, dirty;
+	int r, fd, flags, dirty_flush;
 	static const char diag[] = "flush_cb";
 
 	log_debug("%s: dst=%s flags=%d size=%ld", diag, a->dst, inode->flags,
@@ -344,7 +344,7 @@ flush_cb(const char *value, size_t value_size, void *arg)
 		return;
 	}
 
-	kv_lock_flush_read(a->key, a->key_size, diag, inode->size, 0);
+	kv_lock_flush_start(a->key, a->key_size, diag, inode->size, 0);
 	if (S_ISREG(mode))
 		goto regular_file;
 
@@ -384,7 +384,7 @@ regular_file:
 		if (r == -1)
 			r = fs_err(-errno);
 		else if (r != inode->size) {
-			log_error("%s: %s: %d of %ld bytes written", diag,
+			log_info("%s: %s: %d of %ld bytes written", diag,
 				a->dst, r, inode->size);
 			r = KV_ERR_PARTIAL_WRITE;
 		} else if (inode->size < inode->chunk_size) {
@@ -397,13 +397,15 @@ regular_file:
 		close(fd);
 	}
 done:
-	if (r != KV_SUCCESS)
-		log_error("%s: %s: %s", diag, a->dst, kv_err_string(r));
-	dirty = kv_lock_flush_write(a->key, a->key_size, diag, inode->size, 0);
-	if (r == KV_SUCCESS && !dirty) {
+	dirty_flush = kv_lock_flush(a->key, a->key_size, diag, inode->size, 0);
+	if (r == KV_SUCCESS && !dirty_flush) {
 		inode->flags = (inode->flags & ~CHFS_FS_DIRTY) | CHFS_FS_CACHE;
 		kv_persist(&inode->flags, sizeof(inode->flags));
-	}
+	} else if (dirty_flush)
+		log_info("%s: %s: dirty flush: %s", diag, a->dst,
+				kv_err_string(r));
+	else
+		log_error("%s: %s: %s", diag, a->dst, kv_err_string(r));
 	kv_unlock_flush(a->key, a->key_size);
 }
 
