@@ -322,6 +322,8 @@ fs_err(int err)
 struct flush_cb_arg {
 	char *dst;
 	int index;
+	void *key;
+	size_t key_size;
 };
 
 #include <sys/stat.h>
@@ -332,7 +334,7 @@ flush_cb(const char *value, size_t value_size, void *arg)
 	struct flush_cb_arg *a = arg;
 	struct inode *inode = (void *)value;
 	mode_t mode = MODE_MASK(inode->mode);
-	int r, fd, flags;
+	int r, fd, flags, dirty;
 	static const char diag[] = "flush_cb";
 
 	log_debug("%s: dst=%s flags=%d size=%ld", diag, a->dst, inode->flags,
@@ -341,8 +343,8 @@ flush_cb(const char *value, size_t value_size, void *arg)
 		log_info("%s: clean", diag);
 		return;
 	}
-	/* lock chunk */
 
+	kv_lock_flush_read(a->key, a->key_size, diag, inode->size, 0);
 	if (S_ISREG(mode))
 		goto regular_file;
 
@@ -397,10 +399,12 @@ regular_file:
 done:
 	if (r != KV_SUCCESS)
 		log_error("%s: %s: %s", diag, a->dst, kv_err_string(r));
-	else {
+	dirty = kv_lock_flush_write(a->key, a->key_size, diag, inode->size, 0);
+	if (r == KV_SUCCESS && !dirty) {
 		inode->flags = (inode->flags & ~CHFS_FS_DIRTY) | CHFS_FS_CACHE;
 		kv_persist(&inode->flags, sizeof(inode->flags));
 	}
+	kv_unlock_flush(a->key, a->key_size);
 }
 
 int
@@ -431,9 +435,9 @@ fs_inode_flush(void *key, size_t key_size)
 	else {
 		arg->dst = dst;
 		arg->index = index;
-		kv_lock(key, key_size, diag, 0, 0);
+		arg->key = key;
+		arg->key_size = key_size;
 		r = kv_get_cb(key, key_size, flush_cb, arg);
-		kv_unlock(key, key_size);
 		free(arg);
 	}
 	free(dst);

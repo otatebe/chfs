@@ -23,6 +23,8 @@ static struct {
 	char key[KEYBUF_SIZE];
 	size_t key_size;
 	struct timespec lock, unlock;
+	int flush;
+	int dirty;
 } holder[LOCK_TABLE_SIZE];
 
 static int
@@ -35,8 +37,9 @@ key_index(char *key, size_t key_size)
 	return (index);
 }
 
-void
-kv_lock(char *key, size_t key_size, const char *diag, size_t size, off_t off)
+static int
+kv_lock_internal(char *key, size_t key_size, const char *diag, size_t size,
+	off_t off)
 {
 	HASH_T hash;
 	int n, r, index1, index2;
@@ -83,10 +86,22 @@ kv_lock(char *key, size_t key_size, const char *diag, size_t size, off_t off)
 		holder[n].key[key_size - 1] = '\0';
 	holder[n].key_size = key_size;
 	clock_gettime(CLOCK_REALTIME, &holder[n].lock);
+
+	return (n);
 }
 
 void
-kv_unlock(char *key, size_t key_size)
+kv_lock(char *key, size_t key_size, const char *diag, size_t size, off_t off)
+{
+	int n;
+
+	n = kv_lock_internal(key, key_size, diag, size, off);
+	if (holder[n].flush > 0)
+		holder[n].dirty = 1;
+}
+
+static void
+kv_unlock_internal(char *key, size_t key_size)
 {
 	HASH_T hash;
 	int n;
@@ -97,4 +112,45 @@ kv_unlock(char *key, size_t key_size)
 	mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&kv_lock_mutex[n]);
 	clock_gettime(CLOCK_REALTIME, &holder[n].unlock);
 	ABT_mutex_unlock(mutex);
+}
+
+void
+kv_unlock(char *key, size_t key_size)
+{
+	kv_unlock_internal(key, key_size);
+}
+
+void
+kv_lock_flush_read(char *key, size_t key_size, const char *diag, size_t size,
+	off_t off)
+{
+	int n;
+
+	n = kv_lock_internal(key, key_size, diag, size, off);
+	++holder[n].flush;
+	kv_unlock_internal(key, key_size);
+}
+
+int
+kv_lock_flush_write(char *key, size_t key_size, const char *diag, size_t size,
+	off_t off)
+{
+	int n;
+
+	n = kv_lock_internal(key, key_size, diag, size, off);
+	return (holder[n].dirty);
+}
+
+void
+kv_unlock_flush(char *key, size_t key_size)
+{
+	HASH_T hash;
+	int n;
+
+	HASH(key, key_size, hash);
+	n = HASH_MODULO(hash, LOCK_TABLE_SIZE);
+	--holder[n].flush;
+	if (holder[n].flush == 0)
+		holder[n].dirty = 0;
+	kv_unlock_internal(key, key_size);
 }
