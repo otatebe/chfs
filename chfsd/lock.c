@@ -1,9 +1,9 @@
-#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <abt.h>
 #include "timespec.h"
 #include "murmur3.h"
+#include "key.h"
 #include "log.h"
 
 typedef uint32_t HASH_T[1];
@@ -26,16 +26,6 @@ static struct {
 	int flush;
 	int dirty_flush;
 } holder[LOCK_TABLE_SIZE];
-
-static int
-key_index(char *key, size_t key_size)
-{
-	int index = 0, slen = strlen(key) + 1;
-
-	if (slen < key_size)
-		index = atoi(key + slen);
-	return (index);
-}
 
 static int
 kv_lock_internal(char *key, size_t key_size, const char *diag, size_t size,

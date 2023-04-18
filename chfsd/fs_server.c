@@ -13,6 +13,7 @@
 #include "fs_hook.h"
 #include "fs.h"
 #include "flush.h"
+#include "key.h"
 #include "log.h"
 
 static struct {
@@ -90,6 +91,7 @@ inode_create(hg_handle_t h)
 	fs_create_in_t in;
 	int32_t err = KV_SUCCESS;
 	char *target;
+	int index;
 	static const char diag[] = "inode_create RPC";
 
 	fs_server_rpc_begin((void *)inode_create, diag);
@@ -98,19 +100,27 @@ inode_create(hg_handle_t h)
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
 		goto destroy;
 	}
-	log_debug("%s: key=%s", diag, (char *)in.key.v);
+	index = key_index(in.key.v, in.key.s);
+	log_debug("%s: key=%s index=%d", diag, (char *)in.key.v, index);
 
 	target = ring_list_lookup(in.key.v, in.key.s);
 	if (target && strcmp(env.self, target) != 0) {
 		ret = fs_rpc_inode_create(target, in.key.v, in.key.s, in.uid,
 			in.gid, in.mode, in.chunk_size, in.value.v, in.value.s,
 			&err);
-		if (ret != HG_SUCCESS)
+		if (ret != HG_SUCCESS) {
+			log_error("%s (rpc_create) %s:%d: %s", diag,
+				(char *)in.key.v, index,
+				HG_Error_to_string(ret));
 			err = KV_ERR_SERVER_DOWN;
+		}
 	} else
 		err = fs_inode_create(in.key.v, in.key.s, in.uid, in.gid,
 			in.mode, in.chunk_size, in.value.v, in.value.s);
 	free(target);
+	if (err != KV_SUCCESS)
+		log_error("%s: %s:%d: %s", diag, (char *)in.key.v, index,
+				kv_err_string(err));
 
 	ret = margo_free_input(h, &in);
 	if (ret != HG_SUCCESS)
@@ -138,6 +148,7 @@ inode_stat(hg_handle_t h)
 	kv_byte_t in;
 	fs_stat_out_t out;
 	char *target;
+	int index;
 	static const char diag[] = "inode_stat RPC";
 
 	fs_server_rpc_begin((void *)inode_stat, diag);
@@ -147,16 +158,23 @@ inode_stat(hg_handle_t h)
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
 		goto destroy;
 	}
-	log_debug("%s: key=%s", diag, (char *)in.v);
+	index = key_index(in.v, in.s);
+	log_debug("%s: key=%s index=%d", diag, (char *)in.v, index);
 
 	target = ring_list_lookup(in.v, in.s);
 	if (target && strcmp(env.self, target) != 0) {
 		ret = fs_rpc_inode_stat(target, in.v, in.s, &sb, &out.err);
-		if (ret != HG_SUCCESS)
+		if (ret != HG_SUCCESS) {
+			log_error("%s (rpc_stat) %s:%d: %s", diag,
+				(char *)in.v, index, HG_Error_to_string(ret));
 			out.err = KV_ERR_SERVER_DOWN;
+		}
 	} else
 		out.err = fs_inode_stat(in.v, in.s, &sb);
 	free(target);
+	if (out.err != KV_SUCCESS && out.err != KV_ERR_NO_ENTRY)
+		log_error("%s: %s:%d: %s", diag, (char *)in.v, index,
+				kv_err_string(out.err));
 
 	ret = margo_free_input(h, &in);
 	if (ret != HG_SUCCESS)
@@ -187,6 +205,7 @@ inode_write(hg_handle_t h)
 	fs_write_in_t in;
 	kv_get_rdma_out_t out;
 	char *target;
+	int index;
 	static const char diag[] = "inode_write RPC";
 
 	fs_server_rpc_begin((void *)inode_write, diag);
@@ -196,7 +215,8 @@ inode_write(hg_handle_t h)
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
 		goto destroy;
 	}
-	log_debug("%s: key=%s", diag, (char *)in.key.v);
+	index = key_index(in.key.v, in.key.s);
+	log_debug("%s: key=%s index=%d", diag, (char *)in.key.v, index);
 
 	out.value_size = in.value.s;
 	target = ring_list_lookup(in.key.v, in.key.s);
@@ -204,12 +224,19 @@ inode_write(hg_handle_t h)
 		ret = fs_rpc_inode_write(target, in.key.v, in.key.s, in.value.v,
 			&out.value_size, in.offset, in.mode, in.chunk_size,
 			&out.err);
-		if (ret != HG_SUCCESS)
+		if (ret != HG_SUCCESS) {
+			log_error("%s (rpc_write) %s:%d: %s", diag,
+				(char *)in.key.v, index,
+				HG_Error_to_string(ret));
 			out.err = KV_ERR_SERVER_DOWN;
+		}
 	} else
 		out.err = fs_inode_write(in.key.v, in.key.s, in.value.v,
 			&out.value_size, in.offset, in.mode, in.chunk_size);
 	free(target);
+	if (out.err != KV_SUCCESS)
+		log_error("%s: %s:%d: %s", diag, (char *)in.key.v, index,
+				kv_err_string(out.err));
 
 	ret = margo_free_input(h, &in);
 	if (ret != HG_SUCCESS)
@@ -240,6 +267,7 @@ inode_write_rdma(hg_handle_t h)
 	hg_addr_t client_addr;
 	hg_bulk_t bulk;
 	void *buf;
+	int index;
 	static const char diag[] = "inode_write_rdma RPC";
 
 	fs_server_rpc_begin((void *)inode_write_rdma, diag);
@@ -249,7 +277,8 @@ inode_write_rdma(hg_handle_t h)
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
 		goto destroy;
 	}
-	log_debug("%s: key=%s", diag, (char *)in.key.v);
+	index = key_index(in.key.v, in.key.s);
+	log_debug("%s: key=%s index=%d", diag, (char *)in.key.v, index);
 
 	out.value_size = in.value_size;
 	if (out.value_size == 0) {
@@ -269,7 +298,8 @@ inode_write_rdma(hg_handle_t h)
 			in.client, in.value, &out.value_size, in.offset,
 			in.mode, in.chunk_size, &out.err);
 		if (ret != HG_SUCCESS) {
-			log_error("%s (rpc_write_rdma_bulk): %s", diag,
+			log_error("%s (rpc_write_rdma_bulk) %s:%d: %s", diag,
+				(char *)in.key.v, index,
 				HG_Error_to_string(ret));
 			out.err = KV_ERR_SERVER_DOWN;
 		}
@@ -309,6 +339,9 @@ free_buf:
 free_target:
 	free(target);
 	margo_addr_free(mid, client_addr);
+	if (out.err != KV_SUCCESS)
+		log_error("%s: %s:%d: %s", diag, (char *)in.key.v, index,
+				kv_err_string(out.err));
 free_input:
 	ret = margo_free_input(h, &in);
 	if (ret != HG_SUCCESS)
@@ -335,6 +368,7 @@ inode_read(hg_handle_t h)
 	fs_read_in_t in;
 	kv_get_out_t out;
 	char *target;
+	int index;
 	static const char diag[] = "inode_read RPC";
 
 	fs_server_rpc_begin((void *)inode_read, diag);
@@ -344,7 +378,8 @@ inode_read(hg_handle_t h)
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
 		goto destroy;
 	}
-	log_debug("%s: key=%s", diag, (char *)in.key.v);
+	index = key_index(in.key.v, in.key.s);
+	log_debug("%s: key=%s index=%d", diag, (char *)in.key.v, index);
 
 	out.value.s = in.size;
 	out.value.v = malloc(out.value.s);
@@ -362,12 +397,19 @@ inode_read(hg_handle_t h)
 	if (target && strcmp(env.self, target) != 0) {
 		ret = fs_rpc_inode_read(target, in.key.v, in.key.s,
 			out.value.v, &out.value.s, in.offset, &out.err);
-		if (ret != HG_SUCCESS)
+		if (ret != HG_SUCCESS) {
+			log_error("%s (rpc_read) %s:%d: %s", diag,
+				(char *)in.key.v, index,
+				HG_Error_to_string(ret));
 			out.err = KV_ERR_SERVER_DOWN;
+		}
 	} else
 		out.err = fs_inode_read(in.key.v, in.key.s, out.value.v,
 			&out.value.s, in.offset);
 	free(target);
+	if (out.err != KV_SUCCESS && out.err != KV_ERR_NO_ENTRY)
+		log_error("%s: %s:%d: %s", diag, (char *)in.key.v, index,
+				kv_err_string(out.err));
 free_input:
 	ret = margo_free_input(h, &in);
 	if (ret != HG_SUCCESS)
@@ -400,6 +442,7 @@ inode_read_rdma(hg_handle_t h)
 	hg_addr_t client_addr;
 	hg_bulk_t bulk;
 	void *buf;
+	int index;
 	static const char diag[] = "inode_read_rdma RPC";
 
 	fs_server_rpc_begin((void *)inode_read_rdma, diag);
@@ -409,7 +452,8 @@ inode_read_rdma(hg_handle_t h)
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
 		goto destroy;
 	}
-	log_debug("%s: key=%s", diag, (char *)in.key.v);
+	index = key_index(in.key.v, in.key.s);
+	log_debug("%s: key=%s index=%d", diag, (char *)in.key.v, index);
 
 	out.value_size = in.value_size;
 	if (out.value_size == 0) {
@@ -429,7 +473,8 @@ inode_read_rdma(hg_handle_t h)
 			in.client, in.value, &out.value_size, in.offset,
 			&out.err);
 		if (ret != HG_SUCCESS) {
-			log_error("%s (rpc_read_rdma_bulk): %s", diag,
+			log_error("%s (rpc_read_rdma_bulk) %s:%d: %s", diag,
+				(char *)in.key.v, index,
 				HG_Error_to_string(ret));
 			out.err = KV_ERR_SERVER_DOWN;
 		}
@@ -470,6 +515,9 @@ free_buf:
 free_target:
 	free(target);
 	margo_addr_free(mid, client_addr);
+	if (out.err != KV_SUCCESS && out.err != KV_ERR_NO_ENTRY)
+		log_error("%s: %s:%d: %s", diag, (char *)in.key.v, index,
+				kv_err_string(out.err));
 free_input:
 	ret = margo_free_input(h, &in);
 	if (ret != HG_SUCCESS)
@@ -501,6 +549,7 @@ inode_copy_rdma(hg_handle_t h)
 	hg_addr_t client_addr;
 	hg_bulk_t bulk;
 	void *buf;
+	int index;
 	static const char diag[] = "inode_copy_rdma RPC";
 
 	fs_server_rpc_begin((void *)inode_copy_rdma, diag);
@@ -509,7 +558,8 @@ inode_copy_rdma(hg_handle_t h)
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
 		goto destroy;
 	}
-	log_debug("%s: key=%s", diag, (char *)in.key.v);
+	index = key_index(in.key.v, in.key.s);
+	log_debug("%s: key=%s index=%d", diag, (char *)in.key.v, index);
 
 	ret = margo_addr_lookup(mid, in.client, &client_addr);
 	if (ret != HG_SUCCESS) {
@@ -526,7 +576,8 @@ inode_copy_rdma(hg_handle_t h)
 				in.key.v, in.key.s, in.client, &in.stat,
 				in.value, in.value_size, &out);
 			if (ret != HG_SUCCESS) {
-				log_error("%s (rpc_copy_rdma_bulk): %s", diag,
+				log_error("%s (rpc_copy_rdma_bulk) %s:%d: %s",
+					diag, (char *)in.key.v, index,
 					HG_Error_to_string(ret));
 				out = KV_ERR_SERVER_DOWN;
 			}
@@ -568,6 +619,9 @@ free_buf:
 
 free_addr:
 	margo_addr_free(mid, client_addr);
+	if (out != KV_SUCCESS)
+		log_error("%s: %s:%d: %s", diag, (char *)in.key.v, index,
+				kv_err_string(out));
 free_input:
 	ret = margo_free_input(h, &in);
 	if (ret != HG_SUCCESS)
@@ -594,6 +648,7 @@ inode_truncate(hg_handle_t h)
 	fs_truncate_in_t in;
 	int32_t err = KV_SUCCESS;
 	char *target;
+	int index;
 	static const char diag[] = "inode_truncate RPC";
 
 	fs_server_rpc_begin((void *)inode_truncate, diag);
@@ -602,17 +657,26 @@ inode_truncate(hg_handle_t h)
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
 		goto destroy;
 	}
-	log_debug("%s: key=%s, len=%ld", diag, (char *)in.key.v, in.len);
+	index = key_index(in.key.v, in.key.s);
+	log_debug("%s: key=%s index=%d, len=%ld", diag, (char *)in.key.v,
+			index, in.len);
 
 	target = ring_list_lookup(in.key.v, in.key.s);
 	if (target && strcmp(env.self, target) != 0) {
 		ret = fs_rpc_inode_truncate(target, in.key.v, in.key.s, in.len,
 			&err);
-		if (ret != HG_SUCCESS)
+		if (ret != HG_SUCCESS) {
+			log_error("%s (rpc_truncate) %s:%d: %s", diag,
+				(char *)in.key.v, index,
+				HG_Error_to_string(ret));
 			err = KV_ERR_SERVER_DOWN;
+		}
 	} else
 		err = fs_inode_truncate(in.key.v, in.key.s, in.len);
 	free(target);
+	if (err != KV_SUCCESS)
+		log_error("%s: %s:%d: %s", diag, (char *)in.key.v, index,
+				kv_err_string(err));
 
 	ret = margo_free_input(h, &in);
 	if (ret != HG_SUCCESS)
@@ -639,6 +703,7 @@ inode_remove(hg_handle_t h)
 	kv_byte_t key;
 	int32_t err = KV_SUCCESS;
 	char *target;
+	int index;
 	static const char diag[] = "inode_remove RPC";
 
 	fs_server_rpc_begin((void *)inode_remove, diag);
@@ -647,16 +712,24 @@ inode_remove(hg_handle_t h)
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
 		goto destroy;
 	}
-	log_debug("%s: key=%s", diag, (char *)key.v);
+	index = key_index(key.v, key.s);
+	log_debug("%s: key=%s index=%d", diag, (char *)key.v, index);
 
 	target = ring_list_lookup(key.v, key.s);
 	if (target && strcmp(env.self, target) != 0) {
 		ret = fs_rpc_inode_remove(target, key.v, key.s, &err);
-		if (ret != HG_SUCCESS)
+		if (ret != HG_SUCCESS) {
+			log_error("%s (rpc_remove) %s:%d: %s", diag,
+				(char *)key.v, index,
+				HG_Error_to_string(ret));
 			err = KV_ERR_SERVER_DOWN;
+		}
 	} else
 		err = fs_inode_remove(key.v, key.s);
 	free(target);
+	if (err != KV_SUCCESS)
+		log_error("%s: %s:%d: %s", diag, (char *)key.v, index,
+				kv_err_string(err));
 
 	ret = margo_free_input(h, &key);
 	if (ret != HG_SUCCESS)

@@ -14,6 +14,7 @@
 #include "fs_hook.h"
 #include "fs.h"
 #include "shash.h"
+#include "key.h"
 #include "log.h"
 #include "fs_kv.h"
 
@@ -107,6 +108,7 @@ inode_read_rdma(hg_handle_t h)
 	margo_instance_id mid = margo_hg_handle_get_instance(h);
 	hg_addr_t client_addr;
 	struct read_rdma_cb_arg a;
+	int index;
 	static const char diag[] = "inode_read_rdma RPC";
 
 	fs_server_rpc_begin((void *)inode_read_rdma, diag);
@@ -116,7 +118,8 @@ inode_read_rdma(hg_handle_t h)
 		log_error("%s (get_input): %s", diag, HG_Error_to_string(ret));
 		goto destroy;
 	}
-	log_debug("%s: key=%s", diag, (char *)in.key.v);
+	index = key_index(in.key.v, in.key.s);
+	log_debug("%s: key=%s index=%d", diag, (char *)in.key.v, index);
 
 	ret = margo_addr_lookup(mid, in.client, &client_addr);
 	if (ret != HG_SUCCESS) {
@@ -130,8 +133,12 @@ inode_read_rdma(hg_handle_t h)
 		ret = fs_rpc_inode_read_rdma_bulk(target, in.key.v, in.key.s,
 			in.client, in.value, &out.value_size, in.offset,
 			&out.err);
-		if (ret != HG_SUCCESS)
+		if (ret != HG_SUCCESS) {
+			log_error("%s (rpc_read_rdma_bulk) %s:%d: %s", diag,
+				(char *)in.key.v, index,
+				HG_Error_to_string(ret));
 			out.err = KV_ERR_SERVER_DOWN;
+		}
 	} else {
 		a.mid = mid;
 		a.addr = client_addr;
@@ -144,6 +151,9 @@ inode_read_rdma(hg_handle_t h)
 	}
 	free(target);
 	margo_addr_free(mid, client_addr);
+	if (out.err != KV_SUCCESS && out.err != KV_ERR_NO_ENTRY)
+		log_error("%s: %s:%d: %s", diag, (char *)in.key.v, index,
+				kv_err_string(out.err));
 err_free_input:
 	ret = margo_free_input(h, &in);
 	if (ret != HG_SUCCESS)
