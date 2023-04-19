@@ -6,12 +6,12 @@ CHFS is a parallel consistent hashing file system created instantly using node-l
 
 1. Install development kits
 
-       # apt install build-essential
-       # apt install cmake libtool pkgconf
+       # apt install git python3
+       # apt install gcc automake libtool cmake pkgconf vim
 
 1. Install Spack
 
-       % git clone -c feature.manyFiles=true https://github.com/spack/spack.git
+       % git clone -c feature.manyFiles=true --depth 1 https://github.com/spack/spack.git
        % . spack/share/spack/setup-env.sh
 
    For details, see https://spack.readthedocs.io/
@@ -22,7 +22,7 @@ CHFS is a parallel consistent hashing file system created instantly using node-l
 
    Or, more recommended way to include verbs as follows;
 
-       % spack external find automake autoconf libtool cmake m4 pkgconf bison
+       % spack external find automake autoconf libtool cmake m4 pkgconf
        % spack config edit packages
        manually add rdma-core
        % spack spec mochi-margo ^mercury~boostsys ^libfabric fabrics=rxm,sockets,tcp,udp,verbs
@@ -61,6 +61,36 @@ CHFS is a parallel consistent hashing file system created instantly using node-l
        # make install
 
    If --with-pmemkv is not specified, CHFS uses a POSIX backend.
+
+## Quick installation steps by Spack
+
+1. Install required packages
+
+       # apt install git python3
+       # apt install gcc automake libtool cmake pkgconf vim
+       # apt install libfuse-dev fuse
+       # apt install libpmemkv-dev libmemkind-dev libtbb-dev rapidjson-dev
+       # apt install libopenmpi-dev
+
+1. Install Spack
+
+       % git clone -c feature.manyFiles=true --depth 1 https://github.com/spack/spack.git
+       % . spack/share/spack/setup-env.sh
+
+   For details, see https://spack.readthedocs.io/
+
+1. Install CHFS
+
+       % git clone https://github.com/range3/chfs-spack-packages.git
+       % spack repo add chfs-spack-packages
+       % spack external find automake autoconf libtool cmake m4 pkgconf libfuse
+       % spack config edit packages
+       manually add pmemkv
+       % spack spec chfs@master ^mercury~boostsys
+       see what packages will be built
+       % spack install chfs@master ^mercury~boostsys
+
+   To enable verbs, see above.  To use chfs, `spack load chfs` is required.
 
 ## How to create file system
 
