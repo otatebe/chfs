@@ -387,11 +387,6 @@ regular_file:
 			log_info("%s: %s: %d of %ld bytes written", diag,
 				a->dst, r, inode->size);
 			r = KV_ERR_PARTIAL_WRITE;
-		} else if (inode->size < inode->chunk_size) {
-			r = ftruncate(fd, a->index * inode->chunk_size
-				+ inode->size);
-			if (r == -1)
-				r = fs_err(-errno);
 		} else
 			r = KV_SUCCESS;
 		close(fd);

@@ -803,10 +803,6 @@ regular_file:
 				log_error("%s: %d of %ld bytes written", diag,
 					r, sb.st_size - msize);
 				r = KV_ERR_PARTIAL_WRITE;
-			} else if (r < chunk_size) {
-				r = ftruncate(dst_fd, index * chunk_size + r);
-				if (r == -1)
-					r = fs_err(-errno, diag);
 			} else
 				r = KV_SUCCESS;
 		}
