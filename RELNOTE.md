@@ -1,3 +1,21 @@
+# Release note for CHFS 2.1.0 (2023/5/11)
+
+## New environment variables
+- CHFS_LOOKUP_LOCAL - connect to a local chfsd only
+
+## New features
+- chfsctl - -x option to export environment variable
+- chfsctl - -i option to specify an interval in seconds to execute chfsd
+
+## Updated features
+- libchfs - randomize order for RPCs for all servers
+- chfsctl - warn if less number of servers running
+
+## Bug fixes
+- fix compilation error in gcc 9.4.0
+- chfsd - chfsd does not terminate
+- chfsd - chfs_symlink may fail
+
 # Release note for CHFS 2.0.0 (2022/10/21)
 
 ## New commands
