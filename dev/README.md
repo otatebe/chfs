@@ -16,33 +16,33 @@
 
 - login to a container
 
-      $ ssh $(docker exec chfs-c1 hostname -i)
+      $ docker exec -w ~/chfs -it chfs-c1 /bin/bash
 
 - install CHFS and IOR (in a container)
 
-      c1$ cd ~/chfs/dev
+      c1$ cd dev
       c1$ sh install.sh
       c1$ sh install-ior.sh
 
 - execute a test script (in a container)
 
-      c1$ cd ~/chfs/dev
+      c1$ cd dev
       c1$ sh test.sh
 
 - explore CHFS (in a container)
 
-      c1$ cd ~/chfs/dev
+      c1$ cd dev
       c1$ eval $(chfsctl -h hosts -m /tmp/a start)
       c1$ chlist
 
 - execute IOR (in a container)
 
-      c1$ cd ~/chfs/dev
+      c1$ cd dev
       c1$ mpirun -hostfile hosts -x PATH -x CHFS_SERVER ior -a CHFS --chfs.chunk_size=1048576 -o /tmp/a/testfile
 
 - stop CHFS (in a container)
 
-      c1$ cd ~/chfs/dev
+      c1$ cd dev
       c1$ chfsctl -h hosts -m /tmp/a stop
 
 - shutdown containers
