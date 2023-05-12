@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <dirent.h>
+#include <time.h>
 #include <errno.h>
 #include <margo.h>
 #ifdef USE_ABT_IO
@@ -22,6 +23,7 @@
 #include "fs_types.h"
 #include "fs.h"
 #include "file.h"
+#include "timespec.h"
 #include "log.h"
 
 #ifndef USE_XATTR
@@ -716,6 +718,7 @@ fs_inode_flush(void *key, size_t key_size)
 	int16_t cache_flags;
 	char *dst, *p, *buf, sym_buf[PATH_MAX];
 	struct stat sb;
+	struct timespec ts1, ts2, ts3;
 	static const char diag[] = "flush";
 
 	keylen = strlen(key) + 1;
@@ -785,6 +788,7 @@ regular_file:
 	if (!(cache_flags & CHFS_FS_CACHE))
 		flags |= O_CREAT;
 
+	clock_gettime(CLOCK_REALTIME, &ts1);
 	if ((dst_fd = open(dst, flags, sb.st_mode)) == -1)
 		r = fs_err(-errno, diag);
 	else {
@@ -808,6 +812,11 @@ regular_file:
 		}
 		close(dst_fd);
 	}
+	clock_gettime(CLOCK_REALTIME, &ts2);
+	timespec_sub(&ts1, &ts2, &ts3);
+	if (ts3.tv_sec > 0)
+		log_notice("%s: %s flush %ld.%09ld sec", diag, p,
+			ts3.tv_sec, ts3.tv_nsec);
 close_src_fd:
 	close(src_fd);
 free_dst:

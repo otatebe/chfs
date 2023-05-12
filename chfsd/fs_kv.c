@@ -10,6 +10,7 @@
 #include "fs_types.h"
 #include "fs.h"
 #include "file.h"
+#include "timespec.h"
 #include "log.h"
 #include "fs_kv.h"
 #include "lock.h"
@@ -335,6 +336,7 @@ flush_cb(const char *value, size_t value_size, void *arg)
 	struct inode *inode = (void *)value;
 	mode_t mode = MODE_MASK(inode->mode);
 	int r, fd, flags, dirty_flush;
+	struct timespec ts1, ts2, ts3;
 	static const char diag[] = "flush_cb";
 
 	log_debug("%s: dst=%s flags=%d size=%ld", diag, a->dst, inode->flags,
@@ -345,6 +347,7 @@ flush_cb(const char *value, size_t value_size, void *arg)
 	}
 
 	kv_lock_flush_start(a->key, a->key_size, diag, inode->size, 0);
+	clock_gettime(CLOCK_REALTIME, &ts1);
 	if (S_ISREG(mode))
 		goto regular_file;
 
@@ -392,6 +395,7 @@ regular_file:
 		close(fd);
 	}
 done:
+	clock_gettime(CLOCK_REALTIME, &ts2);
 	dirty_flush = kv_lock_flush(a->key, a->key_size, diag, inode->size, 0);
 	if (r == KV_SUCCESS && !dirty_flush) {
 		inode->flags = (inode->flags & ~CHFS_FS_DIRTY) | CHFS_FS_CACHE;
@@ -402,6 +406,10 @@ done:
 	else
 		log_error("%s: %s: %s", diag, a->dst, kv_err_string(r));
 	kv_unlock_flush(a->key, a->key_size);
+	timespec_sub(&ts1, &ts2, &ts3);
+	if (ts3.tv_sec > 0)
+		log_notice("%s: %s:%d flush %ld.%09ld sec", diag,
+			(char *)a->key, a->index, ts3.tv_sec, ts3.tv_nsec);
 }
 
 int
