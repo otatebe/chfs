@@ -32,10 +32,10 @@ CHFS_ASYNC_ACCESS
 : set 1 to enable asynchronous accesses.  Default is 0.
 
 CHFS_RDMA_THRESH
-: RDMA transfer is used when the size is larger than or equal to CHFS_RDMA_THRESH.  Default is 32 KiB.
+: RDMA transfer is used when the size is larger than CHFS_RDMA_THRESH.  Zero means RDMA transfer is always used.  -1 means RDMA transfer is never used.  Default is 32 KiB.
 
 CHFS_RPC_TIMEOUT_MSEC
-: RPC timeout in milliseconds
+: RPC timeout in milliseconds.  Zero means no timeout.  Default is 30000 milliseconds (30 seconds).
 
 CHFS_LOG_PRIORITY:
-: maximum log priority to report
+: maximum log priority to report.  Default is notice.
