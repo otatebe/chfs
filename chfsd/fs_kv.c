@@ -336,7 +336,7 @@ flush_cb(const char *value, size_t value_size, void *arg)
 	struct inode *inode = (void *)value;
 	mode_t mode = MODE_MASK(inode->mode);
 	int r, fd, flags, dirty_flush;
-	struct timespec ts1, ts2, ts3;
+	struct timespec ts1, ts2, ts3, ts4, ts5, ts6, ts7, ts8;
 	static const char diag[] = "flush_cb";
 
 	log_debug("%s: dst=%s flags=%d size=%ld", diag, a->dst, inode->flags,
@@ -379,6 +379,7 @@ regular_file:
 		fs_mkdir_parent(a->dst);
 		fd = open(a->dst, flags, mode);
 	}
+	clock_gettime(CLOCK_REALTIME, &ts4);
 	if (fd == -1)
 		r = KV_ERR_NO_ENTRY;
 	else {
@@ -392,6 +393,7 @@ regular_file:
 			r = KV_ERR_PARTIAL_WRITE;
 		} else
 			r = KV_SUCCESS;
+		clock_gettime(CLOCK_REALTIME, &ts5);
 		close(fd);
 	}
 done:
@@ -407,7 +409,16 @@ done:
 		log_error("%s: %s: %s", diag, a->dst, kv_err_string(r));
 	kv_unlock_flush(a->key, a->key_size);
 	timespec_sub(&ts1, &ts2, &ts3);
-	if (ts3.tv_sec > 0)
+	if (r == KV_SUCCESS && S_ISREG(mode) && ts3.tv_sec > 0) {
+		timespec_sub(&ts1, &ts4, &ts6);
+		timespec_sub(&ts4, &ts5, &ts7);
+		timespec_sub(&ts5, &ts2, &ts8);
+		log_notice("%s: %s:%d flush %ld.%09ld sec (open %ld.%09ld sec,"
+			" write %ld.%09ld sec, close %ld.%09ld sec)", diag,
+			(char *)a->key, a->index, ts3.tv_sec, ts3.tv_nsec,
+			ts6.tv_sec, ts6.tv_nsec, ts7.tv_sec, ts7.tv_nsec,
+			ts8.tv_sec, ts8.tv_nsec);
+	} else if (ts3.tv_sec > 0)
 		log_notice("%s: %s:%d flush %ld.%09ld sec", diag,
 			(char *)a->key, a->index, ts3.tv_sec, ts3.tv_nsec);
 }
