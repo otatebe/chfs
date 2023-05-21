@@ -20,7 +20,7 @@ kv_err(int pmemkv_err)
 	case PMEMKV_STATUS_NOT_FOUND:
 		return (KV_ERR_NO_ENTRY);
 	case PMEMKV_STATUS_OUT_OF_MEMORY:
-		return (KV_ERR_NO_MEMORY);
+		return (KV_ERR_NO_SPACE);
 	default:
 		return (KV_ERR_UNKNOWN);
 	}

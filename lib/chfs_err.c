@@ -40,6 +40,9 @@ chfs_set_errno(hg_return_t ret, int err)
 	case KV_ERR_METADATA_SIZE_MISMATCH:
 		errno = EUCLEAN;
 		break;
+	case KV_ERR_NO_SPACE:
+		errno = ENOSPC;
+		break;
 	case KV_ERR_UNKNOWN:
 	default:
 		log_notice("chfs_err: %s", kv_err_string(err));
