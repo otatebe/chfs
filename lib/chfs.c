@@ -858,6 +858,7 @@ chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,
 	if (p == NULL)
 		return (-1);
 	if (chunk_size <= 0) {
+		free(p);
 		errno = EINVAL;
 		return (-1);
 	}
