@@ -831,7 +831,7 @@ chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,
 
 	if (p == NULL)
 		return (-1);
-	if (chunk_size <= 0) {
+	if (p[0] == '\0' || chunk_size <= 0) {
 		free(p);
 		errno = EINVAL;
 		return (-1);
@@ -869,6 +869,11 @@ chfs_open(const char *path, int32_t flags)
 
 	if (p == NULL)
 		return (-1);
+	if (p[0] == '\0') {
+		free(p);
+		errno = EINVAL;
+		return (-1);
+	}
 	ret = chfs_rpc_inode_stat(p, strlen(p) + 1, &st, &err);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
 		free(p);
@@ -1306,6 +1311,11 @@ chfs_unlink(const char *path)
 
 	if (p == NULL)
 		return (-1);
+	if (p[0] == '\0') {
+		free(p);
+		errno = EINVAL;
+		return (-1);
+	}
 	ret = chfs_rpc_remove(p, strlen(p) + 1, &err);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
 		free(p);
@@ -1336,6 +1346,11 @@ chfs_mkdir(const char *path, mode_t mode)
 
 	if (p == NULL)
 		return (-1);
+	if (p[0] == '\0') {
+		free(p);
+		errno = EINVAL;
+		return (-1);
+	}
 	mode |= S_IFDIR;
 	ret = chfs_rpc_inode_create(p, strlen(p) + 1, mode, 0, &err);
 	free(p);
@@ -1355,6 +1370,11 @@ chfs_rmdir(const char *path)
 
 	if (p == NULL)
 		return (-1);
+	if (p[0] == '\0') {
+		free(p);
+		errno = EINVAL;
+		return (-1);
+	}
 	/* XXX check child entries */
 	ret = chfs_rpc_remove(p, strlen(p) + 1, &err);
 	free(p);
@@ -1380,6 +1400,11 @@ chfs_symlink(const char *target, const char *path)
 	p = canonical_path(path);
 	if (p == NULL)
 		return (-1);
+	if (p[0] == '\0') {
+		free(p);
+		errno = EINVAL;
+		return (-1);
+	}
 	mode = 0777 | S_IFLNK;
 	len = strlen(target);
 	/* chunk_size is len but symlink(2) requires the last null byte */
@@ -1403,6 +1428,11 @@ chfs_readlink(const char *path, char *buf, size_t size)
 
 	if (p == NULL)
 		return (-1);
+	if (p[0] == '\0') {
+		free(p);
+		errno = EINVAL;
+		return (-1);
+	}
 	ret = chfs_rpc_inode_read(p, strlen(p) + 1, buf, &s, 0, &err);
 	free(p);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
@@ -1503,6 +1533,11 @@ chfs_truncate(const char *path, off_t len)
 	p = canonical_path(path);
 	if (p == NULL)
 		return (-1);
+	if (p[0] == '\0') {
+		free(p);
+		errno = EINVAL;
+		return (-1);
+	}
 	ret = chfs_rpc_inode_stat(p, strlen(p) + 1, &sb, &err);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS || !S_ISREG(sb.mode)) {
 		free(p);
