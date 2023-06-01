@@ -831,6 +831,10 @@ chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,
 
 	if (p == NULL)
 		return (-1);
+	if (chunk_size <= 0) {
+		errno = EINVAL;
+		return (-1);
+	}
 	mode |= S_IFREG;
 	fd = create_fd(p, mode, chunk_size);
 	if (fd < 0) {
