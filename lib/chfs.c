@@ -857,7 +857,7 @@ chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,
 
 	if (p == NULL)
 		return (-1);
-	if (chunk_size <= 0) {
+	if (p[0] == '\0' || chunk_size <= 0) {
 		free(p);
 		errno = EINVAL;
 		return (-1);
@@ -941,6 +941,11 @@ chfs_open(const char *path, int32_t flags)
 
 	if (p == NULL)
 		return (-1);
+	if (p[0] == '\0') {
+		free(p);
+		errno = EINVAL;
+		return (-1);
+	}
 	psize = strlen(p) + 1;
 	ret = chfs_rpc_inode_stat(p, psize, &st, &err);
 	if (ret == HG_SUCCESS && err == KV_ERR_NO_ENTRY) {
@@ -1413,6 +1418,11 @@ chfs_unlink(const char *path)
 
 	if (p == NULL)
 		return (-1);
+	if (p[0] == '\0') {
+		free(p);
+		errno = EINVAL;
+		return (-1);
+	}
 	ret = chfs_rpc_remove(p, strlen(p) + 1, &err);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
 		free(p);
@@ -1443,6 +1453,11 @@ chfs_mkdir(const char *path, mode_t mode)
 
 	if (p == NULL)
 		return (-1);
+	if (p[0] == '\0') {
+		free(p);
+		errno = EINVAL;
+		return (-1);
+	}
 	mode |= S_IFDIR;
 	ret = chfs_rpc_inode_create(p, strlen(p) + 1, mode, 0, &err);
 	free(p);
@@ -1462,6 +1477,11 @@ chfs_rmdir(const char *path)
 
 	if (p == NULL)
 		return (-1);
+	if (p[0] == '\0') {
+		free(p);
+		errno = EINVAL;
+		return (-1);
+	}
 	/* XXX check child entries */
 	ret = chfs_rpc_remove(p, strlen(p) + 1, &err);
 	free(p);
@@ -1487,6 +1507,11 @@ chfs_symlink(const char *target, const char *path)
 	p = canonical_path(path);
 	if (p == NULL)
 		return (-1);
+	if (p[0] == '\0') {
+		free(p);
+		errno = EINVAL;
+		return (-1);
+	}
 	mode = 0777 | S_IFLNK;
 	len = strlen(target);
 	ret = chfs_rpc_inode_create_data(p, strlen(p) + 1, mode, len + 1,
@@ -1509,6 +1534,11 @@ chfs_readlink(const char *path, char *buf, size_t size)
 
 	if (p == NULL)
 		return (-1);
+	if (p[0] == '\0') {
+		free(p);
+		errno = EINVAL;
+		return (-1);
+	}
 	ret = chfs_rpc_inode_read(p, strlen(p) + 1, buf, &s, 0, &err);
 	if (ret == HG_SUCCESS && err == KV_ERR_NO_ENTRY &&
 		((bp = path_backend(p)) != NULL)) {
@@ -1628,6 +1658,11 @@ chfs_truncate(const char *path, off_t len)
 	p = canonical_path(path);
 	if (p == NULL)
 		return (-1);
+	if (p[0] == '\0') {
+		free(p);
+		errno = EINVAL;
+		return (-1);
+	}
 	ret = chfs_rpc_inode_stat(p, strlen(p) + 1, &sb, &err);
 	mode = MODE_MASK(sb.mode);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS || !S_ISREG(mode)) {
