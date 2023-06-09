@@ -20,6 +20,7 @@
 #include "kv_types.h"
 #include "kv.h"
 #include "kv_err.h"
+#include "fs_err.h"
 #include "fs_types.h"
 #include "fs.h"
 #include "file.h"
@@ -66,27 +67,6 @@ static __thread int __r;
 #define unlink(path) \
 	((__r = abt_io_unlink(abtio, path)) < 0 ? (errno = -__r), -1 : __r)
 #endif
-
-static int
-fs_err(int err, const char *diag)
-{
-	if (err >= 0)
-		return (KV_SUCCESS);
-
-	switch (-err) {
-	case EEXIST:
-		return (KV_ERR_EXIST);
-	case ENOENT:
-		return (KV_ERR_NO_ENTRY);
-	case ENOMEM:
-		return (KV_ERR_NO_MEMORY);
-	case ENOTSUP:
-		return (KV_ERR_NOT_SUPPORTED);
-	default:
-		log_notice("fs_err (%s): %s", diag, strerror(-err));
-		return (KV_ERR_UNKNOWN);
-	}
-}
 
 void
 fs_inode_init(char *dir, int niothreads)

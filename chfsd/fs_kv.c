@@ -7,6 +7,7 @@
 #include "kv_types.h"
 #include "kv.h"
 #include "kv_err.h"
+#include "fs_err.h"
 #include "fs_types.h"
 #include "fs.h"
 #include "file.h"
@@ -299,27 +300,6 @@ fs_inode_unlink_chunk_all(char *path, int i)
 #include <fcntl.h>
 #include <errno.h>
 
-static int
-fs_err(int err)
-{
-	if (err >= 0)
-		return (KV_SUCCESS);
-
-	switch (-err) {
-	case EEXIST:
-		return (KV_ERR_EXIST);
-	case ENOENT:
-		return (KV_ERR_NO_ENTRY);
-	case ENOMEM:
-		return (KV_ERR_NO_MEMORY);
-	case ENOTSUP:
-		return (KV_ERR_NOT_SUPPORTED);
-	default:
-		log_notice("fs_err: %s", strerror(-err));
-		return (KV_ERR_UNKNOWN);
-	}
-}
-
 struct flush_cb_arg {
 	char *dst;
 	int index;
@@ -364,7 +344,7 @@ flush_cb(const char *value, size_t value_size, void *arg)
 		goto done;
 	}
 	if (r == -1)
-		r = fs_err(-errno);
+		r = fs_err(-errno, diag);
 	else
 		r = KV_SUCCESS;
 	goto done;
@@ -386,7 +366,7 @@ regular_file:
 		r = pwrite(fd, value + fs_msize, inode->size,
 			a->index * inode->chunk_size);
 		if (r == -1)
-			r = fs_err(-errno);
+			r = fs_err(-errno, diag);
 		else if (r != inode->size) {
 			log_info("%s: %s: %d of %ld bytes written", diag,
 				a->dst, r, inode->size);
