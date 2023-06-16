@@ -1109,10 +1109,13 @@ chfs_pread_internal_sync(int fd, void *buf, size_t size, off_t offset)
 		return (-1);
 	ret = chfs_rpc_inode_read(path, psize, buf, &s, local_pos, &err);
 	free(path);
-	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
+	if (ret != HG_SUCCESS ||
+		(err != KV_SUCCESS && err != KV_ERR_NO_ENTRY)) {
 		chfs_set_errno(ret, err);
 		return (-1);
-	}
+	} else if (err == KV_ERR_NO_ENTRY)
+		s = 0;
+
 	if (s == 0)
 		return (0);
 
