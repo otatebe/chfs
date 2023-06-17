@@ -24,6 +24,7 @@
 #include "fs_types.h"
 #include "fs.h"
 #include "file.h"
+#include "backend.h"
 #include "timespec.h"
 #include "log.h"
 
@@ -693,12 +694,11 @@ fs_inode_unlink_chunk_all(char *path, int i)
 int
 fs_inode_flush(void *key, size_t key_size)
 {
-	int index, keylen, r = KV_SUCCESS, src_fd, dst_fd, flags;
+	int index, keylen, r = KV_SUCCESS, src_fd, flags;
 	size_t chunk_size;
 	int16_t cache_flags;
 	char *dst, *p, *buf, sym_buf[PATH_MAX];
 	struct stat sb;
-	struct timespec ts1, ts2, ts3;
 	static const char diag[] = "flush";
 
 	keylen = strlen(key) + 1;
@@ -768,35 +768,16 @@ regular_file:
 	if (!(cache_flags & CHFS_FS_CACHE))
 		flags |= O_CREAT;
 
-	clock_gettime(CLOCK_REALTIME, &ts1);
-	if ((dst_fd = open(dst, flags, sb.st_mode)) == -1)
+	r = pread(src_fd, buf, sb.st_size - msize, msize);
+	if (r == -1)
 		r = fs_err(-errno, diag);
-	else {
-		r = pread(src_fd, buf, sb.st_size - msize, msize);
-		if (r == -1)
-			r = fs_err(-errno, diag);
-		else if (r != sb.st_size - msize) {
-			log_error("%s: %d of %ld bytes read", diag, r,
-				sb.st_size - msize);
-			r = KV_ERR_PARTIAL_READ;
-		} else {
-			r = pwrite(dst_fd, buf, r, index * chunk_size);
-			if (r == -1)
-				r = fs_err(-errno, diag);
-			else if (r != sb.st_size - msize) {
-				log_error("%s: %d of %ld bytes written", diag,
-					r, sb.st_size - msize);
-				r = KV_ERR_PARTIAL_WRITE;
-			} else
-				r = KV_SUCCESS;
-		}
-		close(dst_fd);
-	}
-	clock_gettime(CLOCK_REALTIME, &ts2);
-	timespec_sub(&ts1, &ts2, &ts3);
-	if (ts3.tv_sec > 0)
-		log_notice("%s: %s flush %ld.%09ld sec", diag, p,
-			ts3.tv_sec, ts3.tv_nsec);
+	else if (r != sb.st_size - msize) {
+		log_error("%s: %d of %ld bytes read", diag, r,
+			sb.st_size - msize);
+		r = KV_ERR_PARTIAL_READ;
+	} else
+		r = backend_write(dst, flags, sb.st_mode, buf, r,
+			index * chunk_size);
 close_src_fd:
 	close(src_fd);
 free_dst:

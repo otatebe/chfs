@@ -11,6 +11,7 @@
 #include "fs_types.h"
 #include "fs.h"
 #include "file.h"
+#include "backend.h"
 #include "timespec.h"
 #include "log.h"
 #include "fs_kv.h"
@@ -315,8 +316,7 @@ flush_cb(const char *value, size_t value_size, void *arg)
 	struct flush_cb_arg *a = arg;
 	struct inode *inode = (void *)value;
 	mode_t mode = MODE_MASK(inode->mode);
-	int r, fd, flags, dirty_flush;
-	struct timespec ts1, ts2, ts3, ts4, ts5, ts6, ts7, ts8;
+	int r, flags, dirty_flush;
 	static const char diag[] = "flush_cb";
 
 	log_debug("%s: dst=%s flags=%d size=%ld", diag, a->dst, inode->flags,
@@ -327,7 +327,6 @@ flush_cb(const char *value, size_t value_size, void *arg)
 	}
 
 	kv_lock_flush_start(a->key, a->key_size, diag, inode->size, 0);
-	clock_gettime(CLOCK_REALTIME, &ts1);
 	if (S_ISREG(mode))
 		goto regular_file;
 
@@ -354,30 +353,9 @@ regular_file:
 	if (!(inode->flags & CHFS_FS_CACHE))
 		flags |= O_CREAT;
 
-	fd = open(a->dst, flags, mode);
-	if (fd == -1) {
-		fs_mkdir_parent(a->dst);
-		fd = open(a->dst, flags, mode);
-	}
-	clock_gettime(CLOCK_REALTIME, &ts4);
-	if (fd == -1)
-		r = KV_ERR_NO_ENTRY;
-	else {
-		r = pwrite(fd, value + fs_msize, inode->size,
-			a->index * inode->chunk_size);
-		if (r == -1)
-			r = fs_err(-errno, diag);
-		else if (r != inode->size) {
-			log_info("%s: %s: %d of %ld bytes written", diag,
-				a->dst, r, inode->size);
-			r = KV_ERR_PARTIAL_WRITE;
-		} else
-			r = KV_SUCCESS;
-		clock_gettime(CLOCK_REALTIME, &ts5);
-		close(fd);
-	}
+	r = backend_write(a->dst, flags, mode, value + fs_msize, inode->size,
+		a->index * inode->chunk_size);
 done:
-	clock_gettime(CLOCK_REALTIME, &ts2);
 	dirty_flush = kv_lock_flush(a->key, a->key_size, diag, inode->size, 0);
 	if (r == KV_SUCCESS && !dirty_flush) {
 		inode->flags = (inode->flags & ~CHFS_FS_DIRTY) | CHFS_FS_CACHE;
@@ -388,19 +366,6 @@ done:
 	else
 		log_error("%s: %s: %s", diag, a->dst, kv_err_string(r));
 	kv_unlock_flush(a->key, a->key_size);
-	timespec_sub(&ts1, &ts2, &ts3);
-	if (r == KV_SUCCESS && S_ISREG(mode) && ts3.tv_sec > 0) {
-		timespec_sub(&ts1, &ts4, &ts6);
-		timespec_sub(&ts4, &ts5, &ts7);
-		timespec_sub(&ts5, &ts2, &ts8);
-		log_notice("%s: %s:%d flush %ld.%09ld sec (open %ld.%09ld sec,"
-			" write %ld.%09ld sec, close %ld.%09ld sec)", diag,
-			(char *)a->key, a->index, ts3.tv_sec, ts3.tv_nsec,
-			ts6.tv_sec, ts6.tv_nsec, ts7.tv_sec, ts7.tv_nsec,
-			ts8.tv_sec, ts8.tv_nsec);
-	} else if (ts3.tv_sec > 0)
-		log_notice("%s: %s:%d flush %ld.%09ld sec", diag,
-			(char *)a->key, a->index, ts3.tv_sec, ts3.tv_nsec);
 }
 
 int
