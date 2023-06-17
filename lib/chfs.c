@@ -16,6 +16,7 @@
 #include "fs_types.h"
 #include "fs_rpc.h"
 #include "path.h"
+#include "backend.h"
 #include "log.h"
 #include "chfs.h"
 #include "chfs_err.h"
@@ -871,7 +872,7 @@ chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,
 	}
 	ret = chfs_rpc_inode_create(p, strlen(p) + 1, emode, chunk_size, &err);
 	free(p);
-	if (ret == HG_SUCCESS && err == KV_SUCCESS)
+	if (ret == HG_SUCCESS && (err == KV_SUCCESS || err == KV_ERR_NO_SPACE))
 		return (fd);
 
 	clear_fd(fd);
@@ -916,7 +917,7 @@ cache_backend_data(char *path, size_t psize, int index, int chunk_size,
 
 	ret = chfs_rpc_inode_write(path, psize, buf, &rr, 0,
 		sb.st_mode | CHFS_O_CACHE, chunk_size, &err);
-	if (ret != HG_SUCCESS || err != KV_SUCCESS)
+	if (ret != HG_SUCCESS || (err != KV_SUCCESS && err != KV_ERR_NO_SPACE))
 		goto err_free_buf;
 
 	if (modep)
@@ -1034,9 +1035,16 @@ chfs_pwrite_internal_sync(int fd, const void *buf, size_t size, off_t offset)
 	ret = chfs_rpc_inode_write(path, psize, (void *)buf, &s, local_pos,
 		emode, chunk_size, &err);
 	free(path);
-	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
+	if (ret != HG_SUCCESS ||
+		(err != KV_SUCCESS && err != KV_ERR_NO_SPACE)) {
 		chfs_set_errno(ret, err);
 		return (-1);
+	} else if (err == KV_ERR_NO_SPACE) {
+		err = backend_write_key(tab->path, tab->mode, buf, s, offset);
+		if (err != KV_SUCCESS) {
+			chfs_set_errno(ret, err);
+			return (-1);
+		}
 	}
 	if (size - s > 0) {
 		ss = chfs_pwrite_internal_sync(fd, buf + s, size - s,
@@ -1120,10 +1128,20 @@ chfs_pwrite_internal_async(int fd, const void *buf, size_t size, off_t offset)
 	for (i = 0; i < nchunks; ++i) {
 		ret = chfs_async_rpc_inode_write_wait(&req[i].s, &err,
 			&req[i].r);
-		if (ret != HG_SUCCESS || err != KV_SUCCESS) {
+		if (ret != HG_SUCCESS ||
+			(err != KV_SUCCESS && err != KV_ERR_NO_SPACE)) {
 			chfs_set_errno(ret, err);
 			if (save_errno == 0)
 				save_errno = errno;
+		} else if (err == KV_ERR_NO_SPACE) {
+			err = backend_write_key(tab->path, tab->mode, buf + ss,
+				req[i].s, offset + ss);
+			if (save_errno == 0) {
+				chfs_set_errno(ret, err);
+				save_errno = errno;
+			}
+			if (err == KV_SUCCESS || err == KV_ERR_PARTIAL_WRITE)
+				ss += req[i].s;
 		} else
 			ss += req[i].s;
 	}

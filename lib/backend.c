@@ -2,9 +2,11 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <time.h>
 #include <errno.h>
 #include "timespec.h"
+#include "path.h"
 #include "file.h"
 #include "kv_err.h"
 #include "fs_err.h"
@@ -56,5 +58,24 @@ backend_write(char *dst, int flags, mode_t mode,
 		log_notice("%s: %s size %ld off %ld flush %ld.%09ld sec", diag,
 			dst, size, off, ts5.tv_sec, ts5.tv_nsec);
 
+	return (r);
+}
+
+int
+backend_write_key(const char *key, mode_t mode,
+	const char *buf, size_t size, off_t off)
+{
+	char *dst;
+	int r;
+	static const char diag[] = "backend_write_key";
+
+	dst = path_backend(key);
+	if (dst == NULL) {
+		r = KV_ERR_NO_BACKEND_PATH;
+		log_debug("%s: %s", diag, kv_err_string(r));
+		return (r);
+	}
+	r = backend_write(dst, O_WRONLY|O_CREAT, mode, buf, size, off);
+	free(dst);
 	return (r);
 }
