@@ -13,6 +13,7 @@ chfs_set_errno(hg_return_t ret, int err)
 	}
 	switch (err) {
 	case KV_SUCCESS:
+		errno = 0;
 		break;
 	case KV_ERR_EXIST:
 		errno = EEXIST;
