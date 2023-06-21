@@ -5,14 +5,15 @@ ARG UID=1000
 
 RUN apt-get update \
  && apt-get -y upgrade \
- && apt-get -y install gcc automake \
- && apt-get -y install cmake libtool pkgconf \
- && apt-get -y install git python3 bison fuse sudo vim curl \
- && apt-get -y install libpmemkv-dev libmemkind-dev libtbb-dev \
- && apt-get -y install rapidjson-dev \
- && apt-get -y install libfuse-dev pandoc \
- && apt-get -y install libopenmpi-dev libssl-dev \
- && apt-get -y install gdb
+ && apt-get -y install \
+    gcc automake \
+    cmake libtool pkgconf \
+    git python3 bison fuse sudo vim curl \
+    libpmemkv-dev libmemkind-dev libtbb-dev \
+    rapidjson-dev \
+    libfuse-dev pandoc \
+    libopenmpi-dev libssl-dev \
+    gdb numactl
 
 RUN \
   # sshd

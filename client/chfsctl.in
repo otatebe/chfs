@@ -22,6 +22,7 @@ TIMEOUT=30
 NUM_FLUSH_THREADS=1
 NO_MOUNT=false
 EXEC_INTERVAL=0
+NUMACTL_OPT=
 
 program=$(basename $0)
 
@@ -36,6 +37,7 @@ usage() {
 	echo >&2 "	[-b backend_dir] [-f #flush_threads] [-p proto] [-s db_size] [-N vname]"
 	echo >&2 "	[-I interface] [-i interval] [-C socket#] [-L log_dir] [-A]"
 	echo >&2 "	[-n #servers for CHFS_SERVER] [-x env] [-O options]"
+	echo >&2 "	[-NUMACTL options]"
 	echo >&2 "	start | stop | status | kill | clean"
 	exit 1
 }
@@ -46,7 +48,7 @@ while [ $# -gt 0 ]; do
 	    -A) NO_SERVER=false ;;
 	    -b) shift; BEDIR=$1 ;;
 	    -c) shift; DBDIR=$1 ;;
-	    -C) shift; CPUSOCKET=$1 ;;
+	    -C) shift; NUMACTL_OPT="$NUMACTL_OPT -N $1" ;;
 	    -D) DEVDAX=true ;;
 	    -f) shift; NUM_FLUSH_THREADS=$1 ;;
 	    -h) shift; HOSTFILE=$1 ;;
@@ -65,6 +67,7 @@ while [ $# -gt 0 ]; do
 			    *=*) XENV="$XENV $1" ;;
 			    *) XENV="$XENV $1=\"${!1}\"" ;;
 		    esac ;;
+	    -NUMACTL) shift; NUMACTL_OPT="$NUMACTL_OPT $1" ;;
 	    -*) echo "unknown option: $1"
 		usage ;;
 	    *) usage ;;
@@ -89,7 +92,7 @@ else
 fi
 [ "X$HOSTFILE" = X ] && HOSTS=localhost ||
 	HOSTS="$(sed -e 's/#.*//' -e '/^[ 	]*$/d' $HOSTFILE | awk '{ print $1 }')"
-[ "X$CPUSOCKET" = X ] && NUMACTL= || NUMACTL="numactl -N $CPUSOCKET"
+[ "X$NUMACTL_OPT" = X ] && NUMACTL= || NUMACTL="numactl $NUMACTL_OPT"
 if ! $NO_SERVER; then
 	[ X"$CHFS_SERVER" = X ] && err CHFS_SERVER not specified
 fi
