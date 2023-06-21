@@ -57,6 +57,9 @@ chfsctl - manage CHFS servers
 -O options
 : specifies options for chfsd.
 
+-NUMACTL options
+: specifies options for numactl.
+
 # EXAMPLES
 Here is an example to execute chfsd on host listed in hostfile, which utilizes the devdax device /dev/dax0.0.  It is mounted at /tmp/chfs on every node.
 
