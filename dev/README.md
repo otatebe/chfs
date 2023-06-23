@@ -4,7 +4,7 @@
 
 - build image
 
-      $ docker compose build
+      $ docker compose build --build-arg UID=$(id -u)
 
   This creates a docker image to build CHFS.  For details, see Dockerfile.
 
