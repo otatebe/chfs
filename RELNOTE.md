@@ -1,3 +1,11 @@
+# Release note for CHFS 2.1.1 (2023/7/6)
+
+## Updated features
+- chfsctl - -NUMACTL option to specify options for numactl
+
+## Bug fixes
+- fix chfs_pread may return no such file or directory
+
 # Release note for CHFS 2.1.0 (2023/5/11)
 
 ## New environment variables
