@@ -29,6 +29,7 @@ static int chfs_rpc_timeout_msec = 30000;	/* 30 seconds */
 static int chfs_node_list_cache_timeout = 120;	/* 120 seconds */
 static int chfs_async_access = 0;
 static int chfs_buf_size = 0;
+static int initialized = 0;
 
 static ABT_mutex fd_mutex;
 static int fd_table_size;
@@ -207,6 +208,12 @@ get_server(int next)
 }
 
 int
+chfs_initialized()
+{
+	return (initialized);
+}
+
+int
 chfs_init(const char *server)
 {
 	margo_instance_id mid;
@@ -313,6 +320,8 @@ chfs_init(const char *server)
 	if (!ring_list_does_lookup_local())
 		chfs_sync(); /* set up all connections */
 
+	initialized = 1;
+
 	return (0);
 }
 
@@ -322,6 +331,8 @@ chfs_term_without_sync()
 	fd_table_term();
 	fs_client_term();
 	ring_list_term();
+
+	initialized = 0;
 
 	return (0);
 }
