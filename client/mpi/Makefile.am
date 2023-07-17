@@ -1,4 +1,4 @@
-bin_PROGRAMS = chfind
+bin_PROGRAMS = chfind chstagein
 if !HAVE_MPI
 bin_SCRIPTS = chfindrun
 endif

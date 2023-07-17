@@ -6,10 +6,10 @@
 chstagein - stage-in a file to CHFS
 
 # SYNOPSIS
-**chstagein** [_options_] _file_
+**chstagein** [_options_] _file_ ...
 
 # DESCRIPTION
-**chstagein** stages in a file to CHFS.
+**chstagein** stages in a file to CHFS in parallel in MPI.
 
 # OPTIONS
 -a
