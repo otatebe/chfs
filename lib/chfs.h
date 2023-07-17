@@ -1,6 +1,7 @@
 struct stat;
 
 int chfs_init(const char *server);
+int chfs_initialized();
 int chfs_term();
 const char *chfs_version();
 void chfs_set_chunk_size(int chunk_size);
