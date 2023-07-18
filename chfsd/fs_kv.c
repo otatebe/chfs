@@ -322,7 +322,7 @@ flush_cb(const char *value, size_t value_size, void *arg)
 	log_debug("%s: dst=%s flags=%d size=%ld", diag, a->dst, inode->flags,
 		inode->size);
 	if (!(inode->flags & CHFS_FS_DIRTY)) {
-		log_info("%s: clean", diag);
+		log_info("%s: %s: clean", diag, a->dst);
 		return;
 	}
 

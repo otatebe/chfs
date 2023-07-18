@@ -314,7 +314,7 @@ if ! $NO_MOUNT && [ X"$MDIR" != X ]; then
 	if [ $(chlist | wc -l) -lt $nservers ]; then
 		echo >&2 "$program: timeout, $(chlist | wc -l) of $nservers servers are running.  you may need chmkdir $MDIR manually"
 	fi
-	chmkdir "$MDIR" > /dev/null 2>&1 || :
+	chmkdir -m 02000000755 "$MDIR" > /dev/null 2>&1 || :
 
 	if [ "X$HOSTS" = Xlocalhost ]; then
 		mkdir -p "$MDIR"

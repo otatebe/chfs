@@ -322,6 +322,8 @@ fs_inode_create(char *key, size_t key_size, uint32_t uid, uint32_t gid,
 		r = fs_mkdir_p(p, mode);
 		if (r == -1)
 			r = -errno;
+		else
+			r = set_metadata(p, 0, flags);
 	} else if (S_ISLNK(mode)) {
 		r = symlink(buf, p);
 		if (r == -1) {
@@ -723,9 +725,9 @@ fs_inode_flush(void *key, size_t key_size)
 	if (S_ISREG(sb.st_mode))
 		goto regular_file;
 
-	if (S_ISDIR(sb.st_mode)) {
+	if (S_ISDIR(sb.st_mode))
 		r = fs_mkdir_p(dst, sb.st_mode);
-	} else if (S_ISLNK(sb.st_mode)) {
+	else if (S_ISLNK(sb.st_mode)) {
 		r = readlink(p, sym_buf, sizeof sym_buf);
 		if (r > 0) {
 			sym_buf[r] = '\0';
