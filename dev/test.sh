@@ -7,7 +7,7 @@ MDIR=/tmp/a
 BACKEND=$HOME/chfs/dev/backend
 
 # clean up
-chfsctl -h hosts -m $MDIR stop
+chfsctl -h hosts -m $MDIR stop 2> /dev/null
 chfsctl -h hosts -m $MDIR clean
 
 eval $(chfsctl -h hosts -m $MDIR -b $BACKEND -f 2 -L log start)
