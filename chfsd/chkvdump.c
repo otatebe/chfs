@@ -28,14 +28,14 @@ print_time(struct timespec *ts)
 }
 
 static void
-print_stat(struct fs_stat *st)
+print_stat(struct inode *ino)
 {
 	printf("  Mode: (%o) Uid: (%d) Gid: (%d) Size: %ld Chunk size: %ld\n",
-		st->mode, st->uid, st->gid, st->size, st->chunk_size);
+		ino->mode, ino->uid, ino->gid, ino->size, ino->chunk_size);
 	printf("Modify: ");
-	print_time(&st->mtime);
+	print_time(&ino->mtime);
 	printf("\nChange: ");
-	print_time(&st->ctime);
+	print_time(&ino->ctime);
 	printf("\n");
 }
 
@@ -43,14 +43,15 @@ static int opt_stat = 0;
 static long opt_len = 0;
 
 static void
-print_data(const char *v, size_t vs, struct fs_stat *st)
+print_data(const char *v, size_t vs)
 {
 	long i, len;
+	struct inode *inode = (struct inode *)v;
 
 	v += fs_msize;
 	len = vs - fs_msize;
-	if (len > st->size)
-		len = st->size;
+	if (len > inode->size)
+		len = inode->size;
 	if (len > opt_len)
 		len = opt_len;
 	for (i = 0; i < len; ++i)
@@ -61,8 +62,7 @@ print_data(const char *v, size_t vs, struct fs_stat *st)
 static int
 get_all_cb(const char *k, size_t ks, const char *v, size_t vs, void *a)
 {
-	int i, err;
-	struct fs_stat sb;
+	int i;
 
 	printf("   Key: ");
 	for (i = 0; i < ks; ++i)
@@ -70,13 +70,9 @@ get_all_cb(const char *k, size_t ks, const char *v, size_t vs, void *a)
 	printf(" Value size: %ld\n", vs);
 
 	if (opt_stat) {
-		err = fs_inode_stat((void *)k, ks, &sb);
-		if (err == KV_SUCCESS) {
-			print_stat(&sb);
-			if (opt_len > 0)
-				print_data(v, vs, &sb);
-		} else
-			log_error("%s", kv_err_string(err));
+		print_stat((struct inode *)v);
+		if (opt_len > 0)
+			print_data(v, vs);
 		printf("\n");
 	}
         return (0);
