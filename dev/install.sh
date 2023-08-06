@@ -15,6 +15,8 @@ done
 . $HOME/spack/share/spack/setup-env.sh
 spack load mochi-margo
 cd ~/chfs
+
+set -x
 autoreconf -i
 ./configure --prefix $HOME/local $OPT > /dev/null
 make clean > /dev/null
