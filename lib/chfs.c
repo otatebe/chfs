@@ -898,7 +898,7 @@ chfs_open(const char *path, int32_t flags)
 		chfs_set_errno(ret, err);
 		return (-1);
 	}
-	if (st.chunk_size == 0) {
+	if (S_ISDIR(st.mode)) {
 		free(p);
 		errno = EISDIR;
 		return (-1);
