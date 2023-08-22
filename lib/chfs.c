@@ -976,7 +976,7 @@ chfs_open(const char *path, int32_t flags)
 		}
 	}
 	if (ret == HG_SUCCESS && err == KV_SUCCESS) {
-		if (st.chunk_size == 0) {
+		if (S_ISDIR(MODE_MASK(st.mode))) {
 			free(p);
 			errno = EISDIR;
 			return (-1);
