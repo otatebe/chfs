@@ -322,6 +322,13 @@ chfs_init(const char *server)
 
 	initialized = 1;
 
+	log_info("chunk_size %d byte, buf_size %d byte, async_mode %s",
+		chfs_chunk_size, chfs_buf_size,
+		chfs_async_access ? "enable" : "disable");
+	log_info("rdma_thresh %ld byte", chfs_rdma_thresh);
+	log_info("rpc_timeout %d msec, node_list_cache_timeout %d sec",
+		chfs_rpc_timeout_msec, chfs_node_list_cache_timeout);
+
 	return (0);
 }
 
@@ -968,8 +975,14 @@ chfs_open(const char *path, int32_t flags)
 			err = KV_SUCCESS;
 		}
 	}
-	if (ret == HG_SUCCESS && err == KV_SUCCESS)
+	if (ret == HG_SUCCESS && err == KV_SUCCESS) {
+		if (st.chunk_size == 0) {
+			free(p);
+			errno = EISDIR;
+			return (-1);
+		}
 		fd = create_fd(p, MODE_MASK(st.mode), st.chunk_size);
+	}
 	else
 		chfs_set_errno(ret, err);
 	free(p);
