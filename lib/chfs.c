@@ -898,6 +898,11 @@ chfs_open(const char *path, int32_t flags)
 		chfs_set_errno(ret, err);
 		return (-1);
 	}
+	if (st.chunk_size == 0) {
+		free(p);
+		errno = EISDIR;
+		return (-1);
+	}
 	fd = create_fd(p, st.mode, st.chunk_size);
 	free(p);
 	if (fd >= 0)
