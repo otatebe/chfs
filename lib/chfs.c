@@ -962,7 +962,7 @@ chfs_open(const char *path, int32_t flags)
 		return (-1);
 	if (p[0] == '\0') {
 		free(p);
-		errno = EINVAL;
+		errno = EISDIR;
 		return (-1);
 	}
 	psize = strlen(p) + 1;
