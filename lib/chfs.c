@@ -889,7 +889,7 @@ chfs_open(const char *path, int32_t flags)
 		return (-1);
 	if (p[0] == '\0') {
 		free(p);
-		errno = EINVAL;
+		errno = EISDIR;
 		return (-1);
 	}
 	ret = chfs_rpc_inode_stat(p, strlen(p) + 1, &st, &err);
