@@ -1,3 +1,17 @@
+# Release note for CHFS/Cache 3.0.0 (2023/9/11)
+
+CHFS/Cache is a parallel caching file system for node-local storages based on CHFS ad hoc parallel file system.  It provides a caching mechanism against a backend parallel file system.  Files in the backend parallel file system are automatically cached.  Output files are automatically flushed.
+
+## How to create file system
+
+       % eval `chfsctl [-h hostfile] [-p verbs] [-D] [-c /dev/dax0.0] [-b /back/end/path] [-m /mount/point] start`
+
+The backend directory typically in a parallel file system can be specified by the -b option.  Files in the backend directory can be transparently accessed by CHFS.  For efficient access, files can be staged-in by `chstagein` command beforehand.  The output files will be flushed automatically to the backend directory.  It is possible to ensure flushing all dirty files by `chfs_sync()` or `chfsctl stop`.
+
+## Technical details
+
+Osamu Tatebe, Hiroki Ohtsuji, "[Caching Support for CHFS Node-local Persistent Memory File System](https://ieeexplore.ieee.org/document/9835238)", Proceedings of 3rd Workshop on Extreme-Scale Storage and Analysis (ESSA 2022), pp.1103-1110, 2022
+
 # Release note for CHFS 2.1.2 (2023/9/11)
 
 ## New API
