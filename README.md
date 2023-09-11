@@ -1,6 +1,8 @@
-# CHFS - Consistent hashing file system
+# CHFS/Cache - Parallel caching file system for node-local storages
 
 CHFS is a parallel consistent hashing file system created instantly using node-local storages such as persistent memory and NVMe SSD.  It exploits the performance of persistent memory using persistent in-memory key-value store pmemkv.  For NVMe SSD, it uses the POSIX backend.  It supports InfiniBand verbs for high performance data access.
+
+CHFS/Cache provides a caching mechanism against a backend parallel file system.  Files in the backend parallel file system are automatically cached.  Output files are automatically flushed.
 
 ## Quick installation steps
 
@@ -96,13 +98,15 @@ CHFS is a parallel consistent hashing file system created instantly using node-l
 
 1. Create CHFS
 
-       % eval `chfsctl [-h hostfile] [-p verbs] [-D] [-c /dev/dax0.0] [-m /mount/point] start`
+       % eval `chfsctl [-h hostfile] [-p verbs] [-D] [-c /dev/dax0.0] [-b /back/end/path] [-m /mount/point] start`
 
    This executes chfsd servers and mounts the CHFS at /mount/point on hosts specified by the hostfile.  The -p option specifies a communication protocol.  The -c option specifies a devdax device or a scratch directory on each host.
 
+   The backend directory typically in a parallel file system can be specified by the -b option.  Files in the backend directory can be transparently accessed by CHFS.  For efficient access, files can be staged-in by `chstagein` command beforehand.  The output files will be flushed automatically to the backend directory.  It is possible to ensure flushing all dirty files by `chfs_sync()` or `chfsctl stop`.
+
    For the devdax device, -D option is required.  A pmem obj pool should be created with the layout pmemkv by `pmempool create -l pmemkv obj /dev/dax0.0`.  For user-level access, the permission of the device is modified; bad block check is disabled by `pmempool feature --disable CHECK_BAD_BLOCKS /dev/dax0.0`.
 
-   chfsctl outputs the setting of CHFS_SERVER environment variable, which is used to execute chfuse and CHFS commands.
+   chfsctl outputs the setting of CHFS_SERVER, CHFS_BACKEND_PATH, and CHFS_SUBDIR_PATH environment variables, which are used to execute chfuse and CHFS commands.
 
    For details, see [manual page of chfsctl](doc/chfsctl.1.md).
 
@@ -114,7 +118,7 @@ CHFS is a parallel consistent hashing file system created instantly using node-l
 
        % chfuse <mount_point>
 
-   CHFS_SERVER environment variable, which is the output of chfsctl command, should be defined.
+   CHFS_SERVER and other environment variables, which are the output of chfsctl command, should be defined.
 
    For details, see [manual page of chfuse](doc/chfuse.1.md).
 
@@ -123,6 +127,7 @@ CHFS is a parallel consistent hashing file system created instantly using node-l
 - [chlist(1)](doc/chlist.1.md) - list CHFS servers
 - [chmkdir(1)](doc/chmkdir.1.md) - create a directory in CHFS
 - [chrmdir(1)](doc/chrmdir.1.md) - remove a directory in CHFS
+- [chstagein(1)](doc/chstagein.1.md) - stage-in files to CHFS
 
 ## Environment variable
 
@@ -155,7 +160,7 @@ When you use pmemkv, devdax is desirable.  When you use fsdax, the following env
 
 1. How to use
 
-       % mpirun -x CHFS_SERVER ior -a CHFS [--chfs.chunk_size=SIZE]
+       % mpirun -x CHFS_SERVER -x CHFS_BACKEND_PATH -x CHFS_SUBDIR_PATH ior -a CHFS [--chfs.chunk_size=SIZE]
 
    Large chunk size, i.e. 1 MiB, should be specified for best performance.
 
@@ -204,3 +209,5 @@ The following APIs are supported.
 ## References
 
 Osamu Tatebe, Kazuki Obata, Kohei Hiraga, Hiroki Ohtsuji, "[CHFS: Parallel Consistent Hashing File System for Node-local Persistent Memory](https://dl.acm.org/doi/fullHtml/10.1145/3492805.3492807)", Proceedings of the ACM International Conference on High Performance Computing in Asia-Pacific Region (HPC Asia 2022), pp.115-124, 2022
+
+Osamu Tatebe, Hiroki Ohtsuji, "[Caching Support for CHFS Node-local Persistent Memory File System](https://ieeexplore.ieee.org/document/9835238)", Proceedings of 3rd Workshop on Extreme-Scale Storage and Analysis (ESSA 2022), pp.1103-1110, 2022

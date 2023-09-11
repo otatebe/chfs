@@ -3,13 +3,13 @@
 % January 30, 2023
 
 # NAME
-chstagein - stage-in a file to CHFS
+chstagein - stage-in files to CHFS
 
 # SYNOPSIS
 **chstagein** [_options_] _file_ ...
 
 # DESCRIPTION
-**chstagein** stages in a file to CHFS in parallel in MPI.
+**chstagein** stages in files to CHFS in parallel in MPI.
 
 # OPTIONS
 -a
