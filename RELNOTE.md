@@ -1,3 +1,14 @@
+# Release note for CHFS 2.1.2 (2023/9/11)
+
+## New API
+- chfs_initialized() - check whether chfs_init() is called or not
+
+## Updated features
+- chfs_init() - display parameters in info level
+
+## Bug fixes
+- chfs_open() - return EISDIR when opening a directory
+
 # Release note for CHFS 2.1.1 (2023/7/6)
 
 ## Updated features
