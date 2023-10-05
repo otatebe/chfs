@@ -4,7 +4,7 @@ CHFS/Cache is a parallel caching file system for node-local storages based on CH
 
 ## How to create file system
 
-       % eval `chfsctl [-h hostfile] [-p verbs] [-D] [-c /dev/dax0.0] [-b /back/end/path] [-m /mount/point] start`
+    % eval `chfsctl [-h hostfile] [-p verbs] [-D] [-c /dev/dax0.0] [-b /back/end/path] [-m /mount/point] start`
 
 The backend directory typically in a parallel file system can be specified by the -b option.  Files in the backend directory can be transparently accessed by CHFS.  For efficient access, files can be staged-in by `chstagein` command beforehand.  The output files will be flushed automatically to the backend directory.  It is possible to ensure flushing all dirty files by `chfs_sync()` or `chfsctl stop`.
 
