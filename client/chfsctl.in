@@ -9,7 +9,7 @@ export PATH
 PROTO=sockets
 BEDIR=
 DBDIR=/tmp/$USER
-DBSIZE=$((256 * 1024 * 1024))
+DBSIZE=$((1024 * 1024 * 1024))
 LOG_DIR=
 IFACE=default
 VNAME=default
