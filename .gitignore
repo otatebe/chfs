@@ -80,7 +80,7 @@ m4/lt~obsolete.m4
 # (meta build system like autotools,
 # can automatically generate from config.status script
 # (which is called by configure script))
-Makefile
+/Makefile
 
 ## C ##
 ## https://github.com/github/gitignore/blob/e5323759e387ba347a9d50f8b0ddd16502eb71d4/C.gitignore
