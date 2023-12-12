@@ -63,7 +63,20 @@ fi
 PKG_CHECK_MODULES([MARGO], [margo])
 MARGO_RPATH=$(pkg-config --libs-only-L margo | sed 's/-L/-R/g')
 AC_SUBST(MARGO_RPATH)
+
+AC_ARG_WITH([fuse],
+  [AS_HELP_STRING([--with-fuse],
+    [prefix for fuse @<:@default=yes@:>@])], [], [])
+save_PKG_CONFIG_PATH="$PKG_CONFIG_PATH"
+case $with_fuse in
+  yes|no) ;;
+  /*) fuse_pc=$(find $with_fuse -maxdepth 4 -name fuse.pc | head -1)
+      if test x"$fuse_pc" != x; then
+        export PKG_CONFIG_PATH=$(dirname $fuse_pc)
+      fi ;;
+esac
 PKG_CHECK_MODULES([FUSE], [fuse])
+export PKG_CONFIG_PATH="$save_PKG_CONFIG_PATH"
 
 AC_MSG_CHECKING([whether MD5 digest is used])
 AC_ARG_ENABLE([digest-md5],
