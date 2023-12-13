@@ -1,3 +1,8 @@
+# Release note for CHFS/Cache 3.0.1 (2023/12/13)
+
+## Updated features
+- configure - --with-fuse option to specify the prefix
+
 # Release note for CHFS/Cache 3.0.0 (2023/9/11)
 
 CHFS/Cache is a parallel caching file system for node-local storages based on CHFS ad hoc parallel file system.  It provides a caching mechanism against a backend parallel file system.  Files in the backend parallel file system are automatically cached.  Output files are automatically flushed.
