@@ -21,8 +21,10 @@ s1=$(ls -l ~/chfs/configure | awk '{ print $5 }')
 s2=$(ls -l $MDIR/configure | awk '{ print $5 }')
 [ $s1 = $s2 ]
 chfind
-mpirun -x PATH -x CHFS_SERVER -x CHFS_BACKEND_PATH -x CHFS_SUBDIR_PATH -np 4 -hostfile hosts -map-by node ior -a CHFS -o /tmp/a/test -g -w -r -R -G 12345
+mpirun -x PATH -x CHFS_SERVER -x CHFS_BACKEND_PATH -x CHFS_SUBDIR_PATH -np 4 -hostfile hosts -map-by node ior -a CHFS -o $MDIR/test -g -w -r -R -G 12345 -k
 chfsctl -h hosts -m $MDIR stop
+
+mpirun -x PATH -np 4 -hostfile hosts -map-by node ior -o $BACKEND/test -g -r -R -G 12345
 
 ls -l $BACKEND
 rm $BACKEND/configure
