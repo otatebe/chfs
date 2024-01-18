@@ -6,6 +6,7 @@ exec_prefix=@exec_prefix@
 PATH=@bindir@:@sbindir@:$PATH
 export PATH
 
+: ${USER:=$(id -un)}
 PROTO=sockets
 DBDIR=/tmp/$USER
 DBSIZE=$((1024 * 1024 * 1024))
