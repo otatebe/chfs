@@ -39,3 +39,9 @@ CHFS_RPC_TIMEOUT_MSEC
 
 CHFS_LOG_PRIORITY:
 : maximum log priority to report.  Default is notice.
+
+# EXAMPLES
+The following example stages in all files in a backend directory.  **chstagein** can be executed with and without mpirun.
+
+    $ cd <backend_directory>
+    $ find * | xargs mpirun ... chstagein
