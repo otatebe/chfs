@@ -36,7 +36,7 @@ main(int argc, char *argv[])
 			chfs_set_async_access(1);
 			break;
 		case 'b':
-			chfs_stagein_set_buf_size(strtol(optarg, NULL, 0));
+			chfs_set_stagein_buf_size(strtol(optarg, NULL, 0));
 			break;
 		case 'c':
 			chfs_set_chunk_size(strtol(optarg, NULL, 0));

@@ -1953,9 +1953,9 @@ ring_list_free:
 static int stagein_bufsize = 1024 * 1024;
 
 void
-chfs_stagein_set_buf_size(int buf_size)
+chfs_set_stagein_buf_size(int buf_size)
 {
-	log_info("chfs_stagein_set_buf_size: %d", buf_size);
+	log_info("chfs_set_stagein_buf_size: %d", buf_size);
 	stagein_bufsize = buf_size;
 }
 
