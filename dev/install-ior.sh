@@ -7,7 +7,7 @@ spack load mochi-margo
 cd
 [ -d ior ] || git clone https://github.com/otatebe/ior.git -b feature/chfs
 cd ior
-git pull > /dev/null
+git pull > /dev/null || :
 ./bootstrap > /dev/null
 ./configure --prefix $HOME/local > /dev/null
 make > /dev/null
