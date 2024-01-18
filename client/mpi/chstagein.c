@@ -1,10 +1,13 @@
+#include "config.h"
 #include <unistd.h>
 #include <libgen.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <chfs.h>
-#include <log.h>
+#ifdef HAVE_MPI
 #include <mpi.h>
+#endif
+#include <chfs.h>
+#include "log.h"
 
 void
 usage(char *progname)
@@ -18,12 +21,13 @@ int
 main(int argc, char *argv[])
 {
 	char *file, *progname;
-	int r, opt, rank, size;
+	int r, opt, rank = 0, size = 1;
 
+#ifdef HAVE_MPI
 	MPI_Init(&argc, &argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
+#endif
 	progname = basename(argv[0]);
 
 	while ((opt = getopt(argc, argv, "ab:c:")) != -1) {
@@ -64,6 +68,8 @@ main(int argc, char *argv[])
 		argv += size;
 	}
 	chfs_term();
+#ifdef HAVE_MPI
 	MPI_Finalize();
+#endif
 	exit(r);
 }
