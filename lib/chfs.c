@@ -2013,9 +2013,11 @@ chfs_stagein(const char *path)
 
 	if (S_ISREG(sb.st_mode))
 		st = stagein_reg(src, dst, sb.st_mode);
-	else if (S_ISDIR(sb.st_mode))
+	else if (S_ISDIR(sb.st_mode)) {
 		st = chfs_mkdir(dst, sb.st_mode | 0700 | CHFS_O_CACHE);
-	else if (S_ISLNK(sb.st_mode)) {
+		if (st == -1 && errno == EEXIST)
+			st = 0;
+	} else if (S_ISLNK(sb.st_mode)) {
 		st = readlink(src, sym_buf, sizeof sym_buf);
 		if (st > 0) {
 			sym_buf[st] = '\0';
