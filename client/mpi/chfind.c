@@ -278,6 +278,15 @@ main(int argc, char *argv[])
 	argv += optind;
 
 	chfs_init(NULL);
+
+	if (size > 1) {
+		int s = chfs_size();
+
+		if (size < s) {
+			fprintf(stderr, "%d processes required\n", s);
+			exit(EXIT_FAILURE);
+		}
+	}
 	if (opt.newer)
 		if (chfs_stat(opt.newer, &opt.newer_sb) &&
 			lstat(opt.newer, &opt.newer_sb))

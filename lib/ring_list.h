@@ -2,6 +2,7 @@ struct node_list;
 
 void ring_list_init(char *self, char *name);
 void ring_list_term(void);
+int ring_list_size(void);
 void ring_list_set_client(char *client);
 void ring_list_display(int n);
 void ring_list_csv(int n);

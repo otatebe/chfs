@@ -327,6 +327,12 @@ chfs_term()
 	return (0);
 }
 
+int
+chfs_size(void)
+{
+	return (ring_list_size());
+}
+
 const char *
 chfs_version(void)
 {
