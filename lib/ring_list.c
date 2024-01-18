@@ -96,6 +96,18 @@ ring_list_init(char *self, char *name)
 	ring_list_self_index = 0;
 }
 
+int
+ring_list_size(void)
+{
+	int n;
+
+	ABT_mutex_lock(ring_list_mutex);
+	n = ring_list.n;
+	ABT_mutex_unlock(ring_list_mutex);
+	return (n);
+
+}
+
 static void
 ring_list_display_node(struct ring_node *node)
 {

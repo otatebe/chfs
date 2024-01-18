@@ -351,6 +351,12 @@ chfs_term()
 	return (chfs_term_without_sync());
 }
 
+int
+chfs_size(void)
+{
+	return (ring_list_size());
+}
+
 const char *
 chfs_version(void)
 {
