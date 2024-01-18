@@ -12,8 +12,8 @@
 void
 usage(char *progname)
 {
-	fprintf(stderr, "usage: %s [-b bufsize] [-c chunk_size] file ...\n",
-		progname);
+	fprintf(stderr, "usage: %s [-a] [-b bufsize] [-c chunk_size] "
+		"file ...\n", progname);
 	exit(EXIT_FAILURE);
 }
 
