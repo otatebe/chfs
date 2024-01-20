@@ -29,12 +29,12 @@
 
 - explore CHFS (in a container)
 
-      c1$ eval $(chfsctl -h hosts -m /tmp/a -b $PWD/backend -L log start)
+      c1$ eval $(chfsctl -h hosts -m /tmp/a -L log start)
       c1$ chlist
 
 - execute IOR (in a container)
 
-      c1$ mpirun -hostfile hosts -x PATH -x CHFS_SERVER -x CHFS_BACKEND_PATH -x CHFS_SUBDIR_PATH ior -a CHFS --chfs.chunk_size=1048576 -o /tmp/a/testfile
+      c1$ mpirun -hostfile hosts -x PATH -x CHFS_SERVER ior -a CHFS --chfs.chunk_size=1048576 -o /tmp/a/testfile
 
 - stop CHFS (in a container)
 
