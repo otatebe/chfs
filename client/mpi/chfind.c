@@ -109,22 +109,19 @@ parse_size(char *str_size)
 static int
 match_size(size_t size)
 {
-	size_t tmp = size / opt.size_unit;
-
-	if (size != tmp * opt.size_unit)
-		return (0);
+	size_t size_u = (size + opt.size_unit - 1) / opt.size_unit;
 
 	switch (opt.size_prefix) {
 	case -1:
-		if (tmp < opt.size_count)
+		if (size_u < opt.size_count)
 			return (1);
 		break;
 	case 0:
-		if (tmp == opt.size_count)
+		if (size_u == opt.size_count)
 			return (1);
 		break;
 	case 1:
-		if (tmp > opt.size_count)
+		if (size_u > opt.size_count)
 			return (1);
 		break;
 	}
