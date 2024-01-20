@@ -25,6 +25,12 @@ chstagein - stage-in files to CHFS
 CHFS_SERVER
 : server addresses separated by ','
 
+CHFS_BACKEND_PATH
+: backend path
+
+CHFS_SUBDIR_PATH
+: directory in CHFS to be mounted
+
 CHFS_CHUNK_SIZE
 : chunk size.  Default is 64 KiB.
 
