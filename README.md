@@ -123,6 +123,7 @@ CHFS is a parallel consistent hashing file system created instantly using node-l
 - [chlist(1)](doc/chlist.1.md) - list CHFS servers
 - [chmkdir(1)](doc/chmkdir.1.md) - create a directory in CHFS
 - [chrmdir(1)](doc/chrmdir.1.md) - remove a directory in CHFS
+- [chfind(1)](doc/chfind.1.md) - search for files in CHFS
 
 ## Environment variable
 

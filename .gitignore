@@ -12,6 +12,7 @@ lib/config.h.in
 lib/stamp-h1
 libtool
 .libs
+doc/chfind.1
 doc/chfsctl.1
 doc/chfsd.8
 doc/chfuse.1
