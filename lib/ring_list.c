@@ -274,6 +274,24 @@ get_local_server_unlocked()
 	return (strdup(ring_list.nodes[min_i].address));
 }
 
+int
+ceilsqrt(int n)
+{
+	int i, j, ij;
+
+	for (i = 1; i < n; ) {
+		for (j = 1; j < n; j *= 2) {
+			ij = i + 2 * j;
+			if (ij * ij >= n)
+				break;
+		}
+		i += j;
+		if (i * i >= n && (i - 1) * (i - 1) < n)
+			break;
+	}
+	return (i);
+}
+
 void
 ring_list_update(node_list_t *src)
 {
@@ -312,9 +330,11 @@ ring_list_update(node_list_t *src)
 	for (i = 0; i < src->n; ++i)
 		if (strcmp(ring_list.nodes[i].address, ring_list_self) == 0)
 			break;
-	if (i < src->n)
+	if (i < src->n) {
 		ring_list_self_index = i;
-	else {
+		if (ring_list_does_lookup_relay_group_auto())
+			ring_list_set_lookup_relay_group(ceilsqrt(src->n));
+	} else {
 		log_notice("ring_list_update: no self server");
 		ring_list_self_index = -1;
 	}
@@ -376,6 +396,74 @@ ring_list_lookup_index(int i)
 	ABT_mutex_unlock(ring_list_mutex);
 	return (r);
 }
+
+static char *
+ring_list_lookup_relay(const char *key, int key_size)
+{
+	HASH_T hash;
+	unsigned int n, g, i, index = 0, self_g, target_g, target_l, nodes_g;
+	int klen = strlen(key) + 1;
+	char *r;
+
+	if (klen < key_size)
+		index = atoi(key + klen);
+	HASH((const unsigned char *)key, klen, hash);
+	ABT_mutex_lock(ring_list_mutex);
+	n = ring_list.n;
+	g = ring_list_get_lookup_relay_group();
+	self_g = ring_list_self_index % g;
+	i = HASH_MODULO(hash, n);
+	if (index > 0)
+		i = (i + index) % n;
+	target_g = i % g;
+	target_l = i / g;
+	nodes_g = n / g + (self_g < n % g);
+	if (target_g == self_g)
+		/* i */;
+	else if (target_l < nodes_g)
+		i = self_g + target_l * g;
+	else
+		i = self_g + i % nodes_g * g;
+	r = strdup(ring_list.nodes[i].address);
+	ABT_mutex_unlock(ring_list_mutex);
+	return (r);
+}
+
+#if 0
+static char *
+ring_list_lookup_relay(const char *key, int key_size)
+{
+	HASH_T hash;
+	unsigned int n, g, i, index = 0, self_g, target_g, nodes_g;
+	int klen = strlen(key) + 1;
+	char *r;
+
+	if (klen < key_size)
+		index = atoi(key + klen);
+	HASH((const unsigned char *)key, klen, hash);
+	ABT_mutex_lock(ring_list_mutex);
+	n = ring_list.n;
+	g = ring_list_get_lookup_relay_group();
+	self_g = ring_list_self_index % g;
+	i = HASH_MODULO(hash, n);
+	if (index > 0)
+		i = (i + index) % n;
+	target_g = i % g;
+	nodes_g = n / g + (self_g < n % g);
+	if (target_g == self_g)
+		/* i */;
+	else if (target_g <= nodes_g) {
+		if (target_g < self_g)
+			i = self_g + target_g * g;
+		else
+			i = self_g + (target_g - 1) * g;
+	} else
+		i = self_g + i % nodes_g * g;
+	r = strdup(ring_list.nodes[i].address);
+	ABT_mutex_unlock(ring_list_mutex);
+	return (r);
+}
+#endif
 
 #ifdef USE_MODULAR_HASHING
 
@@ -492,6 +580,8 @@ ring_list_lookup_binary(const char *key, int key_size)
 #endif
 
 static int ring_list_lookup_local = 0;
+static int ring_list_lookup_relay_group_auto = 0;
+static int ring_list_lookup_relay_group = 0;
 
 void
 ring_list_set_lookup_local(int enable)
@@ -506,6 +596,32 @@ ring_list_does_lookup_local()
 	return (ring_list_lookup_local);
 }
 
+void
+ring_list_set_lookup_relay_group(int group)
+{
+	log_info("ring_list_set_lookup_relay: %d", group);
+	ring_list_lookup_relay_group = group;
+}
+
+int
+ring_list_get_lookup_relay_group()
+{
+	return (ring_list_lookup_relay_group);
+}
+
+void
+ring_list_set_lookup_relay_group_auto(int enable)
+{
+	log_info("ring_list_set_lookup_relay_group_auto: %d", enable);
+	ring_list_lookup_relay_group_auto = enable;
+}
+
+int
+ring_list_does_lookup_relay_group_auto()
+{
+	return (ring_list_lookup_relay_group_auto);
+}
+
 char *
 ring_list_lookup(const char *key, int key_size)
 {
@@ -513,6 +629,8 @@ ring_list_lookup(const char *key, int key_size)
 		return (NULL);
 	if (ring_list_lookup_local)
 		return (ring_list_get_local_server());
+	if (ring_list_get_lookup_relay_group())
+		return (ring_list_lookup_relay(key, key_size));
 #ifdef USE_MODULAR_HASHING
 	return (ring_list_lookup_modulo(key, key_size));
 #else

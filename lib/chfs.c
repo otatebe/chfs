@@ -279,6 +279,14 @@ chfs_init(const char *server)
 	if (!IS_NULL_STRING(enable))
 		ring_list_set_lookup_local(atoi(enable));
 
+	size = getenv("CHFS_LOOKUP_RELAY_GROUP");
+	if (!IS_NULL_STRING(size))
+		ring_list_set_lookup_relay_group(atoi(size));
+
+	enable = getenv("CHFS_LOOKUP_RELAY_GROUP_AUTO");
+	if (!IS_NULL_STRING(enable))
+		ring_list_set_lookup_relay_group_auto(atoi(enable));
+
 	while (server != NULL) {
 		proto = margo_protocol(server);
 		if (proto != NULL)

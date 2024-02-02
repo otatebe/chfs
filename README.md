@@ -138,6 +138,8 @@ CHFS/Cache provides a caching mechanism against a backend parallel file system. 
 - CHFS_ASYNC_ACCESS - set 1 to enable asynchronous accesses
 - CHFS_BUF_SIZE - buffer size
 - CHFS_LOOKUP_LOCAL - set 1 to connect to a local chfsd only
+- CHFS_LOOKUP_RELAY_GROUP - group number for relayed connections to chfsd
+- CHFS_LOOKUP_RELAY_GROUP_AUTO - set 1 for setting group number automatically for relayed connections to chfsd
 - CHFS_RDMA_THRESH - RDMA transfer is used when the size is larger than CHFS_RDMA_THRESH
 - CHFS_RPC_TIMEOUT_MSEC - RPC timeout in milliseconds
 - CHFS_NODE_LIST_CACHE_TIMEOUT - node list cache timeout in seconds
