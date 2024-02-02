@@ -245,6 +245,7 @@ get_local_server_unlocked()
 {
 	int max_len = 0, min_i = 0, max_num = 0, *c;
 	int len = max_len, i;
+	static const char diag[] = "get_local_server_unlocked";
 
 	if (ring_list_client == NULL || ring_list.n == 0)
 		return (NULL);
@@ -271,6 +272,8 @@ get_local_server_unlocked()
 	if (max_num > 1)
 		min_i = c[random() % max_num];
 	free(c);
+	log_info("%s: ring_list_self_index = %d", diag, min_i);
+	ring_list_self_index = min_i;
 	return (strdup(ring_list.nodes[min_i].address));
 }
 
@@ -326,18 +329,15 @@ ring_list_update(node_list_t *src)
 			ring_list_local_server);
 	}
 	if (ring_list_self == NULL)
-		goto unlock;
+		goto set_relay_group;
 	for (i = 0; i < src->n; ++i)
 		if (strcmp(ring_list.nodes[i].address, ring_list_self) == 0)
 			break;
-	if (i < src->n) {
+	if (i < src->n)
 		ring_list_self_index = i;
-		if (ring_list_does_lookup_relay_group_auto())
-			ring_list_set_lookup_relay_group(ceilsqrt(src->n));
-	} else {
-		log_notice("ring_list_update: no self server");
-		ring_list_self_index = -1;
-	}
+set_relay_group:
+	if (ring_list_does_lookup_relay_group_auto())
+		ring_list_set_lookup_relay_group(ceilsqrt(src->n));
 unlock:
 	ABT_mutex_unlock(ring_list_mutex);
 }
