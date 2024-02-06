@@ -325,7 +325,7 @@ ring_list_update(node_list_t *src)
 	if (ring_list_client) {
 		free(ring_list_local_server);
 		ring_list_local_server = get_local_server_unlocked();
-		log_debug("client: %s local_server: %s", ring_list_client,
+		log_info("client: %s local_server: %s", ring_list_client,
 			ring_list_local_server);
 	}
 	if (ring_list_self == NULL)
@@ -371,7 +371,7 @@ ring_list_remove(char *host)
 			strcmp(host, ring_list_local_server) == 0) {
 			free(ring_list_local_server);
 			ring_list_local_server = get_local_server_unlocked();
-			log_debug("client: %s local_server: %s",
+			log_info("client: %s local_server: %s",
 				ring_list_client, ring_list_local_server);
 		}
 	}
