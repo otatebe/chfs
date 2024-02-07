@@ -595,7 +595,8 @@ ring_list_set_lookup_local(int enable)
 {
 	log_info("ring_list_set_lookup_local: %d", enable);
 	ring_list_lookup_local = enable;
-	ring_list_lookup_direct = 0;
+	if (enable)
+		ring_list_lookup_direct = 0;
 }
 
 int
@@ -609,7 +610,8 @@ ring_list_set_lookup_relay_group(int group)
 {
 	log_info("ring_list_set_lookup_relay: %d", group);
 	ring_list_lookup_relay_group = group;
-	ring_list_lookup_direct = 0;
+	if (group)
+		ring_list_lookup_direct = 0;
 }
 
 int
@@ -623,7 +625,8 @@ ring_list_set_lookup_relay_group_auto(int enable)
 {
 	log_info("ring_list_set_lookup_relay_group_auto: %d", enable);
 	ring_list_lookup_relay_group_auto = enable;
-	ring_list_lookup_direct = 0;
+	if (enable)
+		ring_list_lookup_direct = 0;
 }
 
 int
