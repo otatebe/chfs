@@ -325,7 +325,7 @@ chfs_init(const char *server)
 		log_fatal("chfs_init: no server");
 	node_list_cache_time = time(NULL);
 
-	if (!ring_list_does_lookup_local())
+	if (ring_list_does_lookup_direct())
 		chfs_sync(); /* set up all connections */
 
 	initialized = 1;

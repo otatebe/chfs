@@ -579,15 +579,23 @@ ring_list_lookup_binary(const char *key, int key_size)
 
 #endif
 
+static int ring_list_lookup_direct = 1;
 static int ring_list_lookup_local = 0;
 static int ring_list_lookup_relay_group_auto = 0;
 static int ring_list_lookup_relay_group = 0;
+
+int
+ring_list_does_lookup_direct()
+{
+	return (ring_list_lookup_direct);
+}
 
 void
 ring_list_set_lookup_local(int enable)
 {
 	log_info("ring_list_set_lookup_local: %d", enable);
 	ring_list_lookup_local = enable;
+	ring_list_lookup_direct = 0;
 }
 
 int
@@ -601,6 +609,7 @@ ring_list_set_lookup_relay_group(int group)
 {
 	log_info("ring_list_set_lookup_relay: %d", group);
 	ring_list_lookup_relay_group = group;
+	ring_list_lookup_direct = 0;
 }
 
 int
@@ -614,6 +623,7 @@ ring_list_set_lookup_relay_group_auto(int enable)
 {
 	log_info("ring_list_set_lookup_relay_group_auto: %d", enable);
 	ring_list_lookup_relay_group_auto = enable;
+	ring_list_lookup_direct = 0;
 }
 
 int
