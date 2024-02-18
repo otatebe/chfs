@@ -221,7 +221,7 @@ chfs_init(const char *server)
 	hg_addr_t client_addr;
 	char *size, *enable, *rdma_thresh, *timeout, *proto, *bpath;
 	char *log_priority;
-	int max_log_level;
+	int max_log_level, g;
 	hg_return_t ret;
 
 	if (FLAGS_FROM_MODE(CHFS_O_CACHE) != CHFS_FS_CACHE)
@@ -336,6 +336,12 @@ chfs_init(const char *server)
 	log_info("rdma_thresh %ld byte", chfs_rdma_thresh);
 	log_info("rpc_timeout %d msec, node_list_cache_timeout %d sec",
 		chfs_rpc_timeout_msec, chfs_node_list_cache_timeout);
+	log_info("lookup: %s", ring_list_does_lookup_direct() ? "direct" :
+		 ring_list_does_lookup_local() ? "local" :
+		 ring_list_get_lookup_relay_group() ? "relay_group" :
+		 "unknown");
+	if ((g = ring_list_get_lookup_relay_group()))
+		log_info("relay_group: %d", g);
 
 	return (0);
 }
