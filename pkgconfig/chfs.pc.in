@@ -6,6 +6,6 @@ includedir=@includedir@
 Name: @PACKAGE_NAME@
 Description: CHFS ad hoc parallel and distributed file system
 Version: @VERSION@
-Requires: margo fuse @md5_req@
-Cflags: -I${includedir}
-Libs: -L${libdir} -lchfs
+Requires: margo @md5_req@
+Cflags: -I${includedir} @FUSE_CFLAGS@
+Libs: -L${libdir} -lchfs @FUSE_LIBS@
