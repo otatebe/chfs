@@ -1,3 +1,20 @@
+# Release note for CHFS/Cache 3.0.2 (2024/3/2)
+
+## New documents
+- chfind
+
+## New environment variables
+- CHFS_LOOKUP_RELAY_GROUP - specify the number of groups for relayed connections to chfsd
+- CHFS_LOOKUP_RELAY_GROUP_AUTO - use relayed connections to chfsd.  The number of groups is automatically specified.
+
+## Updated features
+- chfind - MPI size check
+- chstagein - build without mpi if mpi is not found
+
+## Bug fixes
+- chfind - size should be rounding up
+- chstagein - fix -b and -c options
+
 # Release note for CHFS/Cache 3.0.1 (2023/12/13)
 
 ## Updated features
