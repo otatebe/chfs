@@ -2022,6 +2022,8 @@ chfs_stagein(const char *path)
 
 	if (src == NULL)
 		return (-1);
+	if (src[0] == '\0')
+		return (0);
 
 	dst = path_subdir(src);
 	if (dst == NULL) {

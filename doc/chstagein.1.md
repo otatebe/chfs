@@ -50,7 +50,7 @@ CHFS_LOG_PRIORITY:
 The following example stages in all files in a backend directory.  **chstagein** can be executed with and without mpirun.
 
     $ cd <backend_directory>
-    $ find * | xargs [ mpirun ... ] chstagein
+    $ find . | xargs [ mpirun ... ] chstagein
 
 In OpenMPI, several environment variables should be explicitly passed.
 
