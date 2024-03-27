@@ -6,8 +6,8 @@ OPT=
 while [ $# -gt 0 ]
 do
 	case $1 in
-	pmemkv) OPT=--with-pmemkv ;;
-	*) exit 1 ;;
+	pmemkv) OPT="$OPT --with-pmemkv" ;;
+	*) OPT="$OPT $1" ;;
 	esac
 	shift
 done
