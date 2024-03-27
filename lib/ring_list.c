@@ -9,7 +9,7 @@
 #include <openssl/evp.h>
 #include <openssl/md5.h>
 
-static void calc_md5(const uint8_t *buf, uint8_t size, uint8_t *digest)
+static void calc_md5(const uint8_t *buf, uint32_t size, uint8_t *digest)
 {
 	EVP_MD_CTX *ctx;
 	unsigned int len = MD5_DIGEST_LENGTH;
@@ -40,11 +40,21 @@ void display_hash(HASH_T hash)
 	for (i = 0; i < MD5_DIGEST_LENGTH; ++i)
 		printf("%02X", hash.c[i]);
 }
-#else
+#elif defined(USE_DIGEST_MURMUR3)
 #include "murmur3.h"
 
 typedef uint32_t HASH_T[1];
 #define HASH(data, len, hash) MurmurHash3_x86_32(data, len, 1234, hash)
+#define HASH_CMP(a, b) ((a[0] < b[0]) ? -1 : ((a[0] > b[0]) ? 1 : 0))
+#ifdef USE_MODULAR_HASHING
+#define HASH_MODULO(a, b) (a[0] % (b))
+#endif
+#define display_hash(hash) printf("%08X", hash[0])
+#else
+#include "koyama_hash.h"
+
+typedef uint32_t HASH_T[1];
+#define HASH(data, len, hash) koyama_hash(data, len, hash)
 #define HASH_CMP(a, b) ((a[0] < b[0]) ? -1 : ((a[0] > b[0]) ? 1 : 0))
 #ifdef USE_MODULAR_HASHING
 #define HASH_MODULO(a, b) (a[0] % (b))

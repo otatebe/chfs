@@ -90,6 +90,16 @@ if test x$enableval != xno; then
 fi
 AC_SUBST(md5_req)
 
+AC_MSG_CHECKING([whether Murmur3 digest is used])
+AC_ARG_ENABLE([digest-murmur3],
+  [AS_HELP_STRING([--enable-digest-murmur3],
+    [use murmur3 digest @<:@default=no@:>@])],
+  [], [enableval=no])
+AC_MSG_RESULT([$enableval])
+if test x$enableval != xno; then
+  AC_DEFINE([USE_DIGEST_MURMUR3], [1], [Use murmur3 digest])
+fi
+
 AC_MSG_CHECKING([pmemkv])
 AC_ARG_WITH([pmemkv],
   [AS_HELP_STRING([--with-pmemkv],
