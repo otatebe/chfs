@@ -5,7 +5,7 @@ void
 koyama_hash(const void *buf, size_t size, unsigned int *digest)
 {
 	const char *b = buf, *be = buf + size;
-	unsigned long d = 0, l;
+	unsigned int d = 0, l;
 
 	while (b < be) {
 		if (isdigit(*b)) {
