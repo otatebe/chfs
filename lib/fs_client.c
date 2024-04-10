@@ -837,7 +837,7 @@ fs_client_init_internal(margo_instance_id mid, int timeout,
 void
 fs_client_init_more_internal(hg_id_t read_rdma_rpc, hg_id_t readdir_rpc)
 {
-	if (read_rdma_rpc != -1)
+	if (read_rdma_rpc != 0)
 		env.read_rdma_rpc = read_rdma_rpc;
 	env.readdir_rpc = readdir_rpc;
 }

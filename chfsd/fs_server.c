@@ -40,7 +40,7 @@ fs_server_init(margo_instance_id mid, char *db_dir, size_t db_size, int timeout,
 	int niothreads)
 {
 	hg_id_t create_rpc, stat_rpc, remove_rpc, copy_rdma_rpc;
-	hg_id_t write_rpc, write_rdma_rpc, read_rpc, read_rdma_rpc = -1;
+	hg_id_t write_rpc, write_rdma_rpc, read_rpc, read_rdma_rpc = 0;
 	hg_id_t truncate_rpc, unlink_all_rpc, sync_rpc;
 
 	env.mid = mid;

@@ -24,7 +24,7 @@ void
 fs_server_init_more(margo_instance_id mid, char *db_dir, size_t db_size,
 	int niothreads)
 {
-	hg_id_t read_rdma_rpc = -1, readdir_rpc;
+	hg_id_t read_rdma_rpc = 0, readdir_rpc;
 
 #ifdef USE_ZERO_COPY_READ_RDMA
 #error posix backend does not support --enable-zero-copy-read-rdma
