@@ -4,7 +4,7 @@
 void
 koyama_hash(const void *buf, size_t size, unsigned int *digest)
 {
-	const char *b = buf, *be = buf + size;
+	const char *b = buf, *be = (char *)buf + size;
 	unsigned int d = 0, l;
 
 	while (b < be) {

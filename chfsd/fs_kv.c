@@ -50,7 +50,7 @@ create_inode_all(uint32_t uid, uint32_t gid, uint32_t mode, size_t chunk_size,
 	inode->mtime = *mtime;
 	inode->ctime = *ctime;
 	if (buf) {
-		void *base = (void *)inode + fs_msize;
+		char *base = (char *)inode + fs_msize;
 
 		if (offset > 0)
 			memset(base, 0, offset);
@@ -380,7 +380,7 @@ fs_inode_flush(void *key, size_t key_size)
 	if (keylen == key_size)
 		index = 0;
 	else
-		index = atoi(key + keylen);
+		index = atoi((char *)key + keylen);
 	log_info("%s: %s:%d", diag, (char *)key, index);
 
 	dst = path_backend(key);

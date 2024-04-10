@@ -13,7 +13,7 @@
 int
 main(int argc, char *argv[])
 {
-	void *data, *d;
+	char *data, *d;
 	ssize_t s;
 	uint32_t h[1];
 

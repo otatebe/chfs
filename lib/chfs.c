@@ -570,7 +570,7 @@ fd_flush(int fd)
 }
 
 static int
-fd_write(int fd, const void *buf, size_t size, off_t offset)
+fd_write(int fd, const char *buf, size_t size, off_t offset)
 {
 	struct fd_table *tab = get_fd_table(fd);
 	size_t ss = 0, s;
@@ -613,7 +613,7 @@ static ssize_t
 chfs_pread_internal(int fd, void *buf, size_t size, off_t offset);
 
 static ssize_t
-fd_read(int fd, void *buf, size_t size, off_t offset)
+fd_read(int fd, char *buf, size_t size, off_t offset)
 {
 	struct fd_table *tab = get_fd_table(fd);
 	size_t ss = 0;
@@ -1011,10 +1011,10 @@ chfs_open(const char *path, int32_t flags)
 
 #define MAX_INT_SIZE 11
 
-static void *
+static char *
 path_index(const char *path, int index, size_t *size)
 {
-	void *path_index;
+	char *path_index;
 	int path_len;
 
 	if (path == NULL)
@@ -1050,7 +1050,7 @@ chfs_close(int fd)
 }
 
 static ssize_t
-chfs_pwrite_internal_sync(int fd, const void *buf, size_t size, off_t offset)
+chfs_pwrite_internal_sync(int fd, const char *buf, size_t size, off_t offset)
 {
 	struct fd_table *tab = get_fd_table(fd);
 	void *path;
@@ -1100,7 +1100,7 @@ chfs_pwrite_internal_sync(int fd, const void *buf, size_t size, off_t offset)
 }
 
 static ssize_t
-chfs_pwrite_internal_async(int fd, const void *buf, size_t size, off_t offset)
+chfs_pwrite_internal_async(int fd, const char *buf, size_t size, off_t offset)
 {
 	struct fd_table *tab = get_fd_table(fd);
 	void *path, *p;
@@ -1226,11 +1226,11 @@ chfs_write(int fd, const void *buf, size_t size)
 	return (chfs_pwrite(fd, buf, size, pos));
 }
 
-ssize_t
-chfs_pread_internal_sync(int fd, void *buf, size_t size, off_t offset)
+static ssize_t
+chfs_pread_internal_sync(int fd, char *buf, size_t size, off_t offset)
 {
 	struct fd_table *tab = get_fd_table(fd);
-	void *path, *bdata;
+	char *path, *bdata;
 	hg_return_t ret;
 	int index, local_pos, chunk_size, err;
 	size_t s = size, psize, cs;
@@ -1281,11 +1281,11 @@ chfs_pread_internal_sync(int fd, void *buf, size_t size, off_t offset)
 	return (s + ss);
 }
 
-ssize_t
-chfs_pread_internal_async(int fd, void *buf, size_t size, off_t offset)
+static ssize_t
+chfs_pread_internal_async(int fd, char *buf, size_t size, off_t offset)
 {
 	struct fd_table *tab = get_fd_table(fd);
-	void *path, *p, *bdata;
+	char *path, *p, *bdata;
 	int index, local_pos, pos, chunk_size, nchunks, i, err;
 	size_t psize, s, ss = 0, sss, ssss, may_hole;
 	struct {
@@ -1477,7 +1477,8 @@ int
 chfs_unlink(const char *path)
 {
 	char *p = canonical_path(path);
-	int ret, err, i;
+	hg_return_t ret;
+	int err, i;
 	size_t psize;
 	void *pi;
 
