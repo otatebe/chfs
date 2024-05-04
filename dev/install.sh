@@ -12,13 +12,14 @@ do
 	shift
 done
 
-. $HOME/spack/share/spack/setup-env.sh
-spack load mochi-margo
 cd ~/chfs
 
 set -x
 autoreconf -i
-./configure --prefix $HOME/local $OPT > /dev/null
+rm -rf build
+mkdir build
+cd build
+../configure --prefix $HOME/local $OPT > /dev/null
 make clean > /dev/null
 make -j $(nproc) > /dev/null
 make install > /dev/null

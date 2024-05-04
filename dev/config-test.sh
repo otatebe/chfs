@@ -2,10 +2,8 @@
 
 set -e
 
-. $HOME/spack/share/spack/setup-env.sh
-spack load mochi-margo #mochi-abt-io
-
 cd $HOME/chfs
+autoreconf -i
 
 echo PMEMKV backend
 for hashing in " " --enable-modular-hashing
@@ -18,10 +16,12 @@ do
 			do
 				echo ./configure --with-pmemkv \
 					$hashing $port $zero $md5
-				./configure --with-pmemkv \
+				rm -rf build && mkdir build && cd build
+				../configure --with-pmemkv \
 					$hashing $port $zero $md5 > /dev/null
 				make clean > /dev/null
-				make > /dev/null
+				make -j $(nproc) > /dev/null
+				cd ..
 			done
 		done
 	done
@@ -40,10 +40,12 @@ do
 				do
 					echo ./configure $hashing $port \
 						$xattr $abtio $md5
-					./configure $hashing $port \
+					rm -rf build && mkdir build && cd build
+					../configure $hashing $port \
 						$xattr $abtio $md5 > /dev/null
 					make clean > /dev/null
-					make > /dev/null
+					make -j $(nproc) > /dev/null
+					cd ..
 				done
 #			done
 		done
