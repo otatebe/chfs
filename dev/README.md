@@ -1,5 +1,11 @@
 # Docker containers for developers
 
+## Prerequisite
+
+- install `docker compose` ([Ubuntu](https://docs.docker.com/engine/install/ubuntu/) | [CentOS](https://docs.docker.com/engine/install/centos/)) and `make`.
+
+- to allow docker compose to run with user privileges, add $USER to the docker group by `sudo usermod -aG docker $USER`
+
 ## How to use
 
 - build image
