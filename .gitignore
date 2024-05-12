@@ -24,6 +24,7 @@ doc/chrmdir.1
 doc/chstagein.1
 pkgconfig/chfs.pc
 *~
+/build
 
 ## spack
 removed_la_files.txt
