@@ -13,8 +13,10 @@
 #include "fs_rpc.h"
 #include "fs_hook.h"
 #include "fs.h"
+#include "backend_local.h"
 #include "shash.h"
 #include "key.h"
+#include "lock.h"
 #include "log.h"
 #include "fs_kv.h"
 
@@ -32,8 +34,8 @@ fs_server_init_more(margo_instance_id mid, char *db_dir, size_t db_size,
 	hg_id_t read_rdma_rpc = 0, readdir_rpc;
 
 #ifdef USE_ZERO_COPY_READ_RDMA
-	read_rdma_rpc = MARGO_REGISTER(mid, "inode_read_rdma", kv_put_rdma_in_t,
-		kv_get_rdma_out_t, inode_read_rdma);
+	read_rdma_rpc = MARGO_REGISTER(mid, "inode_read_rdma",
+		fs_write_rdma_in_t, kv_get_rdma_out_t, inode_read_rdma);
 #endif
 	readdir_rpc = MARGO_REGISTER(mid, "inode_readdir", hg_string_t,
 		fs_readdir_out_t, inode_readdir);
@@ -102,7 +104,7 @@ static void
 inode_read_rdma(hg_handle_t h)
 {
 	hg_return_t ret;
-	kv_put_rdma_in_t in;
+	fs_write_rdma_in_t in;
 	kv_get_rdma_out_t out;
 	char *target;
 	margo_instance_id mid = margo_hg_handle_get_instance(h);
@@ -132,7 +134,7 @@ inode_read_rdma(hg_handle_t h)
 	if (target && strcmp(self, target) != 0) {
 		ret = fs_rpc_inode_read_rdma_bulk(target, in.key.v, in.key.s,
 			in.client, in.value, &out.value_size, in.offset,
-			&out.err);
+			in.mode, in.chunk_size, &out.err);
 		if (ret != HG_SUCCESS) {
 			log_error("%s (rpc_read_rdma_bulk) %s:%d: %s", diag,
 				(char *)in.key.v, index,
@@ -145,7 +147,19 @@ inode_read_rdma(hg_handle_t h)
 		a.offset = in.offset + fs_msize;
 		a.bulk = in.value;
 		a.value_size = in.value_size;
+		kv_lock(in.key.v, in.key.s, diag, in.value_size, in.offset);
 		out.err = kv_get_cb(in.key.v, in.key.s, read_rdma_cb, &a);
+		if (out.err == KV_ERR_NO_ENTRY) {
+			char *bdata = backend_read_cache_local(
+				in.key.v, in.key.s, in.chunk_size, NULL, NULL);
+
+			if (bdata != NULL) {
+				free(bdata);
+				out.err = kv_get_cb(in.key.v, in.key.s,
+						read_rdma_cb, &a);
+			}
+		}
+		kv_unlock(in.key.v, in.key.s);
 		if (out.err == KV_SUCCESS)
 			out.value_size = a.value_size;
 	}

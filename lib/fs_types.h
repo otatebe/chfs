@@ -24,6 +24,10 @@ MERCURY_GEN_PROC(fs_create_in_t,
 	((uint32_t)(uid))((uint32_t)(gid))\
 	((uint64_t)(chunk_size)))
 
+MERCURY_GEN_PROC(fs_stat_in_t,
+	((kv_byte_t)(key))\
+	((uint64_t)(chunk_size)))
+
 MERCURY_GEN_PROC(fs_stat_out_t,
 	 ((int32_t)(err))((fs_stat_t)(st)))
 
@@ -31,8 +35,8 @@ MERCURY_GEN_PROC(fs_write_in_t,
 	((kv_byte_t)(key))\
 	((kv_byte_t)(value))\
 	((hg_size_t)(offset))\
-	((hg_size_t)(chunk_size))\
-	((uint32_t)(mode)))
+	((uint32_t)(mode))\
+	((hg_size_t)(chunk_size)))
 
 MERCURY_GEN_PROC(fs_write_rdma_in_t,
 	((kv_byte_t)(key))\
@@ -40,11 +44,12 @@ MERCURY_GEN_PROC(fs_write_rdma_in_t,
 	((hg_size_t)(offset))\
 	((hg_size_t)(value_size))\
 	((hg_bulk_t)(value))\
-	((hg_size_t)(chunk_size))\
-	((uint32_t)(mode)))
+	((uint32_t)(mode))\
+	((hg_size_t)(chunk_size)))
 
 MERCURY_GEN_PROC(fs_read_in_t, ((kv_byte_t)(key))\
-	((hg_size_t)(size))((hg_size_t)(offset)))
+	((hg_size_t)(size))((hg_size_t)(offset))\
+	((uint32_t)(mode))((hg_size_t)(chunk_size)))
 
 MERCURY_GEN_PROC(fs_copy_rdma_in_t,
 	((kv_byte_t)(key))\
@@ -98,12 +103,14 @@ typedef struct {
 	margo_request r;
 } fs_request_t;
 
-#define CHFS_FS_CACHE		0x1
-#define CHFS_FS_DIRTY		0x2
+#define CHFS_FS_CACHE		1
+#define CHFS_FS_DIRTY		2
 
 #define FLAGS_SHIFT		28
 #define MODE_MASK(m)		((m) & ((1 << FLAGS_SHIFT) - 1))
 #define MODE_FLAGS(m, f)	((m) | (f) << FLAGS_SHIFT)
 #define FLAGS_FROM_MODE(m)	((m) >> FLAGS_SHIFT)
 
-#define CHFS_S_IFREP		(1 << 30)
+/* also defined in chfs.h */
+#define CHFS_O_CACHE		(1 << 28) /* CHFS_FS_CACHE << FLAGS_SHIFT */
+#define CHFS_S_IFREP		(4 << 28)

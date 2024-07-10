@@ -40,4 +40,4 @@ void chfs_set_stagein_buf_size(int buf_size);
 int chfs_stagein(const char *path);
 
 #define CHFS_O_CACHE	(1 << 28)
-#define CHFS_S_IFREP	(1 << 30)
+#define CHFS_S_IFREP	(4 << 28)

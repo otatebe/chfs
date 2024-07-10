@@ -5,11 +5,16 @@
 #include <stdlib.h>
 #include <time.h>
 #include <errno.h>
+#include <margo.h>
+#include <mercury_proc_string.h>
 #include "timespec.h"
 #include "path.h"
 #include "file.h"
 #include "kv_err.h"
+#include "kv_types.h"
+#include "fs_types.h"
 #include "fs_err.h"
+#include "key.h"
 #include "log.h"
 
 int
@@ -78,4 +83,51 @@ backend_write_key(const char *key, mode_t mode,
 	r = backend_write(dst, O_WRONLY|O_CREAT, mode, buf, size, off);
 	free(dst);
 	return (r);
+}
+
+char *
+backend_read(char *path, size_t psize, size_t chunk_size,
+	struct fs_stat *st, size_t *size)
+{
+	char *buf = malloc(chunk_size), *bp;
+	struct stat sb;
+	int s, r;
+	size_t rr = 0;
+	int index = key_index(path, psize);
+	off_t offset = index * chunk_size;
+
+	if (buf == NULL)
+		return (NULL);
+	if ((bp = path_backend(path)) == NULL)
+		goto err_free_buf;
+	if (stat(bp, &sb) || (s = open(bp, O_RDONLY)) == -1) {
+		free(bp);
+		goto err_free_buf;
+	}
+	free(bp);
+	r = pread(s, buf, chunk_size, offset);
+	while (r > 0) {
+		rr += r;
+		r = pread(s, buf + rr, chunk_size - rr, offset + rr);
+	}
+	close(s);
+	if (r < 0 || rr == 0)
+		goto err_free_buf;
+
+	if (st) {
+		st->mode = sb.st_mode;
+		st->uid = sb.st_uid;
+		st->gid = sb.st_gid;
+		st->size = sb.st_size;
+		st->chunk_size = chunk_size;
+		st->mtime = sb.st_mtim;
+		st->ctime = sb.st_ctim;
+	}
+	if (size)
+		*size = rr;
+	return (buf);
+
+err_free_buf:
+	free(buf);
+	return (NULL);
 }

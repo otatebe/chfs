@@ -13,7 +13,7 @@ typedef uint32_t HASH_T[1];
 #define LOCK_TABLE_SIZE	16381
 
 static ABT_mutex_memory kv_lock_mutex[LOCK_TABLE_SIZE] = {
-	[0 ... LOCK_TABLE_SIZE - 1] = ABT_MUTEX_INITIALIZER
+	[0 ... LOCK_TABLE_SIZE - 1] = ABT_RECURSIVE_MUTEX_INITIALIZER
 };
 
 #define KEYBUF_SIZE 256
@@ -23,6 +23,7 @@ static struct {
 	char key[KEYBUF_SIZE];
 	size_t key_size;
 	struct timespec lock, unlock;
+	int lockcount;
 	int flush;
 	int dirty_flush;
 } holder[LOCK_TABLE_SIZE];
@@ -75,7 +76,9 @@ kv_lock_internal(char *key, size_t key_size, const char *diag, size_t size,
 	if (key_size == KEYBUF_SIZE)
 		holder[n].key[key_size - 1] = '\0';
 	holder[n].key_size = key_size;
-	clock_gettime(CLOCK_REALTIME, &holder[n].lock);
+	++holder[n].lockcount;
+	if (holder[n].lockcount == 1)
+		clock_gettime(CLOCK_REALTIME, &holder[n].lock);
 
 	return (n);
 }
@@ -100,7 +103,9 @@ kv_unlock_internal(char *key, size_t key_size)
 	HASH(key, key_size, hash);
 	n = HASH_MODULO(hash, LOCK_TABLE_SIZE);
 	mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&kv_lock_mutex[n]);
-	clock_gettime(CLOCK_REALTIME, &holder[n].unlock);
+	--holder[n].lockcount;
+	if (holder[n].lockcount == 0)
+		clock_gettime(CLOCK_REALTIME, &holder[n].unlock);
 	ABT_mutex_unlock(mutex);
 }
 
