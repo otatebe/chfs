@@ -23,15 +23,11 @@ static void calc_md5(const uint8_t *buf, uint32_t size, uint8_t *digest)
 
 typedef union {
 	uint8_t c[MD5_DIGEST_LENGTH];
-#ifdef USE_MODULAR_HASHING
 	unsigned __int128 l;
-#endif
 } HASH_T;
 #define HASH(data, len, hash) calc_md5(data, len, hash.c)
 #define HASH_CMP(a, b) memcmp(a.c, b.c, MD5_DIGEST_LENGTH)
-#ifdef USE_MODULAR_HASHING
 #define HASH_MODULO(a, b) (a.l % (b))	/* XXX - ignore endian */
-#endif
 
 void display_hash(HASH_T hash)
 {
@@ -46,9 +42,7 @@ void display_hash(HASH_T hash)
 typedef uint32_t HASH_T[1];
 #define HASH(data, len, hash) MurmurHash3_x86_32(data, len, 1234, hash)
 #define HASH_CMP(a, b) ((a[0] < b[0]) ? -1 : ((a[0] > b[0]) ? 1 : 0))
-#ifdef USE_MODULAR_HASHING
 #define HASH_MODULO(a, b) (a[0] % (b))
-#endif
 #define display_hash(hash) printf("%08X", hash[0])
 #else
 #include "koyama_hash.h"
@@ -56,9 +50,7 @@ typedef uint32_t HASH_T[1];
 typedef uint32_t HASH_T[1];
 #define HASH(data, len, hash) koyama_hash(data, len, hash)
 #define HASH_CMP(a, b) ((a[0] < b[0]) ? -1 : ((a[0] > b[0]) ? 1 : 0))
-#ifdef USE_MODULAR_HASHING
 #define HASH_MODULO(a, b) (a[0] % (b))
-#endif
 #define display_hash(hash) printf("%08X", hash[0])
 #endif
 
