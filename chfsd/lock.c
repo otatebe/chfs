@@ -69,17 +69,17 @@ kv_lock_internal(char *key, size_t key_size, const char *diag, size_t size,
 				ts4.tv_sec, ts4.tv_nsec,
 				ts5.tv_sec, ts5.tv_nsec);
 	}
-	holder[n].diag = diag;
-	if (key_size > KEYBUF_SIZE)
-		key_size = KEYBUF_SIZE;
-	memcpy(holder[n].key, key, key_size);
-	if (key_size == KEYBUF_SIZE)
-		holder[n].key[key_size - 1] = '\0';
-	holder[n].key_size = key_size;
 	++holder[n].lockcount;
-	if (holder[n].lockcount == 1)
+	if (holder[n].lockcount == 1) {
+		holder[n].diag = diag;
+		if (key_size > KEYBUF_SIZE)
+			key_size = KEYBUF_SIZE;
+		memcpy(holder[n].key, key, key_size);
+		if (key_size == KEYBUF_SIZE)
+			holder[n].key[key_size - 1] = '\0';
+		holder[n].key_size = key_size;
 		clock_gettime(CLOCK_REALTIME, &holder[n].lock);
-
+	}
 	return (n);
 }
 
