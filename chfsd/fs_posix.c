@@ -91,19 +91,27 @@ fs_inode_init(char *dir, int niothreads)
 	log_info("fs_inode_init: path %s", dir);
 }
 
-/* key is modified */
+/* free needed */
 static char *
 key_to_path(char *key, size_t key_size)
 {
-	size_t klen = strlen(key);
+	char *path;
+	size_t klen;
 
-	if (klen + 1 < key_size)
-		key[klen] = ':';
 	while (*key == '/')
-		++key;
+		++key, --key_size;
 	if (*key == '\0')
-		key = ".";
-	return (key);
+		return (strdup("."));
+
+	path = malloc(key_size);
+	if (path == NULL)
+		return (NULL);
+	memcpy(path, key, key_size);
+
+	klen = strlen(key);
+	if (klen + 1 < key_size)
+		path[klen] = ':';
+	return (path);
 }
 
 #define FS_XATTR_CHUNK_SIZE "user.chunk_size"
@@ -287,18 +295,16 @@ int
 fs_inode_create(char *key, size_t key_size, uint32_t uid, uint32_t gid,
 	uint32_t emode, size_t chunk_size, const void *buf, size_t size)
 {
-	char *p, *key_save;
+	char *p;
 	mode_t mode = MODE_MASK(emode);
 	int16_t flags = FLAGS_FROM_MODE(emode);
 	int r, fd;
 	static const char diag[] = "fs_inode_create";
 
-	key_save = malloc(key_size);
-	if (key_save == NULL)
+	p = key_to_path(key, key_size);
+	if (p == NULL)
 		return (KV_ERR_NO_MEMORY);
-	memcpy(key_save, key, key_size);
 
-	p = key_to_path(key_save, key_size);
 	log_debug("%s: %s mode %o chunk_size %ld", diag, p, mode, chunk_size);
 	if (S_ISREG(mode)) {
 		if (!(flags & CHFS_FS_CACHE))
@@ -335,7 +341,7 @@ fs_inode_create(char *key, size_t key_size, uint32_t uid, uint32_t gid,
 		log_error("%s: %s (%o): %s", diag, p, mode, strerror(-r));
 	else if (!(flags & CHFS_FS_CACHE))
 		fs_inode_flush_enq(key, key_size);
-	free(key_save);
+	free(p);
 	return (fs_err(r, diag));
 }
 
@@ -343,19 +349,17 @@ int
 fs_inode_create_stat(char *key, size_t key_size, struct fs_stat *st,
 	const void *buf, size_t size)
 {
-	char *p, *key_save;
+	char *p;
 	struct timespec times[2];
 	mode_t mode = MODE_MASK(st->mode);
 	int16_t flags = 0;
 	int r, fd;
 	static const char diag[] = "fs_inode_create_stat";
 
-	key_save = malloc(key_size);
-	if (key_save == NULL)
+	p = key_to_path(key, key_size);
+	if (p == NULL)
 		return (KV_ERR_NO_MEMORY);
-	memcpy(key_save, key, key_size);
 
-	p = key_to_path(key_save, key_size);
 	log_debug("%s: %s mode %o chunk_size %ld", diag, p, mode,
 		st->chunk_size);
 	if (S_ISREG(mode)) {
@@ -378,25 +382,23 @@ fs_inode_create_stat(char *key, size_t key_size, struct fs_stat *st,
 		times[0] = times[1] = st->mtime;
 		utimensat(AT_FDCWD, p, times, AT_SYMLINK_NOFOLLOW);
 	}
-	free(key_save);
+	free(p);
 	return (r);
 }
 
 int
 fs_inode_stat(char *key, size_t key_size, struct fs_stat *st)
 {
-	char *p, *key_save;
+	char *p;
 	struct stat sb;
 	int r;
 	int16_t flags;
 	static const char diag[] = "fs_inode_stat";
 
-	key_save = malloc(key_size);
-	if (key_save == NULL)
+	p = key_to_path(key, key_size);
+	if (p == NULL)
 		return (KV_ERR_NO_MEMORY);
-	memcpy(key_save, key, key_size);
 
-	p = key_to_path(key_save, key_size);
 	log_debug("%s: %s", diag, p);
 	r = lstat(p, &sb);
 	if (r == -1) {
@@ -420,7 +422,7 @@ fs_inode_stat(char *key, size_t key_size, struct fs_stat *st)
 	st->ctime = sb.st_ctim;
 err:
 	log_debug("%s: %d", diag, r);
-	free(key_save);
+	free(p);
 	return (fs_err(r, diag));
 }
 
@@ -428,19 +430,17 @@ int
 fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 	off_t offset, uint32_t emode, size_t chunk_size)
 {
-	char *p, *key_save;
+	char *p;
 	mode_t mode = MODE_MASK(emode);
 	int16_t flags = FLAGS_FROM_MODE(emode);
 	size_t ss;
 	int fd, r = 0, does_create = 0;
 	static const char diag[] = "fs_inode_write";
 
-	key_save = malloc(key_size);
-	if (key_save == NULL)
+	p = key_to_path(key, key_size);
+	if (p == NULL)
 		return (KV_ERR_NO_MEMORY);
-	memcpy(key_save, key, key_size);
 
-	p = key_to_path(key_save, key_size);
 	log_debug("%s: %s size %ld offset %ld flags %o", diag, p, *size,
 		offset, flags);
 	ss = *size;
@@ -472,7 +472,7 @@ err:
 		log_error("%s: %s: %s", diag, p, strerror(-r));
 	else
 		log_debug("%s: %s: ret %d", diag, p, r);
-	free(key_save);
+	free(p);
 	return (fs_err(r, diag));
 }
 
@@ -480,19 +480,17 @@ int
 fs_inode_read(char *key, size_t key_size, void *buf, size_t *size,
 	off_t offset)
 {
-	char *p, *key_save;
+	char *p;
 	struct stat sb;
 	size_t ss, chunk_size;
 	int16_t flags = 0;
 	int fd, r;
 	static const char diag[] = "fs_inode_read";
 
-	key_save = malloc(key_size);
-	if (key_save == NULL)
+	p = key_to_path(key, key_size);
+	if (p == NULL)
 		return (KV_ERR_NO_MEMORY);
-	memcpy(key_save, key, key_size);
 
-	p = key_to_path(key_save, key_size);
 	log_debug("%s: %s size %ld offset %ld", diag, p, *size, offset);
 	if (lstat(p, &sb) == 0 && S_ISLNK(sb.st_mode)) {
 		r = readlink(p, buf, *size);
@@ -527,7 +525,7 @@ fs_inode_read(char *key, size_t key_size, void *buf, size_t *size,
 	*size = r;
 done:
 	log_debug("%s: ret %d", diag, r);
-	free(key_save);
+	free(p);
 	return (fs_err(r, diag));
 }
 
@@ -599,16 +597,14 @@ rmdir_r(const char *dir)
 int
 fs_inode_truncate(char *key, size_t key_size, off_t len)
 {
-	char *p, *key_save;
+	char *p;
 	int r, fd;
 	static const char diag[] = "fs_inode_truncate";
 
-	key_save = malloc(key_size);
-	if (key_save == NULL)
+	p = key_to_path(key, key_size);
+	if (p == NULL)
 		return (KV_ERR_NO_MEMORY);
-	memcpy(key_save, key, key_size);
 
-	p = key_to_path(key_save, key_size);
 	log_debug("%s: %s len %ld", diag, p, len);
 	r = truncate(p, len + msize);
 	if (r == -1)
@@ -622,35 +618,32 @@ fs_inode_truncate(char *key, size_t key_size, off_t len)
 		} else
 			r = -errno;
 	}
-	free(key_save);
+	free(p);
 	return (fs_err(r, diag));
 }
 
 int
 fs_inode_remove(char *key, size_t key_size)
 {
-	char *p, *key_save;
+	char *p;
 	struct stat sb;
 	int r;
 	static const char diag[] = "fs_inode_remove";
 
-	key_save = malloc(key_size);
-	if (key_save == NULL)
+	p = key_to_path(key, key_size);
+	if (p == NULL)
 		return (KV_ERR_NO_MEMORY);
-	memcpy(key_save, key, key_size);
 
-	p = key_to_path(key_save, key_size);
 	log_debug("%s: %s", diag, p);
-	if (lstat(p, &sb) == -1)
-		return (fs_err(-errno, diag));
-
-	if (S_ISDIR(sb.st_mode))
-		r = rmdir_r(p);
-	else
-		r = unlink(p);
+	if ((r = lstat(p, &sb)) == 0) {
+		if (S_ISDIR(sb.st_mode))
+			r = rmdir_r(p);
+		else
+			r = unlink(p);
+	}
 	if (r == -1)
 		r = -errno;
-	free(key_save);
+	free(p);
 	return (fs_err(r, diag));
 }
 
@@ -666,6 +659,9 @@ fs_inode_readdir(char *path, void (*cb)(struct dirent *, struct stat *, void *),
 	struct stat sb;
 	int r, r2;
 	static const char diag[] = "fs_inode_readdir";
+
+	if (p == NULL)
+		return (KV_ERR_NO_MEMORY);
 
 	log_debug("%s: %s", diag, p);
 	dp = opendir(p);
@@ -691,7 +687,7 @@ fs_inode_readdir(char *path, void (*cb)(struct dirent *, struct stat *, void *),
 		closedir(dp);
 	} else
 		r = -errno;
-
+	free(p);
 	return (fs_err(r, diag));
 }
 
@@ -735,14 +731,15 @@ fs_inode_flush(void *key, size_t key_size)
 		index = atoi((char *)key + keylen);
 	log_info("%s: %s:%d", diag, (char *)key, index);
 
+	p = key_to_path(key, key_size);
+	if (p == NULL)
+		return (KV_ERR_NO_MEMORY);
+
 	dst = path_backend(key);
 	if (dst == NULL) {
 		r = KV_ERR_NO_BACKEND_PATH;
-		log_debug("%s: %s", diag, kv_err_string(r));
-		return (r);
+		goto free_p;
 	}
-
-	p = key_to_path(key, key_size);
 	if (lstat(p, &sb) == -1) {
 		r = fs_err(-errno, diag);
 		goto free_dst;
@@ -805,6 +802,7 @@ regular_file:
 	} else
 		r = backend_write(dst, flags, sb.st_mode, buf, r,
 			index * chunk_size);
+	free(buf);
 close_src_fd:
 	close(src_fd);
 free_dst:
@@ -814,9 +812,11 @@ free_dst:
 		    (cache_flags & ~CHFS_FS_DIRTY) | CHFS_FS_CACHE);
 		r = fs_err(r, diag);
 	}
+free_p:
 	if (r == KV_ERR_NO_ENTRY || r == KV_SUCCESS)
 		log_info("%s: %s: %s", diag, p, kv_err_string(r));
 	else
 		log_error("%s: %s: %s", diag, p, kv_err_string(r));
+	free(p);
 	return (r);
 }
