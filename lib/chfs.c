@@ -1659,12 +1659,12 @@ root_stat(struct stat *st)
 int
 chfs_stat(const char *path, struct stat *st)
 {
-	char *p = canonical_path(path), *bp;
+	char *p = canonical_path(path);
 	struct fs_stat sb;
 	size_t psize;
 	void *pi;
 	hg_return_t ret;
-	int err, i, j, r;
+	int err, i, j;
 
 	if (p == NULL)
 		return (-1);
@@ -1674,15 +1674,6 @@ chfs_stat(const char *path, struct stat *st)
 		return (0);
 	}
 	ret = chfs_rpc_inode_stat(p, strlen(p) + 1, chfs_chunk_size, &sb, &err);
-	if (ret == HG_SUCCESS && err == KV_ERR_NO_ENTRY) {
-		bp = path_backend(p);
-		if (bp != NULL) {
-			r = lstat(bp, st);
-			free(bp);
-			free(p);
-			return (r);
-		}
-	}
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
 		free(p);
 		chfs_set_errno(ret, err);
@@ -1697,7 +1688,7 @@ chfs_stat(const char *path, struct stat *st)
 	st->st_nlink = 1;
 	st->st_blksize = sb.chunk_size;
 	st->st_blocks = NUM_BLOCKS(st->st_size);
-	if (!S_ISREG(st->st_mode) || sb.size < sb.chunk_size) {
+	if (!S_ISREG(st->st_mode) || sb.size != sb.chunk_size) {
 		free(p);
 		return (0);
 	}

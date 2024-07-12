@@ -12,6 +12,7 @@
 #include "fs_rpc.h"
 #include "fs_hook.h"
 #include "fs.h"
+#include "backend.h"
 #include "backend_local.h"
 #include "flush.h"
 #include "key.h"
@@ -149,7 +150,7 @@ inode_stat(hg_handle_t h)
 	struct fs_stat sb;
 	fs_stat_in_t in;
 	fs_stat_out_t out;
-	char *target, *buf;
+	char *target;
 	int index;
 	static const char diag[] = "inode_stat RPC";
 
@@ -174,17 +175,11 @@ inode_stat(hg_handle_t h)
 			out.err = KV_ERR_SERVER_DOWN;
 		}
 	} else {
-		kv_lock(in.key.v, in.key.s, diag, in.chunk_size, 0);
 		out.err = fs_inode_stat(in.key.v, in.key.s, &sb);
 		if (out.err == KV_ERR_NO_ENTRY) {
-			buf = backend_read_cache_local(in.key.v, in.key.s,
-					in.chunk_size, &sb, NULL);
-			if (buf != NULL) {
-				free(buf);
-				out.err = KV_SUCCESS;
-			}
+			out.err = backend_stat(in.key.v, in.key.s,
+					in.chunk_size, &sb);
 		}
-		kv_unlock(in.key.v, in.key.s);
 	}
 	free(target);
 	if (out.err != KV_SUCCESS && out.err != KV_ERR_NO_ENTRY)

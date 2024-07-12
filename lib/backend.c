@@ -85,12 +85,55 @@ backend_write_key(const char *key, mode_t mode,
 	return (r);
 }
 
+int
+backend_stat(char *path, size_t psize, size_t chunk_size, struct fs_stat *st)
+{
+	int r = KV_SUCCESS;
+	char *bp;
+	struct stat sb;
+	int index = key_index(path, psize);
+	static const char diag[] = "backend_stat";
+
+	if ((bp = path_backend(path)) == NULL) {
+		r = KV_ERR_NO_BACKEND_PATH;
+		goto out;
+	}
+	if (stat(bp, &sb) == -1) {
+		r = fs_err(-errno, diag);
+		free(bp);
+		goto out;
+	}
+	free(bp);
+
+	if (index > 0 && index * chunk_size > sb.st_size) {
+		r = KV_ERR_NO_ENTRY;
+		goto out;
+	}
+	if (st) {
+		st->mode = sb.st_mode;
+		st->uid = sb.st_uid;
+		st->gid = sb.st_gid;
+		st->chunk_size = chunk_size;
+		st->mtime = sb.st_mtim;
+		st->ctime = sb.st_ctim;
+		st->size = sb.st_size;
+		if (index > 0) {
+			st->size -= index * chunk_size;
+			if (st->size > chunk_size)
+				st->size = chunk_size;
+		}
+	}
+out:
+	log_debug("%s: key=%s index=%d: %s", diag, path, index,
+			kv_err_string(r));
+	return (r);
+}
+
 char *
 backend_read(char *path, size_t psize, size_t chunk_size,
 	struct fs_stat *st, size_t *size)
 {
 	char *buf = malloc(chunk_size), *bp;
-	struct stat sb;
 	int s, r;
 	size_t rr = 0;
 	int index = key_index(path, psize);
@@ -100,7 +143,11 @@ backend_read(char *path, size_t psize, size_t chunk_size,
 		return (NULL);
 	if ((bp = path_backend(path)) == NULL)
 		goto err_free_buf;
-	if (stat(bp, &sb) || (s = open(bp, O_RDONLY)) == -1) {
+	if (backend_stat(path, psize, chunk_size, st) != KV_SUCCESS) {
+		free(bp);
+		goto err_free_buf;
+	}
+	if ((s = open(bp, O_RDONLY)) == -1) {
 		free(bp);
 		goto err_free_buf;
 	}
@@ -114,15 +161,6 @@ backend_read(char *path, size_t psize, size_t chunk_size,
 	if (r < 0 || rr == 0)
 		goto err_free_buf;
 
-	if (st) {
-		st->mode = sb.st_mode;
-		st->uid = sb.st_uid;
-		st->gid = sb.st_gid;
-		st->size = sb.st_size;
-		st->chunk_size = chunk_size;
-		st->mtime = sb.st_mtim;
-		st->ctime = sb.st_ctim;
-	}
 	if (size)
 		*size = rr;
 	return (buf);
