@@ -176,10 +176,9 @@ inode_stat(hg_handle_t h)
 		}
 	} else {
 		out.err = fs_inode_stat(in.key.v, in.key.s, &sb);
-		if (out.err == KV_ERR_NO_ENTRY) {
+		if (out.err == KV_ERR_NO_ENTRY)
 			out.err = backend_stat(in.key.v, in.key.s,
 					in.chunk_size, &sb);
-		}
 	}
 	free(target);
 	if (out.err != KV_SUCCESS && out.err != KV_ERR_NO_ENTRY)
@@ -721,8 +720,11 @@ inode_truncate(hg_handle_t h)
 				HG_Error_to_string(ret));
 			err = KV_ERR_SERVER_DOWN;
 		}
-	} else
+	} else {
 		err = fs_inode_truncate(in.key.v, in.key.s, in.len);
+		if (err == KV_ERR_NO_ENTRY)
+			err = backend_stat(in.key.v, in.key.s, 0, NULL);
+	}
 	free(target);
 	if (err != KV_SUCCESS)
 		log_error("%s: %s:%d: %s", diag, (char *)in.key.v, index,
