@@ -96,16 +96,13 @@ static char *
 key_to_path(char *key, size_t key_size)
 {
 	size_t klen = strlen(key);
-	static const char diag[] = "key_to_path";
 
-	log_debug("%s: key %s", diag, key);
 	if (klen + 1 < key_size)
 		key[klen] = ':';
 	while (*key == '/')
 		++key;
 	if (*key == '\0')
 		key = ".";
-	log_debug("%s: path %s", diag, key);
 	return (key);
 }
 
