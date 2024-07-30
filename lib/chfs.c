@@ -224,6 +224,9 @@ chfs_init(const char *server)
 	int max_log_level, g;
 	hg_return_t ret;
 
+	if (chfs_initialized())
+		return (0);
+
 	if (FLAGS_FROM_MODE(CHFS_O_CACHE) != CHFS_FS_CACHE)
 		log_fatal("chfs_init: configuration error, flags mismatch");
 
