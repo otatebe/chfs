@@ -221,6 +221,9 @@ chfs_init(const char *server)
 	int max_log_level;
 	hg_return_t ret;
 
+	if (chfs_initialized())
+		return (0);
+
 	log_priority = getenv("CHFS_LOG_PRIORITY");
 	if (!IS_NULL_STRING(log_priority)) {
 		max_log_level = log_priority_from_name(log_priority);
