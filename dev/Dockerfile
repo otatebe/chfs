@@ -65,7 +65,7 @@ RUN cd \
  && make -j $(nproc) && make install \
  && ldconfig
 
-ARG LIBFABRIC_VER=1.21.0
+ARG LIBFABRIC_VER=1.22.0
 
 RUN cd \
  && wget https://github.com/ofiwg/libfabric/archive/refs/tags/v$LIBFABRIC_VER.tar.gz \
