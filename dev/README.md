@@ -30,6 +30,7 @@
       c1$ sh install-ompi.sh
       c1$ sh install.sh     # install CHFS again with MPI
       c1$ sh install-ior.sh
+      c1$ sh install-rdbench.sh
 
 - execute a test script (in a container)
 

@@ -22,7 +22,9 @@ s2=$(ls -l $MDIR/configure | awk '{ print $5 }')
 [ $s1 = $s2 ]
 chfind $MDIR
 mpirun -x PATH -x CHFS_SERVER -x CHFS_BACKEND_PATH -x CHFS_SUBDIR_PATH -np 4 -hostfile hosts -map-by node ior -a CHFS -o $MDIR/test-chfs -g -w -r -R -G 12345 -k
-mpirun --mca io ^ompio -x PATH -x CHFS_SERVER -x CHFS_BACKEND_PATH -x CHFS_SUBDIR_PATH -np 4 -hostfile hosts -map-by node ior -a MPIIO -o chfs:$MDIR/test-mpiio -g -w -r -R -G 123456 -k
+mpirun --mca io romio321 -x PATH -x CHFS_SERVER -x CHFS_BACKEND_PATH -x CHFS_SUBDIR_PATH -np 4 -hostfile hosts -map-by node ior -a MPIIO -o chfs:$MDIR/test-mpiio -g -w -r -R -G 123456 -k
+chmkdir $MDIR/rdbench
+mpirun --mca io romio321 -x PATH -x CHFS_SERVER -x CHFS_BACKEND_PATH -x CHFS_SUBDIR_PATH -np 4 -hostfile hosts -map-by node rdbench -o chfs:$MDIR/rdbench/o -s 1000 --novalidate
 chfsctl -h hosts -m $MDIR stop
 
 mpirun -x PATH -np 4 -hostfile hosts -map-by node ior -o $BACKEND/test-chfs -g -r -R -G 12345
@@ -31,6 +33,7 @@ mpirun -x PATH -np 4 -hostfile hosts -map-by node ior -o $BACKEND/test-mpiio -g 
 ls -l $BACKEND
 rm $BACKEND/configure
 rm -f $BACKEND/test-chfs $BACKEND/test-mpiio
+ls -l $BACKEND/rdbench
 
 chfsctl -h hosts -m $MDIR status
 

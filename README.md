@@ -204,7 +204,7 @@ ROMIO ADIO for CHFS is available.  With the ROMIO ADIO for CHFS, MPI-IO applicat
 
 1. How to use
 
-       % mpirun --mca io ^ompio -x CHFS_SERVER -x CHFS_BACKEND_PATH -x CHFS_SUBDIR_PATH ...
+       % mpirun --mca io romio321 -x CHFS_SERVER -x CHFS_BACKEND_PATH -x CHFS_SUBDIR_PATH ...
 
 ## IOR and mdtest
 
