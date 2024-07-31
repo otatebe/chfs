@@ -974,7 +974,7 @@ index 0000000000..382582a9fd
 +}
 diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_resize.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_resize.c
 new file mode 100644
-index 0000000000..b917e88395
+index 0000000000..7685a2fbfe
 --- /dev/null
 +++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_resize.c
 @@ -0,0 +1,37 @@
@@ -996,7 +996,7 @@ index 0000000000..b917e88395
 +  MPI_Comm_rank(fd->comm, &myrank);
 +#ifdef DEBUG
 +  MPI_Comm_size(fd->comm, &nprocs);
-+  FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_Resize called on %s, sz=%d\n", myrank,
++  FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_Resize called on %s, sz=%lld\n", myrank,
 +          nprocs, fd->filename, size);
 +#endif
 +
@@ -1209,7 +1209,7 @@ index 0000000000..413251a753
 +}
 diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_write.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_write.c
 new file mode 100644
-index 0000000000..a0a9a8be91
+index 0000000000..ad0e25f36b
 --- /dev/null
 +++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_write.c
 @@ -0,0 +1,101 @@
@@ -1258,7 +1258,7 @@ index 0000000000..a0a9a8be91
 +    ss = chfs_pwrite(fd->fd_sys, buf + xfered, data_size - xfered,
 +                     write_offset + xfered);
 +#ifdef DEBUG
-+    FPRINTF(stdout, "[%d/%d]    chfs_pwrite xfered=%d,sz=%d,ofs=%d,ss=%d\n",
++    FPRINTF(stdout, "[%d/%d]    chfs_pwrite xfered=%lu,sz=%lu,ofs=%lu,ss=%ld\n",
 +            myrank, nprocs, xfered, data_size - xfered, write_offset + xfered,
 +            ss);
 +#endif
