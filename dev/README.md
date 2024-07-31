@@ -24,9 +24,10 @@
 
       $ make
 
-- install CHFS and IOR (in a container)
+- install CHFS, MPI and IOR (in a container)
 
       c1$ sh install.sh
+      c1$ sh install-ompi.sh
       c1$ sh install-ior.sh
 
 - execute a test script (in a container)

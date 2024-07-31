@@ -1,0 +1,1404 @@
+diff --git a/ompi/mca/io/romio321/romio/adio/Makefile.mk b/ompi/mca/io/romio321/romio/adio/Makefile.mk
+index ffc05cb415..1c761d2f15 100644
+--- a/ompi/mca/io/romio321/romio/adio/Makefile.mk
++++ b/ompi/mca/io/romio321/romio/adio/Makefile.mk
+@@ -24,6 +24,7 @@ noinst_HEADERS +=                      \
+     adio/include/mpiu_external32.h     \
+     adio/include/hint_fns.h
+ 
++include $(top_srcdir)/adio/ad_chfs/Makefile.mk
+ include $(top_srcdir)/adio/ad_gpfs/Makefile.mk
+ include $(top_srcdir)/adio/ad_gpfs/bg/Makefile.mk
+ include $(top_srcdir)/adio/ad_gpfs/pe/Makefile.mk
+diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/Makefile.mk b/ompi/mca/io/romio321/romio/adio/ad_chfs/Makefile.mk
+new file mode 100644
+index 0000000000..56354f2122
+--- /dev/null
++++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/Makefile.mk
+@@ -0,0 +1,32 @@
++##
++## Copyright (C) by Argonne National Laboratory
++##     See COPYRIGHT in top-level directory
++##
++
++if BUILD_AD_CHFS
++
++noinst_HEADERS += \
++	adio/ad_chfs/ad_chfs.h
++
++romio_other_sources +=                \
++    adio/ad_chfs/ad_chfs_init.c   \
++    adio/ad_chfs/ad_chfs_common.c \
++    adio/ad_chfs/ad_chfs_close.c  \
++    adio/ad_chfs/ad_chfs_read.c   \
++    adio/ad_chfs/ad_chfs_rdcoll.c \
++    adio/ad_chfs/ad_chfs_wrcoll.c \
++    adio/ad_chfs/ad_chfs_open.c   \
++    adio/ad_chfs/ad_chfs_write.c  \
++    adio/ad_chfs/ad_chfs_done.c   \
++    adio/ad_chfs/ad_chfs_fcntl.c  \
++    adio/ad_chfs/ad_chfs_iread.c  \
++    adio/ad_chfs/ad_chfs_iwrite.c \
++    adio/ad_chfs/ad_chfs_wait.c   \
++    adio/ad_chfs/ad_chfs_flush.c  \
++    adio/ad_chfs/ad_chfs_seek.c   \
++    adio/ad_chfs/ad_chfs_resize.c \
++    adio/ad_chfs/ad_chfs_hints.c  \
++    adio/ad_chfs/ad_chfs_delete.c \
++    adio/ad_chfs/ad_chfs.c
++
++endif BUILD_AD_CHFS
+diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs.c
+new file mode 100644
+index 0000000000..2645f3b5e4
+--- /dev/null
++++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs.c
+@@ -0,0 +1,39 @@
++/*
++ * Copyright (C) by Argonne National Laboratory
++ *     See COPYRIGHT in top-level directory
++ */
++
++#include "ad_chfs.h"
++
++/* adioi.h has the ADIOI_Fns_struct define */
++#include "adioi.h"
++
++struct ADIOI_Fns_struct ADIO_CHFS_operations = {
++    ADIOI_CHFS_Open,  /* Open */
++    ADIOI_GEN_OpenColl, /* OpenColl */
++    ADIOI_CHFS_ReadContig,    /* ReadContig */
++    ADIOI_CHFS_WriteContig,   /* WriteContig */
++    ADIOI_CHFS_ReadStridedColl,       /* ReadStridedColl */
++    ADIOI_CHFS_WriteStridedColl,      /* WriteStridedColl */
++    ADIOI_CHFS_SeekIndividual,        /* SeekIndividual */
++    ADIOI_CHFS_Fcntl, /* Fcntl */
++    ADIOI_CHFS_SetInfo,       /* SetInfo */
++    ADIOI_CHFS_ReadStrided,   /* ReadStrided */
++    ADIOI_CHFS_WriteStrided,  /* WriteStrided */
++    ADIOI_CHFS_Close, /* Close */
++    ADIOI_CHFS_IreadContig,   /* IreadContig */
++    ADIOI_CHFS_IwriteContig,  /* IwriteContig */
++    ADIOI_CHFS_ReadDone,      /* ReadDone */
++    ADIOI_CHFS_WriteDone,     /* WriteDone */
++    ADIOI_CHFS_ReadComplete,  /* ReadComplete */
++    ADIOI_CHFS_WriteComplete, /* WriteComplete */
++    ADIOI_CHFS_IreadStrided,  /* IreadStrided */
++    ADIOI_CHFS_IwriteStrided, /* IwriteStrided */
++    ADIOI_CHFS_Flush, /* Flush */
++    ADIOI_CHFS_Resize,        /* Resize */
++    ADIOI_CHFS_Delete,        /* Delete */
++    ADIOI_GEN_Feature,  /* Features */
++    "CHFS: parallel and distributed file system for node-local persistent memory",
++    ADIOI_GEN_IreadStridedColl, /* IreadStridedColl */
++    ADIOI_GEN_IwriteStridedColl,        /* IwriteStridedColl */
++};
+diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs.h b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs.h
+new file mode 100644
+index 0000000000..63306351d4
+--- /dev/null
++++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs.h
+@@ -0,0 +1,77 @@
++/*
++ * Copyright (C) by Argonne National Laboratory
++ *     See COPYRIGHT in top-level directory
++ */
++
++#ifndef AD_CHFS_H_INCLUDED
++#define AD_CHFS_H_INCLUDED
++
++#include "adio.h"
++#include <unistd.h>
++#include <sys/types.h>
++#include <sys/uio.h>
++#include <fcntl.h>
++
++#include <chfs.h>
++
++void ADIOI_CHFS_Init(int *error_code);
++void ADIOI_CHFS_Term(int *error_code);
++void ADIOI_CHFS_Open(ADIO_File fd, int *error_code);
++void ADIOI_CHFS_Close(ADIO_File fd, int *error_code);
++void ADIOI_CHFS_ReadContig(ADIO_File fd, void *buf, int count,
++                             MPI_Datatype datatype, int file_ptr_type,
++                             ADIO_Offset offset, ADIO_Status * status, int
++                             *error_code);
++void ADIOI_CHFS_WriteContig(ADIO_File fd, const void *buf, int count,
++                              MPI_Datatype datatype, int file_ptr_type,
++                              ADIO_Offset offset, ADIO_Status * status, int
++                              *error_code);
++void ADIOI_CHFS_IwriteContig(ADIO_File fd, const void *buf, int count,
++                               MPI_Datatype datatype, int file_ptr_type,
++                               ADIO_Offset offset, ADIO_Request * request, int
++                               *error_code);
++void ADIOI_CHFS_IreadContig(ADIO_File fd, void *buf, int count,
++                              MPI_Datatype datatype, int file_ptr_type,
++                              ADIO_Offset offset, ADIO_Request * request, int
++                              *error_code);
++int ADIOI_CHFS_ReadDone(ADIO_Request * request, ADIO_Status * status, int
++                          *error_code);
++int ADIOI_CHFS_WriteDone(ADIO_Request * request, ADIO_Status * status, int
++                           *error_code);
++void ADIOI_CHFS_ReadComplete(ADIO_Request * request, ADIO_Status * status, int
++                               *error_code);
++void ADIOI_CHFS_WriteComplete(ADIO_Request * request, ADIO_Status * status, int *error_code);
++void ADIOI_CHFS_Fcntl(ADIO_File fd, int flag, ADIO_Fcntl_t * fcntl_struct, int *error_code);
++void ADIOI_CHFS_WriteStrided(ADIO_File fd, const void *buf, int count,
++                               MPI_Datatype datatype, int file_ptr_type,
++                               ADIO_Offset offset, ADIO_Status * status, int *error_code);
++void ADIOI_CHFS_ReadStrided(ADIO_File fd, void *buf, int count,
++                              MPI_Datatype datatype, int file_ptr_type,
++                              ADIO_Offset offset, ADIO_Status * status, int
++                              *error_code);
++void ADIOI_CHFS_WriteStridedColl(ADIO_File fd, const void *buf, int count,
++                                   MPI_Datatype datatype, int file_ptr_type,
++                                   ADIO_Offset offset, ADIO_Status * status, int
++                                   *error_code);
++void ADIOI_CHFS_ReadStridedColl(ADIO_File fd, void *buf, int count,
++                                  MPI_Datatype datatype, int file_ptr_type,
++                                  ADIO_Offset offset, ADIO_Status * status, int
++                                  *error_code);
++void ADIOI_CHFS_IreadStrided(ADIO_File fd, void *buf, int count,
++                               MPI_Datatype datatype, int file_ptr_type,
++                               ADIO_Offset offset, ADIO_Request * request, int
++                               *error_code);
++void ADIOI_CHFS_IwriteStrided(ADIO_File fd, const void *buf, int count,
++                                MPI_Datatype datatype, int file_ptr_type,
++                                ADIO_Offset offset, ADIO_Request * request, int
++                                *error_code);
++void ADIOI_CHFS_Flush(ADIO_File fd, int *error_code);
++void ADIOI_CHFS_Resize(ADIO_File fd, ADIO_Offset size, int *error_code);
++ADIO_Offset ADIOI_CHFS_SeekIndividual(ADIO_File fd, ADIO_Offset offset,
++                                        int whence, int *error_code);
++void ADIOI_CHFS_SetInfo(ADIO_File fd, MPI_Info users_info, int *error_code);
++void ADIOI_CHFS_Get_shared_fp(ADIO_File fd, int size, ADIO_Offset * shared_fp, int *error_code);
++void ADIOI_CHFS_Set_shared_fp(ADIO_File fd, ADIO_Offset offset, int *error_code);
++void ADIOI_CHFS_Delete(const char *filename, int *error_code);
++
++#endif /* AD_CHFS_H_INCLUDED */
+diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_close.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_close.c
+new file mode 100644
+index 0000000000..4e8a5efc3a
+--- /dev/null
++++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_close.c
+@@ -0,0 +1,31 @@
++/*
++ * Copyright (C) by Argonne National Laboratory
++ *     See COPYRIGHT in top-level directory
++ */
++
++#include "ad_chfs.h"
++#include "adioi.h"
++#include "ad_chfs_common.h"
++
++void ADIOI_CHFS_Close(ADIO_File fd, int* error_code) {
++  static char myname[] = "ADIOI_CHFS_Close";
++  struct ADIOI_CHFS_fs_s *chfs_fs;
++
++#ifdef DEBUG
++  int myrank, nprocs;
++  MPI_Comm_size(fd->comm, &nprocs);
++  MPI_Comm_rank(fd->comm, &myrank);
++  FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_Close called on %s\n", myrank, nprocs,
++          fd->filename);
++#endif
++
++  *error_code = MPI_SUCCESS;
++  if (chfs_close(fd->fd_sys)) {
++    *error_code = ADIOI_Err_create_code(myname, fd->filename, errno);
++    return;
++  }
++  chfs_fs = (ADIOI_CHFS_fs*) fd->fs_ptr;
++  ADIOI_Free(chfs_fs);
++  fd->fs_ptr = NULL;
++  fd->fd_sys = -1;
++}
+diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_common.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_common.c
+new file mode 100644
+index 0000000000..4a68e5ea79
+--- /dev/null
++++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_common.c
+@@ -0,0 +1,55 @@
++#include "ad_chfs_common.h"
++#include "ad_chfs.h"
++#include "adioi.h"
++
++MPI_Offset ADIOI_CHFS_get_size_coll(ADIO_File fd, int* error_code) {
++  static char myname[] = "ADIOI_CHFS_get_size_coll";
++  int nprocs, myrank;
++  struct stat st;
++  MPI_Offset res;
++
++  MPI_Comm_rank(fd->comm, &myrank);
++#ifdef DEBUG
++  MPI_Comm_size(fd->comm, &nprocs);
++  FPRINTF(stdout, "[%d/%d] %s called on %s\n", myrank, nprocs, myname,
++          fd->filename);
++#endif
++
++  if (myrank == fd->hints->ranklist[0]) {
++    if (chfs_stat(fd->filename, &st)) {
++      res = -errno;
++    } else {
++      res = st.st_size;
++    }
++  }
++
++  MPI_Bcast(&res, 1, MPI_LONG, fd->hints->ranklist[0], fd->comm);
++
++  if (res < 0) {
++    *error_code = ADIOI_Err_create_code(myname, fd->filename, -res);
++    return -1;
++  } else {
++    *error_code = MPI_SUCCESS;
++    return res;
++  }
++}
++
++char* ADIOI_CHFS_get_absolute_path(const char* relative_path, char* buf, size_t size) {
++  size_t rel_path_len, cwd_len;
++  rel_path_len = strlen(relative_path);
++  if (relative_path[0] != '/') {
++    if (getcwd(buf, size) == NULL) {
++      return NULL;
++    }
++    cwd_len = strlen(buf);
++    if (cwd_len + 1 + rel_path_len + 1 > size) {
++      errno = ENAMETOOLONG;
++      return NULL;
++    }
++    buf[cwd_len] = '/';
++    memcpy(buf + cwd_len + 1, relative_path, rel_path_len + 1);
++  } else {
++    memcpy(buf, relative_path, rel_path_len + 1);
++  }
++  return buf;
++}
+diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_common.h b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_common.h
+new file mode 100644
+index 0000000000..4f975db67d
+--- /dev/null
++++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_common.h
+@@ -0,0 +1,17 @@
++#ifndef AD_CHFS_COMMON_H_INCLUDED
++#define AD_CHFS_COMMON_H_INCLUDED
++
++#include <limits.h>
++#include "adio.h"
++
++struct ADIOI_CHFS_fs_s {
++  char absolute_path[PATH_MAX];
++};
++typedef struct ADIOI_CHFS_fs_s ADIOI_CHFS_fs;
++
++MPI_Offset ADIOI_CHFS_get_size_coll(ADIO_File fd, int* error_code);
++char* ADIOI_CHFS_get_absolute_path(const char* relative_path,
++                                   char* buf,
++                                   size_t size);
++
++#endif
+diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_delete.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_delete.c
+new file mode 100644
+index 0000000000..560bfa2e64
+--- /dev/null
++++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_delete.c
+@@ -0,0 +1,39 @@
++/*
++ * Copyright (C) by Argonne National Laboratory
++ *     See COPYRIGHT in top-level directory
++ */
++
++#include <limits.h>
++#include "ad_chfs.h"
++#include "ad_chfs_common.h"
++#include "adioi.h"
++
++void ADIOI_CHFS_Delete(const char* filename, int* error_code) {
++  static char myname[] = "ADIOI_CHFS_Delete";
++  char absolute_path[PATH_MAX];
++
++#ifdef DEBUG
++  int myrank, nprocs;
++  MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
++  MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
++  FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_Delete called on %s\n", myrank, nprocs,
++          filename);
++#endif
++
++  *error_code = MPI_SUCCESS;
++
++  ADIOI_CHFS_Init(error_code);
++  if (*error_code != MPI_SUCCESS) {
++    return;
++  }
++
++  if (ADIOI_CHFS_get_absolute_path(filename, absolute_path,
++                                   sizeof(absolute_path)) == NULL) {
++    *error_code = ADIOI_Err_create_code(myname, filename, errno);
++    return;
++  }
++
++  if (chfs_unlink(absolute_path)) {
++    *error_code = ADIOI_Err_create_code(myname, filename, errno);
++  }
++}
+diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_done.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_done.c
+new file mode 100644
+index 0000000000..8643a8f98a
+--- /dev/null
++++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_done.c
+@@ -0,0 +1,36 @@
++/*
++ * Copyright (C) by Argonne National Laboratory
++ *     See COPYRIGHT in top-level directory
++ */
++
++#include "ad_chfs.h"
++#include "adioi.h"
++
++int ADIOI_CHFS_ReadDone(ADIO_Request * request, ADIO_Status * status, int
++                          *error_code)
++{
++#ifdef DEBUG
++    int myrank, nprocs;
++    MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
++    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
++    FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_ReadDone called on ADIO_REQUEST_NULL\n", myrank, nprocs);
++#endif
++
++    *error_code = MPI_SUCCESS;
++    return 1;
++}
++
++
++int ADIOI_CHFS_WriteDone(ADIO_Request * request, ADIO_Status * status, int
++                           *error_code)
++{
++#ifdef DEBUG
++    int myrank, nprocs;
++    MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
++    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
++    FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_WriteDone called on ADIO_REQUEST_NULL\n", myrank, nprocs);
++#endif
++
++    *error_code = MPI_SUCCESS;
++    return 1;
++}
+diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_fcntl.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_fcntl.c
+new file mode 100644
+index 0000000000..5a6a992ae5
+--- /dev/null
++++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_fcntl.c
+@@ -0,0 +1,50 @@
++/*
++ * Copyright (C) by Argonne National Laboratory
++ *     See COPYRIGHT in top-level directory
++ */
++
++#include "ad_chfs.h"
++#include "ad_chfs_common.h"
++#include "adio_extern.h"
++#include "adioi.h"
++
++void ADIOI_CHFS_Fcntl(ADIO_File fd,
++                      int flag,
++                      ADIO_Fcntl_t* fcntl_struct,
++                      int* error_code) {
++  int myrank, nprocs;
++  static char myname[] = "ADIOI_CHFS_Fcntl";
++  struct ADIOI_CHFS_fs_s* chfs_fs;
++
++#ifdef DEBUG
++  MPI_Comm_size(fd->comm, &nprocs);
++  MPI_Comm_rank(fd->comm, &myrank);
++  FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_Fcntl called on %s\n", myrank, nprocs,
++          fd->filename);
++#endif
++
++  *error_code = MPI_SUCCESS;
++
++  switch (flag) {
++    case ADIO_FCNTL_GET_FSIZE:
++      chfs_fs = (ADIOI_CHFS_fs*)fd->fs_ptr;
++      fcntl_struct->fsize = 0;
++      struct stat st;
++      if (chfs_stat(chfs_fs->absolute_path, &st)) {
++        *error_code = ADIOI_Err_create_code(myname, fd->filename, errno);
++      } else {
++        fcntl_struct->fsize = st.st_size;
++      }
++      break;
++
++    case ADIO_FCNTL_SET_DISKSPACE:
++    case ADIO_FCNTL_SET_ATOMICITY:
++    default:
++      /* --BEGIN ERROR HANDLING-- */
++      *error_code = MPIO_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE,
++                                         myname, __LINE__, MPI_ERR_ARG,
++                                         "**flag", "**flag %d", flag);
++      return;
++      /* --END ERROR HANDLING-- */
++  }
++}
+diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_flush.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_flush.c
+new file mode 100644
+index 0000000000..11260faac8
+--- /dev/null
++++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_flush.c
+@@ -0,0 +1,23 @@
++/*
++ * Copyright (C) by Argonne National Laboratory
++ *     See COPYRIGHT in top-level directory
++ */
++
++#include "ad_chfs.h"
++#include "adioi.h"
++
++void ADIOI_CHFS_Flush(ADIO_File fd, int* error_code) {
++  static char myname[] = "ADIOI_CHFS_Flush";
++#ifdef DEBUG
++  int myrank, nprocs;
++  MPI_Comm_size(fd->comm, &nprocs);
++  MPI_Comm_rank(fd->comm, &myrank);
++  FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_Flush called on %s\n", myrank, nprocs,
++          fd->filename);
++#endif
++
++  *error_code = MPI_SUCCESS;
++  if (chfs_fsync(fd->fd_sys)) {
++    *error_code = ADIOI_Err_create_code(myname, fd->filename, errno);
++  }
++}
+diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_getsh.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_getsh.c
+new file mode 100644
+index 0000000000..98f4d90ff9
+--- /dev/null
++++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_getsh.c
+@@ -0,0 +1,20 @@
++/*
++ * Copyright (C) by Argonne National Laboratory
++ *     See COPYRIGHT in top-level directory
++ */
++
++#include "ad_chfs.h"
++#include "adioi.h"
++
++void ADIOI_CHFS_Get_shared_fp(ADIO_File fd, int size, ADIO_Offset * shared_fp, int *error_code)
++{
++#ifdef DEBUG
++    int myrank, nprocs;
++    MPI_Comm_size(fd->comm, &nprocs);
++    MPI_Comm_rank(fd->comm, &myrank);
++    FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_Get_shared_fp called on %s\n",
++            myrank, nprocs, fd->filename);
++#endif
++
++    *error_code = MPI_SUCCESS;
++}
+diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_hints.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_hints.c
+new file mode 100644
+index 0000000000..c80a394d05
+--- /dev/null
++++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_hints.c
+@@ -0,0 +1,23 @@
++/*
++ * Copyright (C) by Argonne National Laboratory
++ *     See COPYRIGHT in top-level directory
++ */
++
++#include "ad_chfs.h"
++#include "adioi.h"
++#ifdef ROMIO_BGL
++#include "../ad_bgl/ad_bgl.h"
++#endif
++void ADIOI_CHFS_SetInfo(ADIO_File fd, MPI_Info users_info, int *error_code)
++{
++#ifdef DEBUG
++    int myrank, nprocs;
++    MPI_Comm_size(fd->comm, &nprocs);
++    MPI_Comm_rank(fd->comm, &myrank);
++    FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_SetInfo called on %s\n", myrank, nprocs, fd->filename);
++    FPRINTF(stdout, "[%d/%d]    calling ADIOI_GEN_SetInfo\n", myrank, nprocs);
++#endif
++
++    *error_code = MPI_SUCCESS;
++    ADIOI_GEN_SetInfo(fd, users_info, error_code);
++}
+diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_init.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_init.c
+new file mode 100644
+index 0000000000..3f43dc1416
+--- /dev/null
++++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_init.c
+@@ -0,0 +1,72 @@
++#include "ad_chfs.h"
++
++/* keyval hack to init/term chfs API*/
++static int ADIOI_CHFS_Initialized = MPI_KEYVAL_INVALID;
++
++void ADIOI_CHFS_Term(int* error_code) {
++  static char myname[] = "ADIOI_CHFS_Term";
++  int myrank;
++  MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
++
++  if(myrank == 0) {
++    if (chfs_term()) {
++      *error_code =
++          MPIO_Err_create_code(*error_code, MPIR_ERR_RECOVERABLE, myname,
++                              __LINE__, MPI_ERR_FILE, "chfs_term", 0);
++      return;
++    }
++  } else {
++    if (chfs_term_without_sync()) {
++      *error_code =
++          MPIO_Err_create_code(*error_code, MPIR_ERR_RECOVERABLE, myname,
++                              __LINE__, MPI_ERR_FILE, "chfs_term_without_sync", 0);
++      return;
++    }
++  }
++  *error_code = MPI_SUCCESS;
++}
++
++int ADIOI_CHFS_Term_call(MPI_Comm comm,
++                          int keyval,
++                          void* attribute_val,
++                          void* extra_state) {
++  int error_code;
++#ifdef DEBUG
++  int myrank, nprocs;
++  MPI_Comm_size(comm, &nprocs);
++  MPI_Comm_rank(comm, &myrank);
++  FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_Term_call called\n", myrank, nprocs);
++#endif
++  ADIOI_CHFS_Term(&error_code);
++  MPI_Comm_free_keyval(&keyval);
++  return error_code;
++}
++
++void ADIOI_CHFS_Init(int* error_code) {
++  static char myname[] = "ADIOI_CHFS_Init";
++
++  if (ADIOI_CHFS_Initialized != MPI_KEYVAL_INVALID) {
++    *error_code = MPI_SUCCESS;
++    return;
++  }
++
++#ifdef DEBUG
++  int myrank, nprocs;
++  MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
++  MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
++  FPRINTF(stdout, "[%d/%d] calling chfs_init in ADIOI_CHFS_Init\n", myrank,
++          nprocs);
++#endif
++
++  if (chfs_init(NULL)) {
++    *error_code =
++        MPIO_Err_create_code(*error_code, MPIR_ERR_RECOVERABLE, myname,
++                             __LINE__, MPI_ERR_OTHER, "chfs_init", 0);
++    return;
++  }
++  *error_code = MPI_SUCCESS;
++
++  MPI_Comm_create_keyval(MPI_COMM_NULL_COPY_FN, ADIOI_CHFS_Term_call,
++                         &ADIOI_CHFS_Initialized, (void*)0);
++  MPI_Comm_set_attr(MPI_COMM_SELF, ADIOI_CHFS_Initialized, (void*)0);
++}
+diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_iread.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_iread.c
+new file mode 100644
+index 0000000000..521577560c
+--- /dev/null
++++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_iread.c
+@@ -0,0 +1,59 @@
++/*
++ * Copyright (C) by Argonne National Laboratory
++ *     See COPYRIGHT in top-level directory
++ */
++
++#include "ad_chfs.h"
++#include "adioi.h"
++
++/* ADIOI_CHFS_IreadContig()
++ *
++ * Implemented by immediately calling ReadContig()
++ */
++void ADIOI_CHFS_IreadContig(ADIO_File fd, void *buf, int count,
++                              MPI_Datatype datatype, int file_ptr_type,
++                              ADIO_Offset offset, ADIO_Request * request, int
++                              *error_code)
++{
++    ADIO_Status status;
++    int myrank, nprocs;
++    MPI_Count typesize, len;
++
++    *error_code = MPI_SUCCESS;
++
++    MPI_Type_size_x(datatype, &typesize);
++#ifdef DEBUG
++    MPI_Comm_size(fd->comm, &nprocs);
++    MPI_Comm_rank(fd->comm, &myrank);
++    FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_IreadContig called on %s\n",
++            myrank, nprocs, fd->filename);
++    FPRINTF(stdout, "[%d/%d]    calling ADIOI_CHFS_ReadContig\n", myrank, nprocs);
++#endif
++
++    len = count * typesize;
++    ADIOI_CHFS_ReadContig(fd, buf, len, MPI_BYTE, file_ptr_type, offset, &status, error_code);
++
++    MPIO_Completed_request_create(&fd, len, error_code, request);
++}
++
++void ADIOI_CHFS_IreadStrided(ADIO_File fd, void *buf, int count,
++                               MPI_Datatype datatype, int file_ptr_type,
++                               ADIO_Offset offset, ADIO_Request * request, int
++                               *error_code)
++{
++    ADIO_Status status;
++    int myrank, nprocs;
++    MPI_Count typesize;
++
++    MPI_Type_size_x(datatype, &typesize);
++#ifdef DEBUG
++    MPI_Comm_size(fd->comm, &nprocs);
++    MPI_Comm_rank(fd->comm, &myrank);
++    FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_IreadStrided called on %s\n",
++            myrank, nprocs, fd->filename);
++    FPRINTF(stdout, "[%d/%d]    calling ADIOI_CHFS_ReadStrided\n", myrank, nprocs);
++#endif
++
++    ADIOI_CHFS_ReadStrided(fd, buf, count, datatype, file_ptr_type, offset, &status, error_code);
++    MPIO_Completed_request_create(&fd, count * typesize, error_code, request);
++}
+diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_iwrite.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_iwrite.c
+new file mode 100644
+index 0000000000..8645411a21
+--- /dev/null
++++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_iwrite.c
+@@ -0,0 +1,65 @@
++/*
++ * Copyright (C) by Argonne National Laboratory
++ *     See COPYRIGHT in top-level directory
++ */
++
++#include "ad_chfs.h"
++#include "adioi.h"
++
++#include "mpiu_greq.h"
++#include "../../mpi-io/mpioimpl.h"
++
++/* ADIOI_CHFS_IwriteContig()
++ *
++ * Implemented by immediately calling WriteContig()
++ */
++void ADIOI_CHFS_IwriteContig(ADIO_File fd, const void *buf, int count,
++                               MPI_Datatype datatype, int file_ptr_type,
++                               ADIO_Offset offset, ADIO_Request * request, int
++                               *error_code)
++{
++    ADIO_Status status;
++    int myrank, nprocs;
++    MPI_Count typesize, len;
++
++    *error_code = MPI_SUCCESS;
++
++    MPI_Type_size_x(datatype, &typesize);
++#ifdef DEBUG
++    MPI_Comm_size(fd->comm, &nprocs);
++    MPI_Comm_rank(fd->comm, &myrank);
++    FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_IwriteContig called on %s\n",
++            myrank, nprocs, fd->filename);
++    FPRINTF(stdout, "[%d/%d]    calling ADIOI_CHFS_WriteContig\n", myrank, nprocs);
++#endif
++
++    len = count * typesize;
++    ADIOI_CHFS_WriteContig(fd, buf, len, MPI_BYTE, file_ptr_type, offset, &status, error_code);
++    MPIO_Completed_request_create(&fd, len, error_code, request);
++
++}
++
++void ADIOI_CHFS_IwriteStrided(ADIO_File fd, const void *buf, int count,
++                                MPI_Datatype datatype, int file_ptr_type,
++                                ADIO_Offset offset, ADIO_Request * request, int
++                                *error_code)
++{
++    ADIO_Status status;
++    int myrank, nprocs;
++    MPI_Count typesize;
++
++    *error_code = MPI_SUCCESS;
++
++    MPI_Type_size_x(datatype, &typesize);
++#ifdef DEBUG
++    MPI_Comm_size(fd->comm, &nprocs);
++    MPI_Comm_rank(fd->comm, &myrank);
++    FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_IwriteStrided called on %s\n",
++            myrank, nprocs, fd->filename);
++    FPRINTF(stdout, "[%d/%d]    calling ADIOI_CHFS_WriteStrided\n", myrank, nprocs);
++#endif
++
++    ADIOI_CHFS_WriteStrided(fd, buf, count, datatype, file_ptr_type, offset, &status, error_code);
++    MPIO_Completed_request_create(&fd, count * typesize, error_code, request);
++
++}
+diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_open.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_open.c
+new file mode 100644
+index 0000000000..013c930089
+--- /dev/null
++++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_open.c
+@@ -0,0 +1,96 @@
++/*
++ * Copyright (C) by Argonne National Laboratory
++ *     See COPYRIGHT in top-level directory
++ */
++
++#include <limits.h>
++#include <sys/stat.h>
++#include <unistd.h>
++#include "ad_chfs.h"
++#include "ad_chfs_common.h"
++#include "adioi.h"
++
++void ADIOI_CHFS_Open(ADIO_File fd, int* error_code) {
++  static char myname[] = "ADIOI_CHFS_Open";
++  struct ADIOI_CHFS_fs_s* chfs_fs;
++
++#ifdef DEBUG
++  int myrank, nprocs;
++  MPI_Comm_size(fd->comm, &nprocs);
++  MPI_Comm_rank(fd->comm, &myrank);
++  FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_Open called on %s\n", myrank, nprocs,
++          fd->filename);
++#endif
++
++  *error_code = MPI_SUCCESS;
++
++  ADIOI_CHFS_Init(error_code);
++  if (*error_code != MPI_SUCCESS) {
++    return;
++  }
++
++  chfs_fs = (ADIOI_CHFS_fs*)ADIOI_Malloc(sizeof(ADIOI_CHFS_fs));
++  if (chfs_fs == NULL) {
++    *error_code = MPIO_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE,
++                                       myname, __LINE__, MPI_ERR_UNKNOWN,
++                                       "Error allocating memory", 0);
++    return;
++  }
++
++  if (ADIOI_CHFS_get_absolute_path(fd->filename, chfs_fs->absolute_path,
++                                   sizeof(chfs_fs->absolute_path)) == NULL) {
++    *error_code = ADIOI_Err_create_code(myname, fd->filename, errno);
++    ADIOI_Free(chfs_fs);
++    return;
++  }
++
++  int32_t flags;
++  if (fd->access_mode & ADIO_RDONLY) {
++    flags |= O_RDONLY;
++  }
++  if (fd->access_mode & ADIO_WRONLY) {
++    flags |= O_WRONLY;
++  }
++  if (fd->access_mode & ADIO_RDWR) {
++    flags |= O_RDWR;
++  }
++  if (fd->access_mode & ADIO_APPEND) {
++    flags |= O_APPEND;
++  }
++  if (fd->access_mode & ADIO_EXCL) {
++    flags |= O_EXCL;
++  }
++
++  mode_t perm, mask;
++  if (fd->perm == ADIO_PERM_NULL) {
++    mask = umask(S_IWGRP | S_IWOTH);
++    umask(mask);
++    perm = 0666 ^ mask;
++  } else {
++    perm = fd->perm;
++  }
++  perm = S_IFREG | perm;
++
++  if (fd->access_mode & ADIO_CREATE) {
++#ifdef DEBUG
++    FPRINTF(stdout, "[%d/%d]    calling chfs_create %s\n", myrank, nprocs,
++            chfs_fs->absolute_path);
++#endif
++    fd->fd_sys = chfs_create(chfs_fs->absolute_path, flags, perm);
++  } else {
++#ifdef DEBUG
++    FPRINTF(stdout, "[%d/%d]    calling chfs_open %s\n", myrank, nprocs,
++            chfs_fs->absolute_path);
++#endif
++    fd->fd_sys = chfs_open(chfs_fs->absolute_path, flags);
++  }
++
++  if (fd->fd_sys < 0) {
++    *error_code = ADIOI_Err_create_code(myname, fd->filename, errno);
++    ADIOI_Free(chfs_fs);
++    return;
++  }
++
++  fd->fs_ptr = chfs_fs;
++  fd->fd_direct = -1;
++}
+diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_rdcoll.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_rdcoll.c
+new file mode 100644
+index 0000000000..69fb8740f4
+--- /dev/null
++++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_rdcoll.c
+@@ -0,0 +1,26 @@
++/*
++ * Copyright (C) by Argonne National Laboratory
++ *     See COPYRIGHT in top-level directory
++ */
++
++#include "ad_chfs.h"
++#include "adioi.h"
++
++void ADIOI_CHFS_ReadStridedColl(ADIO_File fd, void *buf, int count,
++                                  MPI_Datatype datatype, int file_ptr_type,
++                                  ADIO_Offset offset, ADIO_Status * status, int *error_code)
++{
++    int myrank, nprocs;
++
++    *error_code = MPI_SUCCESS;
++
++#ifdef DEBUG
++    MPI_Comm_size(fd->comm, &nprocs);
++    MPI_Comm_rank(fd->comm, &myrank);
++    FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_ReadStridedColl called on %s\n",
++            myrank, nprocs, fd->filename);
++    FPRINTF(stdout, "[%d/%d]    calling ADIOI_GEN_ReadStridedColl\n", myrank, nprocs);
++#endif
++
++    ADIOI_GEN_ReadStridedColl(fd, buf, count, datatype, file_ptr_type, offset, status, error_code);
++}
+diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_read.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_read.c
+new file mode 100644
+index 0000000000..382582a9fd
+--- /dev/null
++++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_read.c
+@@ -0,0 +1,94 @@
++/*
++ * Copyright (C) by Argonne National Laboratory
++ *     See COPYRIGHT in top-level directory
++ */
++
++#include "ad_chfs.h"
++#include "ad_chfs_common.h"
++#include "adioi.h"
++
++void ADIOI_CHFS_ReadContig(ADIO_File fd,
++                           void* buf,
++                           int count,
++                           MPI_Datatype datatype,
++                           int file_ptr_type,
++                           ADIO_Offset offset,
++                           ADIO_Status* status,
++                           int* error_code) {
++  static char myname[] = "ADIOI_CHFS_ReadContig";
++  int myrank, nprocs;
++  struct ADIOI_CHFS_fs_s* chfs_fs = (ADIOI_CHFS_fs*)fd->fs_ptr;;
++  MPI_Count datatype_size;
++  MPI_Type_size_x(datatype, &datatype_size);
++
++#ifdef DEBUG
++  MPI_Comm_size(fd->comm, &nprocs);
++  MPI_Comm_rank(fd->comm, &myrank);
++  FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_ReadContig called on %s\n", myrank,
++          nprocs, fd->filename);
++#endif
++
++  *error_code = MPI_SUCCESS;
++
++  if (file_ptr_type == ADIO_INDIVIDUAL) {
++    offset = fd->fp_ind;
++  }
++
++#ifdef DEBUG
++  FPRINTF(stdout, "[%d/%d]    reading (buf = %p, loc = %lld, sz = %lld)\n",
++          myrank, nprocs, buf, (long long)offset,
++          (long long)datatype_size * count);
++#endif
++
++  size_t data_size = datatype_size * count;
++  size_t xfered = 0;
++  ssize_t ss;
++  while (xfered < data_size) {
++    ss = chfs_pread(fd->fd_sys, buf + xfered, data_size - xfered,
++                    offset + xfered);
++    if (ss < 0) {
++      *error_code = ADIOI_Err_create_code(myname, fd->filename, errno);
++      fd->fp_sys_posn = -1;
++      return;
++    }
++
++    if (ss == 0) {
++      break;
++    }
++    xfered += ss;
++  }
++
++  fd->fp_sys_posn = offset + xfered;
++  if (file_ptr_type == ADIO_INDIVIDUAL) {
++    fd->fp_ind += xfered;
++  }
++
++#ifdef HAVE_STATUS_SET_BYTES
++  if (status && ss >= 0) {
++    MPIR_Status_set_bytes(status, datatype, xfered);
++  }
++#endif
++}
++
++void ADIOI_CHFS_ReadStrided(ADIO_File fd,
++                            void* buf,
++                            int count,
++                            MPI_Datatype datatype,
++                            int file_ptr_type,
++                            ADIO_Offset offset,
++                            ADIO_Status* status,
++                            int* error_code) {
++#ifdef DEBUG
++  int myrank, nprocs;
++  MPI_Comm_size(fd->comm, &nprocs);
++  MPI_Comm_rank(fd->comm, &myrank);
++  FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_ReadStrided called on %s\n", myrank,
++          nprocs, fd->filename);
++  FPRINTF(stdout, "[%d/%d]    calling ADIOI_GEN_ReadStrided\n", myrank, nprocs);
++#endif
++
++  *error_code = MPI_SUCCESS;
++
++  ADIOI_GEN_ReadStrided(fd, buf, count, datatype, file_ptr_type, offset, status,
++                        error_code);
++}
+diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_resize.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_resize.c
+new file mode 100644
+index 0000000000..b917e88395
+--- /dev/null
++++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_resize.c
+@@ -0,0 +1,37 @@
++/*
++ * Copyright (C) by Argonne National Laboratory
++ *     See COPYRIGHT in top-level directory
++ */
++
++#include "ad_chfs.h"
++#include "ad_chfs_common.h"
++#include "adioi.h"
++
++void ADIOI_CHFS_Resize(ADIO_File fd, ADIO_Offset size, int* error_code) {
++  static char myname[] = "ADIOI_CHFS_Resize";
++  int ret;
++  int nprocs, myrank;
++  struct ADIOI_CHFS_fs_s* chfs_fs;
++
++  MPI_Comm_rank(fd->comm, &myrank);
++#ifdef DEBUG
++  MPI_Comm_size(fd->comm, &nprocs);
++  FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_Resize called on %s, sz=%d\n", myrank,
++          nprocs, fd->filename, size);
++#endif
++
++  *error_code = MPI_SUCCESS;
++  MPI_Barrier(fd->comm);
++
++
++  if (myrank == 0) {
++    chfs_fs = (ADIOI_CHFS_fs*)fd->fs_ptr;
++    ret = chfs_truncate(chfs_fs->absolute_path, size);
++  }
++
++  MPI_Bcast(&ret, 1, MPI_INT, 0, fd->comm);
++
++  if (ret != 0) {
++    *error_code = ADIOI_Err_create_code(myname, fd->filename, errno);
++  }
++}
+diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_seek.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_seek.c
+new file mode 100644
+index 0000000000..92aecc70d6
+--- /dev/null
++++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_seek.c
+@@ -0,0 +1,82 @@
++/*
++ * Copyright (C) by Argonne National Laboratory
++ *     See COPYRIGHT in top-level directory
++ */
++
++#include "ad_chfs.h"
++#include "adioi.h"
++#include "adio_extern.h"
++
++/* ADIOI_CHFS_SeekIndividual()
++ *
++ * Implements SEEK_SET only (and doesn't test for whence type); all
++ * other types of whence must be converted before calling this.
++ *
++ * Returns an absolute offset in bytes.  The offset passed into the call is in
++ * terms of the etype relative to the filetype, so some calculations are
++ * necessary.
++ */
++ADIO_Offset ADIOI_CHFS_SeekIndividual(ADIO_File fd, ADIO_Offset offset,
++                                        int whence, int *error_code)
++{
++    int myrank, nprocs;
++
++    ADIO_Offset off;
++    ADIOI_Flatlist_node *flat_file;
++    int i, n_etypes_in_filetype, n_filetypes, etype_in_filetype;
++    ADIO_Offset abs_off_in_filetype = 0, sum;
++    int size_in_filetype;
++    int filetype_is_contig;
++    MPI_Count filetype_size;
++    MPI_Aint etype_size, lb, filetype_extent;
++
++    *error_code = MPI_SUCCESS;
++
++#ifdef DEBUG
++    MPI_Comm_size(fd->comm, &nprocs);
++    MPI_Comm_rank(fd->comm, &myrank);
++    FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_SeekIndividual called on %s\n",
++            myrank, nprocs, fd->filename);
++#endif
++
++    ADIOI_Datatype_iscontig(fd->filetype, &filetype_is_contig);
++    etype_size = fd->etype_size;
++
++    if (filetype_is_contig)
++        off = fd->disp + etype_size * offset;
++    else {
++        flat_file = ADIOI_Flatten_and_find(fd->filetype);
++
++        MPI_Type_get_extent(fd->filetype, &lb, &filetype_extent);
++        MPI_Type_size_x(fd->filetype, &filetype_size);
++        if (!filetype_size) {
++            *error_code = MPI_SUCCESS;
++            return 0;
++        }
++
++        n_etypes_in_filetype = filetype_size / etype_size;
++        ADIOI_Assert((offset / n_etypes_in_filetype) == (int) (offset / n_etypes_in_filetype));
++        n_filetypes = (int) (offset / n_etypes_in_filetype);
++        etype_in_filetype = (int) (offset % n_etypes_in_filetype);
++        size_in_filetype = etype_in_filetype * etype_size;
++
++        sum = 0;
++        for (i = 0; i < flat_file->count; i++) {
++            sum += flat_file->blocklens[i];
++
++            if (sum > size_in_filetype) {
++                abs_off_in_filetype = flat_file->indices[i] +
++                    size_in_filetype - (sum - flat_file->blocklens[i]);
++                break;
++            }
++        }
++
++        /* abs. offset in bytes in the file */
++        off = fd->disp + (ADIO_Offset) n_filetypes *(ADIO_Offset) filetype_extent +
++            abs_off_in_filetype;
++    }
++
++    fd->fp_ind = off;
++
++    return off;
++}
+diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_setsh.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_setsh.c
+new file mode 100644
+index 0000000000..315e1d06a4
+--- /dev/null
++++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_setsh.c
+@@ -0,0 +1,21 @@
++/*
++ * Copyright (C) by Argonne National Laboratory
++ *     See COPYRIGHT in top-level directory
++ */
++
++#include "ad_chfs.h"
++#include "adioi.h"
++
++void ADIOI_CHFS_Set_shared_fp(ADIO_File fd, ADIO_Offset offset, int *error_code)
++{
++    int myrank, nprocs;
++
++    *error_code = MPI_SUCCESS;
++
++#ifdef DEBUG
++    MPI_Comm_size(fd->comm, &nprocs);
++    MPI_Comm_rank(fd->comm, &myrank);
++    FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_Set_shared_fp called on %s\n",
++            myrank, nprocs, fd->filename);
++#endif
++}
+diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_wait.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_wait.c
+new file mode 100644
+index 0000000000..0b0e7f6102
+--- /dev/null
++++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_wait.c
+@@ -0,0 +1,39 @@
++/*
++ * Copyright (C) by Argonne National Laboratory
++ *     See COPYRIGHT in top-level directory
++ */
++
++#include "ad_chfs.h"
++#include "adioi.h"
++
++void ADIOI_CHFS_ReadComplete(ADIO_Request * request, ADIO_Status * status, int
++                               *error_code)
++{
++    int myrank, nprocs;
++
++    *error_code = MPI_SUCCESS;
++
++#ifdef DEBUG
++    MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
++    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
++    FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_ReadComplete called \n", myrank, nprocs);
++#endif
++
++    /* do something with status set bytes? */
++}
++
++void ADIOI_CHFS_WriteComplete(ADIO_Request * request, ADIO_Status * status, int
++                                *error_code)
++{
++    int myrank, nprocs;
++
++    *error_code = MPI_SUCCESS;
++
++#ifdef DEBUG
++    MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
++    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
++    FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_WriteComplete called\n", myrank, nprocs);
++#endif
++
++    /* do something with status_set_bytes? */
++}
+diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_wrcoll.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_wrcoll.c
+new file mode 100644
+index 0000000000..413251a753
+--- /dev/null
++++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_wrcoll.c
+@@ -0,0 +1,26 @@
++/*
++ * Copyright (C) by Argonne National Laboratory
++ *     See COPYRIGHT in top-level directory
++ */
++
++#include "ad_chfs.h"
++#include "adioi.h"
++
++void ADIOI_CHFS_WriteStridedColl(ADIO_File fd, const void *buf, int count,
++                                   MPI_Datatype datatype, int file_ptr_type,
++                                   ADIO_Offset offset, ADIO_Status * status, int *error_code)
++{
++    int myrank, nprocs;
++
++    *error_code = MPI_SUCCESS;
++
++#ifdef DEBUG
++    MPI_Comm_size(fd->comm, &nprocs);
++    MPI_Comm_rank(fd->comm, &myrank);
++    FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_WriteStridedColl called on %s\n",
++            myrank, nprocs, fd->filename);
++    FPRINTF(stdout, "[%d/%d]    calling ADIOI_GEN_WriteStridedColl\n", myrank, nprocs);
++#endif
++
++    ADIOI_GEN_WriteStridedColl(fd, buf, count, datatype, file_ptr_type, offset, status, error_code);
++}
+diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_write.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_write.c
+new file mode 100644
+index 0000000000..a0a9a8be91
+--- /dev/null
++++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_write.c
+@@ -0,0 +1,101 @@
++/*
++ * Copyright (C) by Argonne National Laboratory
++ *     See COPYRIGHT in top-level directory
++ */
++
++#include "ad_chfs.h"
++#include "ad_chfs_common.h"
++#include "adioi.h"
++
++void ADIOI_CHFS_WriteContig(ADIO_File fd,
++                            const void* buf,
++                            int count,
++                            MPI_Datatype datatype,
++                            int file_ptr_type,
++                            ADIO_Offset offset,
++                            ADIO_Status* status,
++                            int* error_code) {
++  static char myname[] = "ADIOI_CHFS_WriteContig";
++  int myrank, nprocs;
++  MPI_Count datatype_size;
++  struct ADIOI_CHFS_fs_s* chfs_fs = (ADIOI_CHFS_fs*)fd->fs_ptr;;
++  MPI_Type_size_x(datatype, &datatype_size);
++
++#ifdef DEBUG
++  MPI_Comm_size(fd->comm, &nprocs);
++  MPI_Comm_rank(fd->comm, &myrank);
++  FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_WriteContig called on %s\n", myrank,
++          nprocs, fd->filename);
++  FPRINTF(stdout, "[%d/%d]    writing (buf = %p, loc = %lld, sz = %lld)\n",
++          myrank, nprocs, buf, (long long)offset,
++          (long long)datatype_size * (long long)count);
++#endif
++  *error_code = MPI_SUCCESS;
++
++  off_t write_offset = offset;
++  if (file_ptr_type == ADIO_INDIVIDUAL) {
++    write_offset = fd->fp_ind;
++  }
++  size_t data_size = datatype_size * count;
++  size_t xfered = 0;
++  ssize_t ss;
++  while (xfered < data_size) {
++    ss = chfs_pwrite(fd->fd_sys, buf + xfered, data_size - xfered,
++                     write_offset + xfered);
++#ifdef DEBUG
++    FPRINTF(stdout, "[%d/%d]    chfs_pwrite xfered=%d,sz=%d,ofs=%d,ss=%d\n",
++            myrank, nprocs, xfered, data_size - xfered, write_offset + xfered,
++            ss);
++#endif
++    if (ss < 0) {
++      *error_code = ADIOI_Err_create_code(myname, fd->filename, errno);
++      fd->fp_sys_posn = -1;
++      return;
++    }
++
++    xfered += ss;
++  }
++
++  fd->fp_sys_posn = write_offset + xfered;
++  if (file_ptr_type == ADIO_INDIVIDUAL) {
++    fd->fp_ind += xfered;
++#ifdef DEBUG
++    FPRINTF(stdout, "[%d/%d]    new file position is %lld\n", myrank, nprocs,
++            (long long)fd->fp_ind);
++#endif
++  }
++
++#ifdef HAVE_STATUS_SET_BYTES
++  if (status && ss >= 0) {
++    MPIR_Status_set_bytes(status, datatype, datatype_size * count);
++  }
++#endif
++}
++
++void ADIOI_CHFS_WriteStrided(ADIO_File fd,
++                             const void* buf,
++                             int count,
++                             MPI_Datatype datatype,
++                             int file_ptr_type,
++                             ADIO_Offset offset,
++                             ADIO_Status* status,
++                             int* error_code) {
++#ifdef DEBUG
++  int myrank, nprocs;
++  MPI_Comm_size(fd->comm, &nprocs);
++  MPI_Comm_rank(fd->comm, &myrank);
++  FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_WriteStrided called on %s\n", myrank,
++          nprocs, fd->filename);
++  MPI_Count datatype_size;
++  MPI_Type_size_x(datatype, &datatype_size);
++  // FPRINTF(stdout, "[%d/%d]    writing (buf = %p, loc = %lld, sz = %lld)\n",
++  //         myrank, nprocs, buf, (long long)offset,
++  //         (long long)datatype_size * (long long)count);
++  FPRINTF(stdout, "[%d/%d]    calling ADIOI_GEN_WriteStrided\n", myrank,
++          nprocs);
++#endif
++
++  *error_code = MPI_SUCCESS;
++  ADIOI_GEN_WriteStrided_naive(fd, buf, count, datatype, file_ptr_type, offset,
++                         status, error_code);
++}
+diff --git a/ompi/mca/io/romio321/romio/adio/common/ad_fstype.c b/ompi/mca/io/romio321/romio/adio/common/ad_fstype.c
+index 4ffa79f8d9..ba3fdc0077 100644
+--- a/ompi/mca/io/romio321/romio/adio/common/ad_fstype.c
++++ b/ompi/mca/io/romio321/romio/adio/common/ad_fstype.c
+@@ -572,6 +572,9 @@ static void ADIO_FileSysType_prefix(const char *filename, int *fstype, int *erro
+     else if (!strncmp(filename, "gpfs:", 5) || !strncmp(filename, "GPFS:", 5)) {
+ 	*fstype = ADIO_GPFS;
+     }
++    else if (!strncmp(filename, "chfs:", 5) || !strncmp(filename, "CHFS:", 5)) {
++	*fstype = ADIO_CHFS;
++    }
+     else {
+ #ifdef ROMIO_NTFS
+ 	*fstype = ADIO_NTFS;
+@@ -862,6 +865,16 @@ void ADIO_ResolveFileType(MPI_Comm comm, const char *filename, int *fstype,
+ 	return;
+ #else
+ 	*ops = &ADIO_ZOIDFS_operations;
++#endif
++    }
++    if (file_system == ADIO_CHFS) {
++#ifndef ROMIO_CHFS
++	*error_code = MPIO_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE,
++					   myname, __LINE__, MPI_ERR_IO,
++					   "**iofstypeunsupported", 0);
++	return;
++#else
++	*ops = &ADIO_CHFS_operations;
+ #endif
+     }
+     *error_code = MPI_SUCCESS;
+diff --git a/ompi/mca/io/romio321/romio/adio/include/adio.h b/ompi/mca/io/romio321/romio/adio/include/adio.h
+index b320fe2788..76260ed118 100644
+--- a/ompi/mca/io/romio321/romio/adio/include/adio.h
++++ b/ompi/mca/io/romio321/romio/adio/include/adio.h
+@@ -305,6 +305,7 @@ typedef struct {
+ #define ADIO_ZOIDFS              167   /* ZoidFS: the I/O forwarding fs */
+ /* #define ADIO_BG               168 */
+ #define ADIO_GPFS                  168
++#define ADIO_CHFS                173
+ 
+ #define ADIO_SEEK_SET            SEEK_SET
+ #define ADIO_SEEK_CUR            SEEK_CUR
+diff --git a/ompi/mca/io/romio321/romio/adio/include/adioi_fs_proto.h b/ompi/mca/io/romio321/romio/adio/include/adioi_fs_proto.h
+index e3af917082..be60303b83 100644
+--- a/ompi/mca/io/romio321/romio/adio/include/adioi_fs_proto.h
++++ b/ompi/mca/io/romio321/romio/adio/include/adioi_fs_proto.h
+@@ -89,4 +89,9 @@ extern struct ADIOI_Fns_struct ADIO_GRIDFTP_operations;
+ extern struct ADIOI_Fns_struct ADIO_ZOIDFS_operations;
+ #endif
+ 
++#ifdef ROMIO_CHFS
++/* prototypes are in adio/ad_chfs/ad_chfs.h */
++extern struct ADIOI_Fns_struct ADIO_CHFS_operations;
++#endif
++
+ #endif
+diff --git a/ompi/mca/io/romio321/romio/configure.ac b/ompi/mca/io/romio321/romio/configure.ac
+index 6d40359beb..7af033bf15 100644
+--- a/ompi/mca/io/romio321/romio/configure.ac
++++ b/ompi/mca/io/romio321/romio/configure.ac
+@@ -196,7 +196,7 @@ dnl An m4 macro for use with m4_foreach_w and friends.  You should modify this
+ dnl list if you want to add a known file system.  The list is just whitespace
+ dnl separated, so you can use newlines and tabs as well.
+ m4_define([known_filesystems_m4_w],
+-          [nfs ufs pfs pvfs pvfs2 testfs xfs panfs gridftp lustre gpfs zoidfs hfs piofs sfs])dnl
++          [chfs nfs ufs pfs pvfs pvfs2 testfs xfs panfs gridftp lustre gpfs zoidfs hfs piofs sfs])dnl
+ dnl
+ dnl An m4 macro for use with m4_foreach and friends.  Expands to a quoted list of
+ dnl quoted elements.  A bit easier to use without unintended expansion than the
+@@ -1000,6 +1000,17 @@ if test -n "$file_system_zoidfs"; then
+ 	)
+ fi
+ 
++if test -n "$file_system_chfs"; then
++  PKG_CHECK_MODULES([CHFS], [chfs],
++    AC_DEFINE(ROMIO_CHFS,1,[Define for ROMIO with CHFS]),
++    AC_MSG_ERROR([CHFS support requested but cannot find chfs.pc])
++  )
++  AC_SUBST([CHFS_LIBS])
++  AC_SUBST([CHFS_CFLAGS])
++  PAC_APPEND_FLAG([${CHFS_LIBS}], [LIBS])
++  PAC_APPEND_FLAG([${CHFS_CFLAGS}], [CFLAGS])
++fi
++
+ #
+ # Verify presence of pvfs2.h
+ #

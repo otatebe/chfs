@@ -12,7 +12,7 @@ RUN apt-get update \
     libjson-c-dev libboost-dev \
     git fuse sudo vim curl wget \
     libfuse-dev pandoc \
-    libopenmpi-dev libssl-dev \
+    gfortran bzip2 flex libpmix-dev libnl-3-dev libibverbs-dev libssl-dev \
     gdb numactl
 
 RUN \
