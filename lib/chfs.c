@@ -915,6 +915,7 @@ chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,
 		return (-1);
 	}
 	ret = chfs_rpc_inode_create(p, strlen(p) + 1, emode, chunk_size, &err);
+	log_info("chfs_create: path=%s fd=%d", p, fd);
 	free(p);
 	if (ret == HG_SUCCESS && (err == KV_SUCCESS || err == KV_ERR_NO_SPACE))
 		return (fd);
@@ -1012,6 +1013,7 @@ chfs_open(const char *path, int32_t flags)
 	}
 	else
 		chfs_set_errno(ret, err);
+	log_info("chfs_open: path=%s fd=%d", p, fd);
 	free(p);
 	return (fd);
 }
@@ -1052,6 +1054,7 @@ chfs_fsync(int fd)
 int
 chfs_close(int fd)
 {
+	log_info("chfs_close: fd=%d", fd);
 	fd_flush(fd);
 	return (clear_fd(fd));
 }
@@ -1220,6 +1223,7 @@ chfs_pwrite(int fd, const void *buf, size_t size, off_t offset)
 	s = fd_write(fd, buf, size, offset);
 	if (s > 0)
 		return (s);
+	log_info("chfs_pwrite: fd=%d size=%ld off=%ld", fd, size, offset);
 	return (chfs_pwrite_internal(fd, buf, size, offset));
 }
 
@@ -1435,6 +1439,7 @@ chfs_pread(int fd, void *buf, size_t size, off_t offset)
 	s = fd_read(fd, buf, size, offset);
 	if (s > 0)
 		return (s);
+	log_info("chfs_pread: fd=%d size=%ld off=%ld", fd, size, offset);
 	return (chfs_pread_internal(fd, buf, size, offset));
 }
 
