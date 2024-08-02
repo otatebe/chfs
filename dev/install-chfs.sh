@@ -12,14 +12,14 @@ do
 	shift
 done
 
+echo Install CHFS
 cd ~/chfs
 
 set -x
 autoreconf -i
-rm -rf build
-mkdir build
+
+[ -d build ] || mkdir build
 cd build
 ../configure --prefix $HOME/local $OPT > /dev/null
-make clean > /dev/null
 make -j $(nproc) > /dev/null
 make install > /dev/null
