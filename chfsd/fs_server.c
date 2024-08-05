@@ -176,9 +176,12 @@ inode_stat(hg_handle_t h)
 		}
 	} else {
 		out.err = fs_inode_stat(in.key.v, in.key.s, &sb);
-		if (out.err == KV_ERR_NO_ENTRY)
+		if (out.err == KV_ERR_NO_ENTRY) {
 			out.err = backend_stat(in.key.v, in.key.s,
 					in.chunk_size, &sb);
+			if (out.err == KV_ERR_NO_BACKEND_PATH)
+				out.err = KV_ERR_NO_ENTRY;
+		}
 	}
 	free(target);
 	if (out.err != KV_SUCCESS && out.err != KV_ERR_NO_ENTRY)
@@ -722,8 +725,11 @@ inode_truncate(hg_handle_t h)
 		}
 	} else {
 		err = fs_inode_truncate(in.key.v, in.key.s, in.len);
-		if (err == KV_ERR_NO_ENTRY)
+		if (err == KV_ERR_NO_ENTRY) {
 			err = backend_stat(in.key.v, in.key.s, 0, NULL);
+			if (err == KV_ERR_NO_BACKEND_PATH)
+				err = KV_ERR_NO_ENTRY;
+		}
 	}
 	free(target);
 	if (err != KV_SUCCESS)
