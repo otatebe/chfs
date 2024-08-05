@@ -899,6 +899,7 @@ chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,
 	int16_t cache_flags = FLAGS_FROM_MODE(flags);
 	uint32_t emode = MODE_FLAGS(mode, cache_flags);
 	int fd, err;
+	static const char diag[] = "chfs_create_chunk_size";
 
 	if (p == NULL)
 		return (-1);
@@ -915,13 +916,13 @@ chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,
 		return (-1);
 	}
 	ret = chfs_rpc_inode_create(p, strlen(p) + 1, emode, chunk_size, &err);
-	log_info("chfs_create: path=%s fd=%d", p, fd);
+	log_info("%s: path=%s fd=%d", diag, p, fd);
 	free(p);
 	if (ret == HG_SUCCESS && (err == KV_SUCCESS || err == KV_ERR_NO_SPACE))
 		return (fd);
 
 	clear_fd(fd);
-	chfs_set_errno(ret, err);
+	chfs_set_errno(ret, err, diag);
 	return (-1);
 }
 
@@ -983,6 +984,7 @@ chfs_open(const char *path, int32_t flags)
 #ifdef CLIENT_CACHING
 	char *buf;
 #endif
+	static const char diag[] = "chfs_open";
 
 	if (p == NULL)
 		return (-1);
@@ -1012,8 +1014,8 @@ chfs_open(const char *path, int32_t flags)
 		fd = create_fd(p, MODE_MASK(st.mode), st.chunk_size);
 	}
 	else
-		chfs_set_errno(ret, err);
-	log_info("chfs_open: path=%s fd=%d", p, fd);
+		chfs_set_errno(ret, err, diag);
+	log_info("%s: path=%s fd=%d", diag, p, fd);
 	free(p);
 	return (fd);
 }
@@ -1069,6 +1071,7 @@ chfs_pwrite_internal_sync(int fd, const char *buf, size_t size, off_t offset)
 	size_t s = size, psize;
 	ssize_t ss = 0;
 	hg_return_t ret;
+	static const char diag[] = "chfs_pwrite_internal_sync";
 
 	if (tab == NULL)
 		return (-1);
@@ -1091,12 +1094,12 @@ chfs_pwrite_internal_sync(int fd, const char *buf, size_t size, off_t offset)
 	free(path);
 	if (ret != HG_SUCCESS ||
 		(err != KV_SUCCESS && err != KV_ERR_NO_SPACE)) {
-		chfs_set_errno(ret, err);
+		chfs_set_errno(ret, err, diag);
 		return (-1);
 	} else if (err == KV_ERR_NO_SPACE) {
 		err = backend_write_key(tab->path, tab->mode, buf, s, offset);
 		if (err != KV_SUCCESS) {
-			chfs_set_errno(ret, err);
+			chfs_set_errno(ret, err, diag);
 			return (-1);
 		}
 	}
@@ -1122,6 +1125,7 @@ chfs_pwrite_internal_async(int fd, const char *buf, size_t size, off_t offset)
 		fs_request_t r;
 	} *req;
 	hg_return_t ret = HG_SUCCESS;
+	static const char diag[] = "chfs_pwrite_internal_async";
 
 	if (tab == NULL)
 		return (-1);
@@ -1174,7 +1178,7 @@ chfs_pwrite_internal_async(int fd, const char *buf, size_t size, off_t offset)
 				&req[i].r);
 		free(req);
 		if (ret != HG_SUCCESS)
-			chfs_set_errno(ret, KV_SUCCESS);
+			chfs_set_errno(ret, KV_SUCCESS, diag);
 		return (-1);
 	}
 
@@ -1184,14 +1188,14 @@ chfs_pwrite_internal_async(int fd, const char *buf, size_t size, off_t offset)
 			&req[i].r);
 		if (ret != HG_SUCCESS ||
 			(err != KV_SUCCESS && err != KV_ERR_NO_SPACE)) {
-			chfs_set_errno(ret, err);
+			chfs_set_errno(ret, err, diag);
 			if (save_errno == 0)
 				save_errno = errno;
 		} else if (err == KV_ERR_NO_SPACE) {
 			err = backend_write_key(tab->path, tab->mode, buf + ss,
 				req[i].s, offset + ss);
 			if (save_errno == 0) {
-				chfs_set_errno(ret, err);
+				chfs_set_errno(ret, err, diag);
 				save_errno = errno;
 			}
 			if (err == KV_SUCCESS || err == KV_ERR_PARTIAL_WRITE)
@@ -1251,6 +1255,7 @@ chfs_pread_internal_sync(int fd, char *buf, size_t size, off_t offset)
 	char *bdata;
 	size_t cs;
 #endif
+	static const char diag[] = "chfs_pread_internal_sync";
 
 	if (tab == NULL)
 		return (-1);
@@ -1282,7 +1287,7 @@ chfs_pread_internal_sync(int fd, char *buf, size_t size, off_t offset)
 	free(path);
 	if (ret != HG_SUCCESS ||
 		(err != KV_SUCCESS && err != KV_ERR_NO_ENTRY)) {
-		chfs_set_errno(ret, err);
+		chfs_set_errno(ret, err, diag);
 		return (-1);
 	} else if (err == KV_ERR_NO_ENTRY)
 		s = 0;
@@ -1318,6 +1323,7 @@ chfs_pread_internal_async(int fd, char *buf, size_t size, off_t offset)
 	char *bdata;
 	size_t ssss;
 #endif
+	static const char diag[] = "chfs_pread_internal_async";
 
 	if (tab == NULL)
 		return (-1);
@@ -1371,7 +1377,7 @@ chfs_pread_internal_async(int fd, char *buf, size_t size, off_t offset)
 		free(req);
 		free(p);
 		if (ret != HG_SUCCESS)
-			chfs_set_errno(ret, KV_SUCCESS);
+			chfs_set_errno(ret, KV_SUCCESS, diag);
 		return (-1);
 	}
 
@@ -1417,7 +1423,7 @@ chfs_pread_internal_async(int fd, char *buf, size_t size, off_t offset)
 	free(req);
 	free(p);
 	if (save_ret != HG_SUCCESS) {
-		chfs_set_errno(save_ret, KV_SUCCESS);
+		chfs_set_errno(save_ret, KV_SUCCESS, diag);
 		return (-1);
 	}
 	return (sss);
@@ -1511,6 +1517,7 @@ chfs_unlink(const char *path)
 	int err, i;
 	size_t psize;
 	void *pi;
+	static const char diag[] = "chfs_unlink";
 
 	if (p == NULL)
 		return (-1);
@@ -1522,7 +1529,7 @@ chfs_unlink(const char *path)
 	ret = chfs_rpc_remove(p, strlen(p) + 1, &err);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
 		free(p);
-		chfs_set_errno(ret, err);
+		chfs_set_errno(ret, err, diag);
 		return (-1);
 	}
 	for (i = 1; i < UNLINK_CHUNK_SIZE; ++i) {
@@ -1546,6 +1553,7 @@ chfs_mkdir(const char *path, mode_t mode)
 	char *p = canonical_path(path);
 	hg_return_t ret;
 	int err;
+	static const char diag[] = "chfs_mkdir";
 
 	if (p == NULL)
 		return (-1);
@@ -1558,7 +1566,7 @@ chfs_mkdir(const char *path, mode_t mode)
 	ret = chfs_rpc_inode_create(p, strlen(p) + 1, mode, 0, &err);
 	free(p);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
-		chfs_set_errno(ret, err);
+		chfs_set_errno(ret, err, diag);
 		return (-1);
 	}
 	return (0);
@@ -1570,6 +1578,7 @@ chfs_rmdir(const char *path)
 	char *p = canonical_path(path);
 	hg_return_t ret;
 	int err;
+	static const char diag[] = "chfs_rmdir";
 
 	if (p == NULL)
 		return (-1);
@@ -1582,7 +1591,7 @@ chfs_rmdir(const char *path)
 	ret = chfs_rpc_remove(p, strlen(p) + 1, &err);
 	free(p);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
-		chfs_set_errno(ret, err);
+		chfs_set_errno(ret, err, diag);
 		return (-1);
 	}
 	return (0);
@@ -1595,6 +1604,7 @@ chfs_symlink(const char *target, const char *path)
 	mode_t mode;
 	hg_return_t ret;
 	int err, len;
+	static const char diag[] = "chfs_symlink";
 
 	if (target == NULL) {
 		errno = ENOENT;
@@ -1614,7 +1624,7 @@ chfs_symlink(const char *target, const char *path)
 		target, len + 1, &err);
 	free(p);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
-		chfs_set_errno(ret, err);
+		chfs_set_errno(ret, err, diag);
 		return (-1);
 	}
 	return (0);
@@ -1627,6 +1637,7 @@ chfs_readlink(const char *path, char *buf, size_t size)
 	size_t s = size;
 	hg_return_t ret;
 	int err;
+	static const char diag[] = "chfs_readlink";
 
 	if (p == NULL)
 		return (-1);
@@ -1646,7 +1657,7 @@ chfs_readlink(const char *path, char *buf, size_t size)
 	}
 	free(p);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
-		chfs_set_errno(ret, err);
+		chfs_set_errno(ret, err, diag);
 		return (-1);
 	}
 	if (s > 1 && buf[s - 1] == '\0')
@@ -1673,6 +1684,7 @@ chfs_stat(const char *path, struct stat *st)
 	void *pi;
 	hg_return_t ret;
 	int err, i, j;
+	static const char diag[] = "chfs_stat";
 
 	if (p == NULL)
 		return (-1);
@@ -1684,7 +1696,7 @@ chfs_stat(const char *path, struct stat *st)
 	ret = chfs_rpc_inode_stat(p, strlen(p) + 1, chfs_chunk_size, &sb, &err);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
 		free(p);
-		chfs_set_errno(ret, err);
+		chfs_set_errno(ret, err, diag);
 		return (-1);
 	}
 	st->st_mode = MODE_MASK(sb.mode);
@@ -1738,6 +1750,7 @@ chfs_truncate(const char *path, off_t len)
 	hg_return_t ret;
 	mode_t mode;
 	int err, i;
+	static const char diag[] = "chfs_truncate";
 
 	if (len < 0) {
 		errno = EINVAL;
@@ -1755,7 +1768,7 @@ chfs_truncate(const char *path, off_t len)
 	mode = MODE_MASK(sb.mode);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS || !S_ISREG(mode)) {
 		free(p);
-		chfs_set_errno(ret, err);
+		chfs_set_errno(ret, err, diag);
 		if (errno == 0 && !S_ISREG(sb.mode))
 			errno = EINVAL;
 		return (-1);
@@ -1768,7 +1781,7 @@ chfs_truncate(const char *path, off_t len)
 	free(pi);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
 		free(p);
-		chfs_set_errno(ret, err);
+		chfs_set_errno(ret, err, diag);
 		return (-1);
 	}
 	for (i = index + 1;; ++i) {

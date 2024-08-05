@@ -4,10 +4,10 @@
 #include "log.h"
 
 void
-chfs_set_errno(hg_return_t ret, int err)
+chfs_set_errno(hg_return_t ret, int err, const char *diag)
 {
 	if (ret != HG_SUCCESS) {
-		log_notice("chfs_err: %s", HG_Error_to_string(ret));
+		log_notice("%s: %s", diag, HG_Error_to_string(ret));
 		errno = ENOTCONN;
 		return;
 	}
@@ -25,7 +25,7 @@ chfs_set_errno(hg_return_t ret, int err)
 	case KV_ERR_LOOKUP:
 	case KV_ERR_BULK_CREATE:
 	case KV_ERR_BULK_TRANSFER:
-		log_notice("chfs_err: %s", kv_err_string(err));
+		log_notice("%s: %s", diag, kv_err_string(err));
 		errno = ENOTCONN;
 		break;
 	case KV_ERR_NO_MEMORY:
@@ -46,7 +46,7 @@ chfs_set_errno(hg_return_t ret, int err)
 		break;
 	case KV_ERR_UNKNOWN:
 	default:
-		log_notice("chfs_err: %s", kv_err_string(err));
+		log_notice("%s: %s", diag, kv_err_string(err));
 		errno = EPERM;
 		break;
 	}
