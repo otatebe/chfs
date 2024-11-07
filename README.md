@@ -107,8 +107,8 @@ CHFS/Cache provides a caching mechanism against a backend parallel file system. 
 
 1. Install CHFS
 
-       % git clone https://github.com/range3/chfs-spack-packages.git
-       % spack repo add chfs-spack-packages
+       % git clone https://github.com/tsukuba-hpcs/spack-packages
+       % spack repo add spack-packages
        % spack external find automake autoconf libtool cmake m4 pkgconf libfuse
        % spack config edit packages
        manually add pmemkv
