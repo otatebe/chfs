@@ -44,6 +44,8 @@ CHFS/Cache provides a caching mechanism against a backend parallel file system. 
 
        % git clone -c feature.manyFiles=true --depth 1 https://github.com/spack/spack.git
        % . spack/share/spack/setup-env.sh
+       % spack external find
+       % spack compiler find
 
    For details, see https://spack.readthedocs.io/
 
@@ -88,7 +90,7 @@ CHFS/Cache provides a caching mechanism against a backend parallel file system. 
 
    If --with-pmemkv is not specified, CHFS uses a POSIX backend.  To use chfs, `spack load mochi-margo` is required.
 
-## Quick installation steps by Spack
+## Quick installation steps by custom  repo
 
 1. Install required packages
 
@@ -102,18 +104,19 @@ CHFS/Cache provides a caching mechanism against a backend parallel file system. 
 
        % git clone -c feature.manyFiles=true --depth 1 https://github.com/spack/spack.git
        % . spack/share/spack/setup-env.sh
+       % spack external find
+       % spack compiler find
+
 
    For details, see https://spack.readthedocs.io/
 
 1. Install CHFS
 
-       % git clone https://github.com/range3/chfs-spack-packages.git
-       % spack repo add chfs-spack-packages
+       % git clone https://github.com/tsukuba-hpcs/spack-packages
+       % spack repo add spack-packages
        % spack external find automake autoconf libtool cmake m4 pkgconf libfuse
-       % spack config edit packages
-       manually add pmemkv
        % spack spec chfs@master ^mercury~boostsys
-       see what packages will be built
+       // see what packages will be built
        % spack install chfs@master ^mercury~boostsys
 
    To enable verbs, see above.  To use chfs, `spack load chfs` is required.
@@ -210,12 +213,9 @@ ROMIO ADIO for CHFS is available.  With the ROMIO ADIO for CHFS, MPI-IO applicat
 
 1. Installation
 
-       % git clone https://github.com/hpc/ior.git
-       % cd ior
-       % ./bootstrap
-       % ./configure [--prefix=PREFIX]
-       % make
-       # make install
+       % git clone https://github.com/tsukuba-hpcs/spack-packages
+       % spack repo add ./spack-packages
+       % spack install ior
 
 1. How to use
 
