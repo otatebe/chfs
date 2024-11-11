@@ -11,7 +11,7 @@ if USE_PMEMKV
 chfsd_SOURCES += fs_server_kv.c lock.c fs_kv.c pmemkv.c profile.c
 chkvdump_SOURCES = chkvdump.c lock.c fs_kv.c fs_hook.c flush.c pmemkv.c profile.c
 else
-chfsd_SOURCES += fs_server_posix.c lock.c fs_posix.c
+chfsd_SOURCES += fs_server_posix.c lock.c fs_posix.c profile.c
 endif
 
 AM_CPPFLAGS = -Wall -pthread -I$(top_srcdir)/lib @MARGO_CFLAGS@ @OPENSSL_CFLAGS@
