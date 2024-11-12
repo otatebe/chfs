@@ -9,6 +9,7 @@ client/chstagein
 client/mpi/chfind
 client/mpi/chstagein
 client/murmur3sum
+client/koyamasum
 lib/config.h
 lib/config.h.in
 lib/stamp-h1
