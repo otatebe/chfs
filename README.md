@@ -38,7 +38,7 @@ CHFS/Cache provides a caching mechanism against a backend parallel file system. 
 1. Install development kits
 
        # apt install git python3
-       # apt install gcc automake libtool cmake pkgconf vim
+       # apt install gcc g++ automake libtool cmake pkgconf vim
 
 1. Install Spack
 
@@ -93,7 +93,7 @@ CHFS/Cache provides a caching mechanism against a backend parallel file system. 
 1. Install required packages
 
        # apt install git python3
-       # apt install gcc automake libtool cmake pkgconf vim
+       # apt install gcc g++ automake libtool cmake pkgconf vim
        # apt install libfuse-dev fuse
        # apt install libpmemkv-dev libmemkind-dev libtbb-dev rapidjson-dev
        # apt install libopenmpi-dev
