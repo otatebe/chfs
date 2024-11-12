@@ -15,8 +15,8 @@ usage()
 int
 main(int argc, char *argv[])
 {
-	char opt, *server = NULL;
-	int num_servers = 0;
+	char *server = NULL;
+	int opt, num_servers = 0;
 	void (*display)(int) = ring_list_display;
 
 	while ((opt = getopt(argc, argv, "cn:s:V")) != -1) {
