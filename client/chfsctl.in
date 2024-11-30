@@ -251,6 +251,7 @@ if ! $NO_SERVER; then
 	nservers=$#
 fi
 p=0
+pids=()
 for host in $HOSTS
 do
 	if $NO_SERVER; then
@@ -264,40 +265,57 @@ do
 	COPT="-c $DBDIR"
 	[ "X$LOG_DIR" = X ] && LOPT= || LOPT="-l $LOG_DIR/$host-$IFACE-$VNAME"
 	if [ "X$host" = Xlocalhost ]; then
-		$SUDO $NUMACTL $CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $NOPT "$1"
+		$SUDO $NUMACTL $CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $NOPT "$1" & pids[$p]=$!
 	else
 		[ "X$LOG_DIR" != X ] && ssh $host $SUDO mkdir -p $LOG_DIR
-		ssh $host PATH=\"$PATH\" $XENV $SUDO $NUMACTL $CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $NOPT \"$1\"
-	fi
-	[ $? -eq 0 ] || continue
-	nservers=$((nservers + 1))
-
-	if $NO_SERVER; then
-		timeout=$TIMEOUT
-		while [ $timeout -gt 0 ]; do
-			if does_exist $host $SERVER_INFO_FILE; then
-				break
-			fi
-			sleep 1
-			timeout=$((timeout - 1))
-		done
-		[ $timeout -eq 0 ] && err $CHFSD: timeout
-
-		SERVER=`cat_file $host $SERVER_INFO_FILE`
-		[ X"$SERVER" = X ] && err $CHFSD: no server info
-		NO_SERVER=false
-		CHFS_SERVER="$SERVER"; export CHFS_SERVER
+		ssh $host PATH=\"$PATH\" $XENV $SUDO $NUMACTL $CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $NOPT \"$1\" & pids[$p]=$!
 	fi
 
 	shift
 	p=$((p + 1))
 	if [ $p -ge $MAX_JOBS ]; then
+		pp=0
+		while [ $pp -lt $p ]; do
+			wait ${pids[$pp]}
+			[ $? -eq 0 ] && nservers=$((nservers + 1))
+			pp=$((pp + 1))
+		done
+
+		if $NO_SERVER && [ $nservers -gt 0 ]; then
+			timeout=$TIMEOUT
+			while [ $timeout -gt 0 ]; do
+				if does_exist $host $SERVER_INFO_FILE; then
+					break
+				fi
+				sleep 1
+				timeout=$((timeout - 1))
+			done
+			[ $timeout -eq 0 ] && err $CHFSD: timeout
+
+			SERVER=`cat_file $host $SERVER_INFO_FILE`
+			[ X"$SERVER" = X ] && err $CHFSD: no server info
+			NO_SERVER=false
+			CHFS_SERVER="$SERVER"; export CHFS_SERVER
+		fi
+		if ! $NO_SERVER; then
+			set $(chlist | awk '{ print $1 }')
+			MAX_JOBS=$#
+		fi
+
 		p=0
-		set $(chlist | awk '{ print $1 }')
-		MAX_JOBS=$#
+		pids=()
 	fi
 	sleep $EXEC_INTERVAL
 done
+if [ $p -gt 0 ]; then
+	pp=0
+	while [ $pp -lt $p ]; do
+		wait ${pids[$pp]}
+		[ $? -eq 0 ] && nservers=$((nservers + 1))
+		pp=$((pp + 1))
+	done
+fi
+
 if $NO_SERVER; then err no server executed; fi
 timeout=$TIMEOUT
 while [ $timeout -gt 0 -a $(chlist | wc -l) -lt $nservers ]; do
