@@ -122,9 +122,9 @@ CHFS/Cache provides a caching mechanism against a backend parallel file system. 
 
 1. Create CHFS
 
-       % eval `chfsctl [-h hostfile] [-p verbs] [-D] [-c /dev/dax0.0] [-b /back/end/path] [-m /mount/point] start`
+       % eval `chfsctl [-h hostfile] [-p verbs] [-c /dev/dax0.0] [-b /back/end/path] [-m /mount/point] start`
 
-   This executes chfsd servers and mounts the CHFS at /mount/point on hosts specified by the hostfile.  The -p option specifies a communication protocol.  The -c option specifies a devdax device or a scratch directory on each host.  For the devdax device, -D option is required.
+   This executes chfsd servers and mounts the CHFS at /mount/point on hosts specified by the hostfile.  The -p option specifies a communication protocol.  The -c option specifies a devdax device or a scratch directory on each host.
 
    The backend directory typically in a parallel file system can be specified by the -b option.  Files in the backend directory can be transparently accessed at the CHFS mount directory.  For efficient access, files can be staged-in by `chstagein` command beforehand.  This is an example to stage-in all files in the backend directory.
 

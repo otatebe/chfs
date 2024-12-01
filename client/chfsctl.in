@@ -15,7 +15,6 @@ LOG_DIR=
 IFACE=default
 VNAME=default
 CHFSD="chfsd"
-DEVDAX=false
 NO_SERVER=true
 SUDO=
 NUM_SERVS=32
@@ -51,7 +50,7 @@ while [ $# -gt 0 ]; do
 	    -b) shift; BEDIR=$1 ;;
 	    -c) shift; DBDIR=$1 ;;
 	    -C) shift; NUMACTL_OPT="$NUMACTL_OPT -N $1" ;;
-	    -D) DEVDAX=true ;;
+	    -D) ;; # deprecated
 	    -f) shift; NUM_FLUSH_THREADS=$1 ;;
 	    -h) shift; HOSTFILE=$1 ;;
 	    -i) shift; EXEC_INTERVAL=$1 ;;
@@ -88,7 +87,8 @@ if [ "X$LOG_DIR" != X ]; then
 fi
 
 [ "$mode" = kill ] && PKILL_FLAG=-9 || PKILL_FLAG=
-if $DEVDAX; then
+if [ -c $DBDIR ]; then
+	# devdax
 	[ -w $DBDIR ] || SUDO=sudo
 else
 	DBDIR=$DBDIR/$IFACE-$VNAME
