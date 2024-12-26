@@ -2,9 +2,6 @@
 
 set -e
 
-cd $HOME/chfs
-autoreconf -i
-
 echo PMEMKV backend
 for hashing in " " --disable-modular-hashing
 do
@@ -12,19 +9,17 @@ do
 	do
 		for zero in " " --enable-zero-copy-read-rdma
 		do
-			for md5 in " " --enable-digest-md5 \
+# md5 segfaults with zpoline
+#			for md5 in " " --enable-digest-md5 \
+			for md5 in " " \
 				--enable-digest-murmur3
 			do
 				echo ./configure --with-pmemkv \
 					$hashing $port $zero $md5
-				rm -rf build && mkdir build && cd build
-				../configure --prefix $HOME/local \
-					--with-pmemkv \
-					$hashing $port $zero $md5 > /dev/null
-				make -j $(nproc) > /dev/null
-				make install > /dev/null
-				(cd ../dev && sh ./test.sh)
-				cd ..
+				sh ./install-chfs.sh --with-pmemkv \
+					$hashing $port $zero $md5
+				sh ./install-zpoline.sh
+				sh ./test.sh
 			done
 		done
 	done
@@ -39,19 +34,18 @@ do
 		do
 #			for abtio in " " --with-abt-io
 #			do
-				for md5 in " " --enable-digest-md5 \
+# md5 segfaults with zpoline
+#				for md5 in " " --enable-digest-md5 \
+				for md5 in " " \
 					--enable-digest-murmur3
 				do
 					echo ./configure $hashing $port \
 						$xattr $abtio $md5
-					rm -rf build && mkdir build && cd build
-					../configure --prefix $HOME/local\
+					sh ./install-chfs.sh \
 						$hashing $port \
-						$xattr $abtio $md5 > /dev/null
-					make -j $(nproc) > /dev/null
-					make install > /dev/null
-					(cd ../dev && sh ./test.sh)
-					cd ..
+						$xattr $abtio $md5
+					sh ./install-zpoline.sh
+					sh ./test.sh
 				done
 #			done
 		done
