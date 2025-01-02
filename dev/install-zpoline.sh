@@ -15,5 +15,6 @@ autoreconf -i > /dev/null
 [ -d build ] || mkdir build
 cd build
 ../configure --prefix $HOME/local > /dev/null
+make clean > /dev/null
 make -j $(nproc) > /dev/null
 make install > /dev/null
