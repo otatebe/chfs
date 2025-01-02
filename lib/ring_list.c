@@ -6,34 +6,30 @@
 #include "log.h"
 
 #ifdef USE_DIGEST_MD5
-#include <openssl/evp.h>
-#include <openssl/md5.h>
+#include <md5.h>
 
 static void calc_md5(const uint8_t *buf, uint32_t size, uint8_t *digest)
 {
-	EVP_MD_CTX *ctx;
-	unsigned int len = MD5_DIGEST_LENGTH;
+	MD5_CTX ctx;
 
-	ctx = EVP_MD_CTX_new();
-	EVP_DigestInit_ex(ctx, EVP_md5(), NULL);
-	EVP_DigestUpdate(ctx, buf, size);
-	EVP_DigestFinal_ex(ctx, digest, &len);
-	EVP_MD_CTX_free(ctx);
+	md5_init(&ctx);
+	md5_update(&ctx, buf, size);
+	md5_final(&ctx, digest);
 }
 
 typedef union {
-	uint8_t c[MD5_DIGEST_LENGTH];
+	uint8_t c[MD5_BLOCK_SIZE];
 	unsigned __int128 l;
 } HASH_T;
 #define HASH(data, len, hash) calc_md5(data, len, hash.c)
-#define HASH_CMP(a, b) memcmp(a.c, b.c, MD5_DIGEST_LENGTH)
+#define HASH_CMP(a, b) memcmp(a.c, b.c, MD5_BLOCK_SIZE)
 #define HASH_MODULO(a, b) (a.l % (b))	/* XXX - ignore endian */
 
 void display_hash(HASH_T hash)
 {
 	int i;
 
-	for (i = 0; i < MD5_DIGEST_LENGTH; ++i)
+	for (i = 0; i < MD5_BLOCK_SIZE; ++i)
 		printf("%02X", hash.c[i]);
 }
 #elif defined(USE_DIGEST_MURMUR3)

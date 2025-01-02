@@ -8,7 +8,7 @@ CHFS/Cache provides a caching mechanism against a backend parallel file system. 
 
 1. Install development kits and required tools
 
-       # apt install gcc g++ automake cmake libtool pkgconf libssl-dev libfuse-dev fuse
+       # apt install gcc g++ automake cmake libtool pkgconf libfuse-dev fuse
        # apt install git sudo vim curl wget pandoc gdb numactl
 
 1. (Optional) Install pmamkv for a pmemkv backend
