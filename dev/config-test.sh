@@ -9,16 +9,13 @@ do
 	do
 		for zero in " " --enable-zero-copy-read-rdma
 		do
-# md5 segfaults with zpoline
-#			for md5 in " " --enable-digest-md5 \
-			for md5 in " " \
+			for md5 in " " --enable-digest-md5 \
 				--enable-digest-murmur3
 			do
 				echo ./configure --with-pmemkv \
 					$hashing $port $zero $md5
 				sh ./install-chfs.sh --with-pmemkv \
 					$hashing $port $zero $md5
-				sh ./install-zpoline.sh
 				sh ./test.sh
 			done
 		done
@@ -34,9 +31,7 @@ do
 		do
 #			for abtio in " " --with-abt-io
 #			do
-# md5 segfaults with zpoline
-#				for md5 in " " --enable-digest-md5 \
-				for md5 in " " \
+				for md5 in " " --enable-digest-md5 \
 					--enable-digest-murmur3
 				do
 					echo ./configure $hashing $port \
@@ -44,7 +39,6 @@ do
 					sh ./install-chfs.sh \
 						$hashing $port \
 						$xattr $abtio $md5
-					sh ./install-zpoline.sh
 					sh ./test.sh
 				done
 #			done
