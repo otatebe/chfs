@@ -9,7 +9,7 @@ BACKEND=$PWD/backend
 trap 'rm -f $BACKEND/test-*' 0 1 2 15
 
 # test
-(cd test && make clean && make)
+(cd test && make)
 
 # clean up
 chfsctl -h hosts -m $MDIR stop 2> /dev/null
