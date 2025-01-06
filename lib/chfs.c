@@ -1696,7 +1696,7 @@ chfs_stat(const char *path, struct stat *st)
 	size_t psize;
 	void *pi;
 	hg_return_t ret;
-	int err, i, j;
+	int err, i, j, save_errno;
 	static const char diag[] = "chfs_stat";
 
 	if (p == NULL)
@@ -1704,12 +1704,16 @@ chfs_stat(const char *path, struct stat *st)
 	if (p[0] == '\0') {
 		root_stat(st);
 		free(p);
+		log_info("%s: path=/", diag);
 		return (0);
 	}
 	ret = chfs_rpc_inode_stat(p, strlen(p) + 1, chfs_chunk_size, &sb, &err);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
 		free(p);
 		chfs_set_errno(ret, err, diag);
+		save_errno = errno;
+		log_info("%s: path=%s: %s", diag, path, strerror(errno));
+		errno = save_errno;
 		return (-1);
 	}
 	st->st_mode = MODE_MASK(sb.mode);
