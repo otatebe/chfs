@@ -351,6 +351,40 @@ chfs_init(const char *server)
 }
 
 int
+chfs_init_margo()
+{
+	margo_instance_id mid;
+	char *server, *proto;
+	static const char diag[] = "chfs_init_margo";
+
+	server = get_server(0);
+	if (IS_NULL_STRING(server))
+		log_fatal("%s: no server", diag);
+	log_info("%s: server %s", diag, server);
+
+	while (server != NULL) {
+		proto = margo_protocol(server);
+		if (proto != NULL)
+			break;
+		log_notice("%s: %s: no protocol", diag, server);
+		server = get_server(1);
+	}
+	if (server == NULL)
+		log_fatal("%s: no protocol", diag);
+
+	mid = margo_init(proto, MARGO_CLIENT_MODE, 1, 0);
+	free(proto);
+	if (mid == MARGO_INSTANCE_NULL)
+		log_fatal("%s: margo_init failed, abort", diag);
+	ring_list_rpc_init(mid, chfs_rpc_timeout_msec);
+	fs_client_init(mid, chfs_rpc_timeout_msec);
+
+	if (ring_list_does_lookup_direct())
+		chfs_sync(); /* set up all connections */
+
+	return (0);
+}
+int
 chfs_term_without_sync()
 {
 	fd_table_term();

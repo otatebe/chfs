@@ -1,6 +1,7 @@
 struct stat;
 
 int chfs_init(const char *server);
+int chfs_init_margo();
 int chfs_initialized();
 int chfs_term();
 int chfs_term_without_sync();
