@@ -1568,7 +1568,8 @@ chfs_mkdir(const char *path, mode_t mode)
 		return (-1);
 	if (p[0] == '\0') {
 		free(p);
-		errno = EINVAL;
+		errno = EEXIST;
+		log_info("%s: path=/ mode=%o: %s", diag, mode, strerror(errno));
 		return (-1);
 	}
 	mode |= S_IFDIR;
@@ -1576,6 +1577,8 @@ chfs_mkdir(const char *path, mode_t mode)
 	free(p);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
 		chfs_set_errno(ret, err, diag);
+		log_info("%s: path=%s mode=%o: %s", diag, path, mode,
+				strerror(errno));
 		return (-1);
 	}
 	log_info("%s: path=%s mode=%o", diag, path, mode);
