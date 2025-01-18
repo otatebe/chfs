@@ -37,6 +37,7 @@ int chfs_readdir(const char *path, void *buf,
 	int (*filler)(void *, const char *, const struct stat *, off_t));
 int chfs_readdir_index(const char *path, int index, void *buf,
 	int (*filler)(void *, const char *, const struct stat *, off_t));
+int chfs_linux_getdents64(int fd, char dirp[], size_t count);
 int chfs_symlink(const char *target, const char *path);
 int chfs_readlink(const char *path, char *buf, size_t size);
 void chfs_sync();

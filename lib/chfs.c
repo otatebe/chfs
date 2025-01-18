@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -618,6 +619,8 @@ fd_write(int fd, const char *buf, size_t size, off_t offset)
 
 	if (tab == NULL || tab->buf == NULL)
 		return (0);
+	if (S_ISDIR(tab->mode))
+		return (0);
 	if (size > tab->buf_size) {
 		/* large message, skip buffering */
 		fd_flush(fd);
@@ -661,6 +664,8 @@ fd_read(int fd, char *buf, size_t size, off_t offset)
 
 	if (tab == NULL)
 		return (0); /* EBADF */
+	if (S_ISDIR(tab->mode))
+		return (0);
 	if (tab->buf == NULL || size > tab->buf_size) {
 		/* large message, skip buffering */
 		return (0);
@@ -1010,6 +1015,8 @@ backend_read_cache(char *path, size_t psize, size_t chunk_size,
 }
 #endif
 
+static void root_stat(struct stat *st);
+
 int
 chfs_open(const char *path, int32_t flags)
 {
@@ -1026,9 +1033,18 @@ chfs_open(const char *path, int32_t flags)
 	if (p == NULL)
 		return (-1);
 	if (p[0] == '\0') {
+		struct stat sb;
+
+		if ((flags & (O_PATH|O_DIRECTORY)) == 0) {
+			free(p);
+			errno = EISDIR;
+			return (-1);
+		}
+		root_stat(&sb);
+		fd = create_fd(p, sb.st_mode, 0);
+		log_info("%s: path=/ fd=%d", diag, fd);
 		free(p);
-		errno = EISDIR;
-		return (-1);
+		return (fd);
 	}
 	psize = strlen(p) + 1;
 	ret = chfs_rpc_inode_stat(p, psize, chfs_chunk_size, &st, &err);
@@ -1043,7 +1059,8 @@ chfs_open(const char *path, int32_t flags)
 	}
 #endif
 	if (ret == HG_SUCCESS && err == KV_SUCCESS) {
-		if (S_ISDIR(MODE_MASK(st.mode))) {
+		if (S_ISDIR(MODE_MASK(st.mode)) &&
+			((flags & (O_PATH|O_DIRECTORY)) == 0)) {
 			free(p);
 			errno = EISDIR;
 			return (-1);
@@ -1113,6 +1130,10 @@ chfs_pwrite_internal_sync(int fd, const char *buf, size_t size, off_t offset)
 
 	if (tab == NULL)
 		return (-1);
+	if (S_ISDIR(tab->mode)) {
+		errno = EISDIR;
+		return (-1);
+	}
 	if (size == 0)
 		return (0);
 
@@ -1167,6 +1188,10 @@ chfs_pwrite_internal_async(int fd, const char *buf, size_t size, off_t offset)
 
 	if (tab == NULL)
 		return (-1);
+	if (S_ISDIR(tab->mode)) {
+		errno = EISDIR;
+		return (-1);
+	}
 	chunk_size = tab->chunk_size;
 	emode = MODE_FLAGS(tab->mode, tab->cache_flags);
 	p = strdup(tab->path);
@@ -1298,6 +1323,10 @@ chfs_pread_internal_sync(int fd, char *buf, size_t size, off_t offset)
 
 	if (tab == NULL)
 		return (-1);
+	if (S_ISDIR(tab->mode)) {
+		errno = EISDIR;
+		return (-1);
+	}
 
 	chunk_size = tab->chunk_size;
 	emode = MODE_FLAGS(tab->mode, tab->cache_flags);
@@ -1366,6 +1395,10 @@ chfs_pread_internal_async(int fd, char *buf, size_t size, off_t offset)
 
 	if (tab == NULL)
 		return (-1);
+	if (S_ISDIR(tab->mode)) {
+		errno = EISDIR;
+		return (-1);
+	}
 
 	chunk_size = tab->chunk_size;
 	emode = MODE_FLAGS(tab->mode, tab->cache_flags);
@@ -1520,6 +1553,10 @@ chfs_seek(int fd, off_t off, int whence)
 
 	if (tab == NULL)
 		return (-1);
+	if (S_ISDIR(tab->mode)) {
+		errno = EISDIR;
+		return (-1);
+	}
 	switch (whence) {
 	case SEEK_SET:
 		pos = fd_pos_set(fd, off);
@@ -1896,6 +1933,10 @@ chfs_ftruncate(int fd, off_t len)
 
 	if (tab == NULL)
 		return (-1);
+	if (S_ISDIR(tab->mode)) {
+		errno = EISDIR;
+		return (-1);
+	}
 	return (chfs_truncate(tab->path, len));
 }
 
@@ -2030,6 +2071,81 @@ chfs_readdir_index(const char *path, int index, void *buf,
 	free(p);
 	log_info("chfs_readdir_index: path=%s index=%d", path, index);
 	return (0);
+}
+
+struct linux_dirent64 {
+	uint64_t	d_ino;		/* 64-bit inode number */
+	int64_t		d_off;		/* Not an offset; see getdents() */
+	unsigned short	d_reclen;	/* Size of this dirent */
+	unsigned char	d_type;		/* File type */
+	char		d_name[];	/* Filename (null-terminated) */
+};
+
+#define MIN_GETDENTS_SIZE	4096
+
+static int
+getdents_filler(void *buf, const char *name, const struct stat *st, off_t off)
+{
+	struct fd_table *tab = buf;
+	struct linux_dirent64 *d;
+	unsigned short reclen = sizeof(struct linux_dirent64) + strlen(name);
+
+	if (tab->buf_size < tab->pos + reclen) {
+		char *tmp;
+		int bsize = 2 * tab->buf_size;
+
+		if (bsize < MIN_GETDENTS_SIZE)
+			bsize = MIN_GETDENTS_SIZE;
+		tmp = realloc(tab->buf, sizeof(tab->buf[0]) * bsize);
+		if (tmp == NULL)
+			return (-1);
+		tab->buf = tmp;
+		tab->buf_size = bsize;
+	}
+	d = (struct linux_dirent64 *)&tab->buf[tab->pos];
+	d->d_ino = st->st_ino;
+	d->d_off = 0;
+	d->d_reclen = reclen;
+	d->d_type = st->st_mode << 12;
+	strcpy(d->d_name, name);
+	tab->pos += reclen;
+	return (0);
+}
+
+int
+chfs_linux_getdents64(int fd, char dirp[], size_t count)
+{
+	struct fd_table *tab = get_fd_table(fd);
+	struct linux_dirent64 *d;
+	int size = 0;
+
+	if (tab == NULL)
+		return (-1);
+	if (!S_ISDIR(tab->mode)) {
+		errno = EBADF;
+		return (-1);
+	}
+	ABT_mutex_lock(tab->mutex);
+	if (tab->pos == 0) {
+		chfs_readdir(tab->path, tab, getdents_filler);
+		tab->buf_size = tab->pos;
+		tab->pos = 0;
+	}
+	if (tab->pos + count > tab->buf_size)
+		count = tab->buf_size - tab->pos;
+	for (;;) {
+		d = (struct linux_dirent64 *) (&tab->buf[tab->pos] + size);
+		if (size + d->d_reclen > count)
+			break;
+		size += d->d_reclen;
+		if (size == count)
+			break;
+	}
+	memcpy(dirp, tab->buf, size);
+	tab->pos += size;
+	ABT_mutex_unlock(tab->mutex);
+	log_info("getdents64: %d", size);
+	return (size);
 }
 
 static int
