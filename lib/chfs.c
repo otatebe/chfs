@@ -2086,14 +2086,16 @@ struct linux_dirent64 {
 };
 
 #define MIN_GETDENTS_SIZE	4096
+#define DIRENT_ALIGN		(8 - 1)
 
 static int
 getdents_filler(void *buf, const char *name, const struct stat *st, off_t off)
 {
 	struct fd_table *tab = buf;
 	struct linux_dirent64 *d;
-	unsigned short reclen = sizeof(struct linux_dirent64) + strlen(name);
+	unsigned short reclen = sizeof(struct linux_dirent64);
 
+	reclen += (strlen(name) + 1 + DIRENT_ALIGN) & ~DIRENT_ALIGN;
 	if (tab->buf_size < tab->pos + reclen) {
 		char *tmp;
 		int bsize = 2 * tab->buf_size;
