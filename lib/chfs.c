@@ -2093,9 +2093,9 @@ getdents_filler(void *buf, const char *name, const struct stat *st, off_t off)
 {
 	struct fd_table *tab = buf;
 	struct linux_dirent64 *d;
-	unsigned short reclen = sizeof(struct linux_dirent64);
+	unsigned short reclen = offsetof(struct linux_dirent64, d_name);
 
-	reclen += (strlen(name) + 1 + DIRENT_ALIGN) & ~DIRENT_ALIGN;
+	reclen = (reclen + strlen(name) + 2 + DIRENT_ALIGN) & ~DIRENT_ALIGN;
 	if (tab->buf_size < tab->pos + reclen) {
 		char *tmp;
 		int bsize = 2 * tab->buf_size;
