@@ -2124,6 +2124,7 @@ chfs_linux_getdents64(int fd, char dirp[], size_t count)
 	struct fd_table *tab = get_fd_table(fd);
 	struct linux_dirent64 *d;
 	int size = 0;
+	static const char diag[] = "chfs_linux_getdents64";
 
 	if (tab == NULL)
 		return (-1);
@@ -2150,6 +2151,7 @@ chfs_linux_getdents64(int fd, char dirp[], size_t count)
 	memcpy(dirp, tab->buf, size);
 	tab->pos += size;
 	ABT_mutex_unlock(tab->mutex);
+	log_info("%s: fd=%d size=%d", diag, fd, size);
 	return (size);
 }
 
