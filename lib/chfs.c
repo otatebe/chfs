@@ -2150,7 +2150,6 @@ chfs_linux_getdents64(int fd, char dirp[], size_t count)
 	memcpy(dirp, tab->buf, size);
 	tab->pos += size;
 	ABT_mutex_unlock(tab->mutex);
-	log_info("getdents64: %d", size);
 	return (size);
 }
 
