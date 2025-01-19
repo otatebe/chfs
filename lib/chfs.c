@@ -1017,6 +1017,10 @@ backend_read_cache(char *path, size_t psize, size_t chunk_size,
 
 static void root_stat(struct stat *st);
 
+#ifndef O_PATH
+#define O_PATH 0
+#endif
+
 int
 chfs_open(const char *path, int32_t flags)
 {
