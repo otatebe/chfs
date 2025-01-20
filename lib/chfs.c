@@ -444,6 +444,7 @@ create_fd_unlocked(const char *path, uint32_t mode, int chunk_size)
 		log_error("create_fd: %s, no memory", path);
 		return (-1);
 	}
+	fd_table[fd].buf_size = 0;
 	if (chfs_buf_size > 0) {
 		fd_table[fd].buf = malloc(chfs_buf_size);
 		if (fd_table[fd].buf == NULL) {
