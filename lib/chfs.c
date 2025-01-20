@@ -481,6 +481,7 @@ clear_fd_table(struct fd_table *tab)
 	tab->path = NULL;
 	free(tab->buf);
 	tab->buf = NULL;
+	tab->buf_size = 0;
 }
 
 static int
