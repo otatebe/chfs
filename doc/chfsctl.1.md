@@ -66,6 +66,9 @@ chfsctl - manage CHFS servers
 -O options
 : specifies options for chfsd.
 
+-ssh ssh_cmd
+: specifies a remote shell command.  Default is ssh.
+
 -NUMACTL options
 : specifies options for numactl.
 
