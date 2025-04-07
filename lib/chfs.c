@@ -1883,10 +1883,13 @@ root_stat(struct stat *st)
 {
 	memset(st, 0, sizeof(*st));
 	st->st_mode = S_IFDIR | 0755;
+	st->st_ino = 2;
 }
 
 /* Number of 512B blocks */
 #define NUM_BLOCKS(size) ((size + 511) / 512)
+
+#include "murmur3.h"
 
 int
 chfs_stat(const char *path, struct stat *st)
@@ -1897,6 +1900,7 @@ chfs_stat(const char *path, struct stat *st)
 	void *pi;
 	hg_return_t ret;
 	int err, i, j, save_errno;
+	uint32_t ino;
 	static const char diag[] = "chfs_stat";
 
 	if (p == NULL)
@@ -1925,6 +1929,8 @@ chfs_stat(const char *path, struct stat *st)
 	st->st_nlink = 1;
 	st->st_blksize = sb.chunk_size;
 	st->st_blocks = NUM_BLOCKS(st->st_size);
+	MurmurHash3_x86_32(p, strlen(p) + 1, 1234, &ino);
+	st->st_ino = ino;
 	if (!S_ISREG(st->st_mode) || sb.size != sb.chunk_size) {
 		free(p);
 		log_info("%s (1): path=%s", diag, path);
