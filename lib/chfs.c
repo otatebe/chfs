@@ -1121,6 +1121,127 @@ chfs_close(int fd)
 	return (clear_fd(fd));
 }
 
+static char *chfs_cwd = NULL;
+
+/* 'path' should be a malloc'ed string */
+static void
+set_cwd(char *path, const char *diag)
+{
+	free(chfs_cwd);
+	chfs_cwd = path;
+	log_info("%s: path=%s", diag, path ? path : "(NULL)");
+}
+
+static char *
+cat_path(const char *dir, const char *path)
+{
+	char *p = canonical_path(path), *pp;
+
+	if (p == NULL) {
+		errno = EINVAL;
+		return (NULL);
+	}
+	pp = malloc(strlen(dir) + 1 + strlen(p) + 1);
+	if (pp == NULL) {
+		free(p);
+		return (NULL);
+	}
+	strcpy(pp, dir);
+	if (pp[0] != '\0' && p[0] != '\0')
+		strcat(pp, "/");
+	if (p[0] != '\0')
+		strcat(pp, p);
+	free(p);
+	return (pp);
+}
+
+/* returned string should be free'ed */
+char *
+chfs_path_at(int fd, const char *path)
+{
+	struct fd_table *tab;
+
+	if (path == NULL) {
+		errno = EINVAL;
+		return (NULL);
+	}
+	if (path[0] == '/')
+		return (strdup(path));
+
+	if (fd == AT_FDCWD) {
+		if (chfs_cwd == NULL)
+			return (strdup(path));
+		return (cat_path(chfs_cwd, path));
+	}
+	tab = get_fd_table(fd);
+	if (tab == NULL || !S_ISDIR(tab->mode)) {
+		errno = EBADF;
+		return (NULL);
+	}
+	return (cat_path(tab->path, path));
+}
+
+int
+chfs_chdir(const char *path)
+{
+	char *p = canonical_path(path), *pp;
+	size_t psize;
+	struct fs_stat st;
+	hg_return_t ret;
+	int err, save_errno;
+	static const char diag[] = "chfs_chdir";
+
+	if (p == NULL) {
+		errno = ENOENT;
+		return (-1);
+	}
+	if (path[0] == '\0' || path[0] == '/')
+		pp = p;
+	else {
+		pp = chfs_path_at(AT_FDCWD, p);
+		free(p);
+		if (pp == NULL)
+			return (-1);
+	}
+	psize = strlen(pp) + 1;
+	ret = chfs_rpc_inode_stat(pp, psize, chfs_chunk_size, &st, &err);
+	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
+		free(pp);
+		chfs_set_errno(ret, err, diag);
+		save_errno = errno;
+		log_info("%s: path=%s: %s", diag, path, strerror(errno));
+		errno = save_errno;
+		return (-1);
+	} else if (!S_ISDIR(MODE_MASK(st.mode))) {
+		free(pp);
+		log_info("%s: path=%s: %s", diag, path, strerror(ENOTDIR));
+		errno = ENOTDIR;
+		return (-1);
+	}
+	set_cwd(pp, diag);
+	return (0);
+}
+
+int
+chfs_fchdir(int fd)
+{
+	struct fd_table *tab = get_fd_table(fd);
+	static const char diag[] = "chfs_fchdir";
+
+	if (tab == NULL)
+		return (-1);
+	if (!S_ISDIR(tab->mode)) {
+		log_info("%s: fd=%d path=%s: %s", diag, fd, tab->path,
+			strerror(ENOTDIR));
+		errno = ENOTDIR;
+		return (-1);
+	}
+	set_cwd(strdup(tab->path), diag);
+	if (chfs_cwd == NULL)
+		return (-1);
+	return (0);
+}
+
 static ssize_t
 chfs_pwrite_internal_sync(int fd, const char *buf, size_t size, off_t offset)
 {
