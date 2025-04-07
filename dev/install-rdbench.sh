@@ -16,7 +16,7 @@ cmake --install build > /dev/null
 
 echo Install RDBench viz
 
-ENVDIR=~/rdbench-venv
+ENVDIR=~/local/rdbench-venv
 [ -d $ENVDIR ] || {
 	python3 -m venv $ENVDIR
 	. $ENVDIR/bin/activate
