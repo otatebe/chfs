@@ -1070,6 +1070,12 @@ chfs_open(const char *path, int32_t flags)
 			errno = EISDIR;
 			return (-1);
 		}
+		if (S_ISREG(MODE_MASK(st.mode)) &&
+			((flags & O_DIRECTORY) != 0)) {
+			free(p);
+			errno = ENOTDIR;
+			return (-1);
+		}
 		fd = create_fd(p, MODE_MASK(st.mode), st.chunk_size);
 	}
 	else
