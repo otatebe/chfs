@@ -17,7 +17,7 @@ CHFS/Cache provides a caching mechanism against a backend parallel file system. 
 
    For details, see https://pmem.io/pmemkv/
 
-1. Install libfabric, mercury, argobots and mochi-margo
+1. Install [libfabric](https://github.com/ofiwg/libfabric), [mercury](https://github.com/mercury-hpc/mercury), [argobots](https://github.com/pmodels/argobots) and [mochi-margo](https://github.com/mochi-hpc/mochi-margo)
 
    - See [Docker file](dev/Dockerfile)
 
@@ -139,8 +139,6 @@ CHFS/Cache provides a caching mechanism against a backend parallel file system. 
 
    For details, see [manual page of chfsctl](doc/chfsctl.1.md).
 
-## How to use
-
 1. Mount the CHFS
 
    CHFS is mounted by the chfsctl command.  If you need to mount it on other hosts, chfuse command is used;
@@ -150,6 +148,26 @@ CHFS/Cache provides a caching mechanism against a backend parallel file system. 
    CHFS_SERVER and other environment variables, which are the output of chfsctl command, should be defined.
 
    For details, see [manual page of chfuse](doc/chfuse.1.md).
+
+## POSIX interface for CHFS
+
+POSIX programs can access CHFS using CHFS-zpoline interception library without modification.
+
+1. Install CHFS-zpoline
+
+       % git clone --recursive https://github.com/otatebe/chfs-zpoline.git
+       % cd chfs-zpoline
+       % autoreconf -i
+       % ./configure [--prefix=PREFIX]
+       % make
+       # make install
+
+1. How to use CHFS-zpoline
+
+   When using CHFS-zpoline, CHFS is virtually mounted on /chfs.
+
+       % export LIBZPHOOK=/usr/local/lib/libcz.so
+       % LD_PRELOAD=/usr/local/lib/libzpoline.so program ...
 
 ## CHFS commands
 
