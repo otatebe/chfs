@@ -6,168 +6,131 @@ CHFS/Cache provides a caching mechanism against a backend parallel file system. 
 
 ## Quick installation steps
 
-1. Install development kits and required tools
+### Install development kits and required tools
 
-       # apt install gcc g++ automake cmake libtool pkgconf libfuse-dev fuse
-       # apt install git sudo vim curl wget pandoc gdb numactl
+```console
+# apt install gcc g++ automake cmake libtool pkgconf
+# apt install git python3 bzip2 xz-utils vim
+# apt install libfuse-dev fuse pandoc
+```
 
-1. (Optional) Install pmamkv for a pmemkv backend
+### Install Spack
 
-       # apt install libpmemkv-dev libmemkind-dev libtbb-dev rapidjson-dev
+```console
+% git clone -c feature.manyFiles=true --depth 1 https://github.com/spack/spack.git
+% . spack/share/spack/setup-env.sh
+```
 
-   For details, see https://pmem.io/pmemkv/
+For details, see <https://spack.readthedocs.io/>
 
-1. Install [libfabric](https://github.com/ofiwg/libfabric), [mercury](https://github.com/mercury-hpc/mercury), [argobots](https://github.com/pmodels/argobots) and [mochi-margo](https://github.com/mochi-hpc/mochi-margo)
+### Install Mochi-margo
 
-   - See [Docker file](dev/Dockerfile)
+```console
+% git clone https://github.com/mochi-hpc/mochi-spack-packages.git
+% spack repo add mochi-spack-packages
+% spack external find autoconf automake libtool cmake m4 pkgconf
+% spack install mochi-margo ^mercury~boostsys ^libfabric fabrics=rxm,sockets,tcp,udp
+```
 
-1. Install CHFS
+If you can use verbs, specify `verbs` also in fabrics.
 
-       % git clone https://github.com/otatebe/chfs.git
-       % cd chfs
-       % autoreconf -i
-       % ./configure [--prefix=PREFIX] [--with-pmemkv] [--enable-zero-copy-read-rdma]
-       % make
-       # make install
+For details, see <https://mochi.readthedocs.io/>
 
-   If --with-pmemkv is not specified, CHFS uses a POSIX backend.
+### Install CHFS
 
+```console
+% git clone https://github.com/otatebe/chfs.git
+% cd chfs
+% spack load mochi-margo
+% autoreconf -i
+% ./configure [--prefix=PREFIX] [--enable-zero-copy-read-rdma]
+% make
+# make install
+```
 
-## Quick installation steps using Spack
-
-1. Install development kits
-
-       # apt install git python3
-       # apt install gcc g++ automake libtool cmake pkgconf vim
-
-1. Install Spack
-
-       % git clone -c feature.manyFiles=true --depth 1 https://github.com/spack/spack.git
-       % . spack/share/spack/setup-env.sh
-
-   For details, see https://spack.readthedocs.io/
-
-1. Install Mochi-margo
-
-       % spack install mochi-margo
-
-   Or, more recommended way to include verbs as follows;
-
-       % spack external find automake autoconf libtool cmake m4 pkgconf
-       % spack config edit packages
-       manually add rdma-core
-       % spack spec mochi-margo ^mercury~boostsys ^libfabric fabrics=rxm,sockets,tcp,udp,verbs
-       see what packages will be built
-       % spack install mochi-margo ^mercury~boostsys ^libfabric fabrics=rxm,sockets,tcp,udp,verbs
-
-   For details, see https://mochi.readthedocs.io/
-
-1. (Optional) Install pmemkv for a pmemkv backend
-
-       # apt install libpmemkv-dev libmemkind-dev libtbb-dev rapidjson-dev
-
-   For details, see https://pmem.io/pmemkv/
-
-1. Install Fuse
-
-       # apt install libfuse-dev
-
-1. (Optional) Install pandoc to generate manual pages
-
-       # apt install pandoc
-
-1. Install CHFS
-
-       % spack load mochi-margo
-       % git clone https://github.com/otatebe/chfs.git
-       % cd chfs
-       % autoreconf -i
-       % ./configure [--prefix=PREFIX] [--with-pmemkv] [--enable-zero-copy-read-rdma]
-       % make
-       # make install
-
-   If --with-pmemkv is not specified, CHFS uses a POSIX backend.  To use chfs, `spack load mochi-margo` is required.
+If you use the pmemkv backend, specify `--with-pmemkv` in configure.
 
 ## Quick installation steps by Spack
 
-1. Install required packages
+### Install development kits and required tools
 
-       # apt install git python3
-       # apt install gcc g++ automake libtool cmake pkgconf vim
-       # apt install libfuse-dev fuse
-       # apt install libpmemkv-dev libmemkind-dev libtbb-dev rapidjson-dev
-       # apt install libopenmpi-dev
+see above
 
-1. Install Spack
+### Install Spack
 
-       % git clone -c feature.manyFiles=true --depth 1 https://github.com/spack/spack.git
-       % . spack/share/spack/setup-env.sh
+see above
 
-   For details, see https://spack.readthedocs.io/
+### Install CHFS
 
-1. Install CHFS
+```console
+% git clone https://github.com/tsukuba-hpcs/spack-packages
+% spack repo add spack-packages
+% spack external find autoconf automake libtool cmake m4 pkgconf libfuse
+% spack install chfs~verbs~pmemkv ^mercury~boostsys
+```
 
-       % git clone https://github.com/tsukuba-hpcs/spack-packages
-       % spack repo add spack-packages
-       % spack external find automake autoconf libtool cmake m4 pkgconf libfuse
-       % spack config edit packages
-       manually add pmemkv
-       % spack spec chfs@master ^mercury~boostsys
-       see what packages will be built
-       % spack install chfs@master ^mercury~boostsys
-
-   To enable verbs, see above.  To use chfs, `spack load chfs` is required.
+To use chfs, `spack load chfs` is required.
 
 ## How to create file system
 
-1. Create CHFS
+### Create CHFS
 
-       % eval `chfsctl [-h hostfile] [-p verbs] [-c /dev/dax0.0] [-b /back/end/path] [-m /mount/point] start`
+```console
+% eval `chfsctl [-h hostfile] [-p verbs] [-c /dev/dax0.0] [-b /back/end/path] [-m /mount/point] start`
+```
 
-   This executes chfsd servers and mounts the CHFS at /mount/point on hosts specified by the hostfile.  The -p option specifies a communication protocol.  The -c option specifies a devdax device or a scratch directory on each host.
+This executes chfsd servers and mounts the CHFS at /mount/point on hosts specified by the hostfile.  The -p option specifies a communication protocol.  The -c option specifies a devdax device or a scratch directory on each host.
 
-   The backend directory typically in a parallel file system can be specified by the -b option.  Files in the backend directory can be transparently accessed at the CHFS mount directory.  For efficient access, files can be staged-in by `chstagein` command beforehand.  This is an example to stage-in all files in the backend directory.
+The backend directory typically in a parallel file system can be specified by the -b option.  Files in the backend directory can be transparently accessed at the CHFS mount directory.  For efficient access, files can be staged-in by `chstagein` command beforehand.  This is an example to stage-in all files in the backend directory.
 
-       % cd /back/end/path
-       % find . | xargs [ mpirun ... ] chstagein
+```console
+% cd /back/end/path
+% find . | xargs [ mpirun ... ] chstagein
+```
 
-   `chstagein` can be executed with and without mpirun.  The output files will be flushed automatically to the backend directory.  It is possible to ensure flushing all dirty files by `chfs_sync()` or `chfsctl stop`.
+`chstagein` can be executed with and without mpirun.  The output files will be flushed automatically to the backend directory.  It is possible to ensure flushing all dirty files by `chfs_sync()` or `chfsctl stop`.
 
-   A pmem obj pool should be created with the layout pmemkv by `pmempool create -l pmemkv obj /dev/dax0.0`.  For user-level access, the permission of the device should be modified; bad block check should be disabled by `pmempool feature --disable CHECK_BAD_BLOCKS /dev/dax0.0`.
+A pmem obj pool should be created with the layout pmemkv by `pmempool create -l pmemkv obj /dev/dax0.0`.  For user-level access, the permission of the device should be modified; bad block check should be disabled by `pmempool feature --disable CHECK_BAD_BLOCKS /dev/dax0.0`.
 
-   chfsctl outputs the setting of CHFS_SERVER, CHFS_BACKEND_PATH, and CHFS_SUBDIR_PATH environment variables, which are used to execute chfuse and CHFS commands.
+chfsctl outputs the setting of CHFS_SERVER, CHFS_BACKEND_PATH, and CHFS_SUBDIR_PATH environment variables, which are used to execute chfuse and CHFS commands.
 
-   For details, see [manual page of chfsctl](doc/chfsctl.1.md).
+For details, see [manual page of chfsctl](doc/chfsctl.1.md).
 
-1. Mount the CHFS
+### Mount the CHFS
 
-   CHFS is mounted by the chfsctl command.  If you need to mount it on other hosts, chfuse command is used;
+CHFS is mounted by the chfsctl command.  If you need to mount it on other hosts, chfuse command is used;
 
-       % chfuse <mount_point>
+```console
+% chfuse <mount_point>
+```
 
-   CHFS_SERVER and other environment variables, which are the output of chfsctl command, should be defined.
+CHFS_SERVER and other environment variables, which are the output of chfsctl command, should be defined.
 
-   For details, see [manual page of chfuse](doc/chfuse.1.md).
+For details, see [manual page of chfuse](doc/chfuse.1.md).
 
 ## POSIX interface for CHFS
 
 POSIX programs can access CHFS using CHFS-zpoline interception library without modification.
 
-1. Install CHFS-zpoline
+### Install CHFS-zpoline
 
-       % git clone --recursive https://github.com/otatebe/chfs-zpoline.git
-       % cd chfs-zpoline
-       % autoreconf -i
-       % ./configure [--prefix=PREFIX]
-       % make
-       # make install
+```console
+% git clone --recursive https://github.com/otatebe/chfs-zpoline.git
+% cd chfs-zpoline
+% autoreconf -i
+% ./configure [--prefix=PREFIX]
+% make
+# make install
+```
 
-1. How to use CHFS-zpoline
+### How to use CHFS-zpoline
 
-   When using CHFS-zpoline, CHFS is virtually mounted on /chfs.
+When using CHFS-zpoline, CHFS is virtually mounted on /chfs.
 
-       % export LIBZPHOOK=/usr/local/lib/libcz.so
-       % LD_PRELOAD=/usr/local/lib/libzpoline.so program ...
+```console
+% export LIBZPHOOK=/usr/local/lib/libcz.so
+% LD_PRELOAD=/usr/local/lib/libzpoline.so program ...
+```
 
 ## CHFS commands
 
@@ -197,98 +160,111 @@ When you use pmemkv, devdax is desirable.  When you use fsdax, the following env
 - PMEMOBJ_CONF="prefault.at_open=1;prefault.at_create=1"
 
 ## Open MPI with CHFS ADIO
-ROMIO ADIO for CHFS is available.  With the ROMIO ADIO for CHFS, MPI-IO applications can access CHFS without any source code modification.  you can access CHFS by chfs:/path/name.
 
-1. Installation
+ROMIO ADIO for CHFS is available.  With the ROMIO ADIO for CHFS, MPI-IO applications can access CHFS without any source code modification.  You can access CHFS by chfs:/path/name.
 
-       % apt install gfortran bzip2 flex libpmix-dev libnl-3-dev libibverbs-dev
-       % wget https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.6.tar.bz2
-       % tar xfp openmpi-4.1.6.tar.bz2
-       % cd openmpi-4.1.6
-       % wget https://raw.githubusercontent.com/otatebe/chfs/cache/dev/ompi/ad_chfs.patch
-       % patch -p1 < ad_chfs.patch
-       % (cd ompi/mca/io/romio321/romio/ && ./autogen.sh)
-       % mkdir build && cd build
-       % ../configure --enable-mpirun-prefix-by-default --with-pmix=/usr/lib/x86_64-linux-gnu/pmix2
-       % make -j $(nproc)
-       # make install
+### Installation
 
-1. install CHFS again with MPI for parallel find and parallel stage-in
+```console
+% apt install gfortran bzip2 flex libpmix-dev libnl-3-dev libibverbs-dev
+% wget https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.6.tar.bz2
+% tar xfp openmpi-4.1.6.tar.bz2
+% cd openmpi-4.1.6
+% wget https://raw.githubusercontent.com/otatebe/chfs/cache/dev/ompi/ad_chfs.patch
+% patch -p1 < ad_chfs.patch
+% (cd ompi/mca/io/romio321/romio/ && ./autogen.sh)
+% mkdir build && cd build
+% ../configure --enable-mpirun-prefix-by-default --with-pmix=/usr/lib/x86_64-linux-gnu/pmix2
+% make -j $(nproc)
+# make install
+```
 
-       % cd chfs
-       % ./configure [--prefix=PREFIX] [--with-pmemkv] [--enable-zero-copy-read-rdma]
-       % make
-       # make install
+### Install CHFS again with MPI for parallel find and parallel stage-in
 
-1. How to use
+```console
+% cd chfs
+% ./configure [--prefix=PREFIX] [--enable-zero-copy-read-rdma]
+% make
+# make install
+```
 
-       % mpirun --mca io romio321 -x CHFS_SERVER -x CHFS_BACKEND_PATH -x CHFS_SUBDIR_PATH ...
+### How to use
+
+```console
+% mpirun --mca io romio321 -x CHFS_SERVER -x CHFS_BACKEND_PATH -x CHFS_SUBDIR_PATH ...
+```
 
 ## IOR and mdtest
 
-1. Installation
+### Installation
 
-       % git clone https://github.com/hpc/ior.git
-       % cd ior
-       % ./bootstrap
-       % ./configure [--prefix=PREFIX]
-       % make
-       # make install
+```console
+% git clone https://github.com/hpc/ior.git
+% cd ior
+% ./bootstrap
+% ./configure [--prefix=PREFIX]
+% make
+# make install
+```
 
-1. How to use
+### How to use
 
-       % mpirun -x CHFS_SERVER -x CHFS_BACKEND_PATH -x CHFS_SUBDIR_PATH ior -a CHFS [--chfs.chunk_size=SIZE]
+```console
+% mpirun -x CHFS_SERVER -x CHFS_BACKEND_PATH -x CHFS_SUBDIR_PATH ior -a CHFS [--chfs.chunk_size=SIZE]
+```
 
-   Large chunk size, i.e. 1 MiB, should be specified for best performance.  If you are using Open MPI with CHFS ADIO, it is possible to use the MPIIO backend by `-a MPIIO` with `chfs:/path/name`.
+Large chunk size, i.e. 1 MiB, should be specified for best performance.  If you are using Open MPI with CHFS ADIO, it is possible to use the MPIIO backend by `-a MPIIO` with `chfs:/path/name`.
 
 ## CHFS API
 
 The following APIs are supported.
 
-    int chfs_init(const char *server);
-    int chfs_initialized();
-    int chfs_term();
-    int chfs_term_without_sync();
-    int chfs_size();
-    const char *chfs_version();
-    void chfs_set_chunk_size(int chunk_size);
-    void chfs_set_async_access(int enable);
-    void chfs_set_buf_size(int buf_size);
-    void chfs_set_stagein_buf_size(int buf_size);
-    void chfs_set_rdma_thresh(size_t thresh);
-    void chfs_set_rpc_timeout_msec(int timeout_msec);
-    void chfs_set_node_list_cache_timeout(int timeout_sec);
+```c
+int chfs_init(const char *server);
+int chfs_initialized();
+int chfs_term();
+int chfs_term_without_sync();
+int chfs_size();
+const char *chfs_version();
+void chfs_set_chunk_size(int chunk_size);
+void chfs_set_async_access(int enable);
+void chfs_set_buf_size(int buf_size);
+void chfs_set_stagein_buf_size(int buf_size);
+void chfs_set_rdma_thresh(size_t thresh);
+void chfs_set_rpc_timeout_msec(int timeout_msec);
+void chfs_set_node_list_cache_timeout(int timeout_sec);
 
-    int chfs_create(const char *path, int32_t flags, mode_t mode);
-    int chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,
-            int chunk_size);
-    int chfs_open(const char *path, int32_t flags);
-    int chfs_close(int fd);
-    char *chfs_path_at(int fd, const char *path);
-    int chfs_chdir(const char *path);
-    int chfs_fchdir(int fd);
-    ssize_t chfs_pwrite(int fd, const void *buf, size_t size, off_t offset);
-    ssize_t chfs_write(int fd, const void *buf, size_t size);
-    ssize_t chfs_pread(int fd, void *buf, size_t size, off_t offset);
-    ssize_t chfs_read(int fd, void *buf, size_t size);
-    off_t chfs_seek(int fd, off_t off, int whence);
-    int chfs_fsync(int fd);
-    int chfs_truncate(const char *path, off_t len);
-    int chfs_ftruncate(int fd, off_t len);
-    int chfs_unlink(const char *path);
-    int chfs_mkdir(const char *path, mode_t mode);
-    int chfs_rmdir(const char *path);
-    int chfs_stat(const char *path, struct stat *st);
-    int chfs_fstat(int fd, struct stat *st);
-    int chfs_access(const char *path, int mode);
-    int chfs_readdir(const char *path, void *buf,
-            int (*filler)(void *, const char *, const struct stat *, off_t));
-    int chfs_readdir_index(const char *path, int index, void *buf,
-            int (*filler)(void *, const char *, const struct stat *, off_t));
-    int chfs_symlink(const char *target, const char *path);
-    int chfs_readlink(const char *path, char *buf, size_t size);
-    void chfs_sync();
-    int chfs_stagein(const char *path);
+int chfs_create(const char *path, int32_t flags, mode_t mode);
+int chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,
+        int chunk_size);
+int chfs_open(const char *path, int32_t flags);
+int chfs_close(int fd);
+char *chfs_path_at(int fd, const char *path);
+int chfs_chdir(const char *path);
+int chfs_fchdir(int fd);
+ssize_t chfs_pwrite(int fd, const void *buf, size_t size, off_t offset);
+ssize_t chfs_write(int fd, const void *buf, size_t size);
+ssize_t chfs_pread(int fd, void *buf, size_t size, off_t offset);
+ssize_t chfs_read(int fd, void *buf, size_t size);
+off_t chfs_seek(int fd, off_t off, int whence);
+int chfs_fsync(int fd);
+int chfs_truncate(const char *path, off_t len);
+int chfs_ftruncate(int fd, off_t len);
+int chfs_unlink(const char *path);
+int chfs_mkdir(const char *path, mode_t mode);
+int chfs_rmdir(const char *path);
+int chfs_stat(const char *path, struct stat *st);
+int chfs_fstat(int fd, struct stat *st);
+int chfs_access(const char *path, int mode);
+int chfs_readdir(const char *path, void *buf,
+        int (*filler)(void *, const char *, const struct stat *, off_t));
+int chfs_readdir_index(const char *path, int index, void *buf,
+        int (*filler)(void *, const char *, const struct stat *, off_t));
+int chfs_symlink(const char *target, const char *path);
+int chfs_readlink(const char *path, char *buf, size_t size);
+void chfs_sync();
+int chfs_stagein(const char *path);
+```
 
 ## References
 
