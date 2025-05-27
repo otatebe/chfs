@@ -9,9 +9,10 @@ CHFS/Cache provides a caching mechanism against a backend parallel file system. 
 ### Install development kits and required tools
 
 ```console
-# apt install gcc g++ automake cmake libtool pkgconf
-# apt install git python3 bzip2 xz-utils vim
-# apt install libfuse-dev fuse pandoc
+# apt install gcc g++ automake cmake libtool pkgconf \
+    rdma-core librdmacm-dev \
+    libfuse-dev fuse pandoc \
+    git python3 bzip2 xz-utils vim
 ```
 
 ### Install Spack
@@ -28,11 +29,9 @@ For details, see <https://spack.readthedocs.io/>
 ```console
 % git clone https://github.com/mochi-hpc/mochi-spack-packages.git
 % spack repo add mochi-spack-packages
-% spack external find autoconf automake libtool cmake m4 pkgconf
-% spack install mochi-margo ^mercury~boostsys ^libfabric fabrics=rxm,sockets,tcp,udp
+% spack external find autoconf automake libtool cmake m4 rdma-core pkgconf
+% spack install mochi-margo ^mercury~boostsys ^libfabric fabrics=rxm,sockets,tcp,udp,verbs
 ```
-
-If you can use verbs, specify `verbs` also in fabrics.
 
 For details, see <https://mochi.readthedocs.io/>
 
@@ -48,7 +47,7 @@ For details, see <https://mochi.readthedocs.io/>
 # make install
 ```
 
-If you use the pmemkv backend, specify `--with-pmemkv` in configure.
+If you use the pmemkv backend, install [pmemkv](https://github.com/pmem/pmemkv) and specify `--with-pmemkv` in configure.
 
 ## Quick installation steps by Spack
 
@@ -65,8 +64,8 @@ see above
 ```console
 % git clone https://github.com/tsukuba-hpcs/spack-packages
 % spack repo add spack-packages
-% spack external find autoconf automake libtool cmake m4 pkgconf libfuse
-% spack install chfs~verbs~pmemkv ^mercury~boostsys
+% spack external find autoconf automake libtool cmake m4 rdma-core pkgconf libfuse
+% spack install chfs~pmemkv ^mercury~boostsys
 ```
 
 To use chfs, `spack load chfs` is required.
