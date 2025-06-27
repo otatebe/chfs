@@ -202,7 +202,7 @@ dir_list_pop(void)
 static int
 filler(void *buf, const char *name, const struct stat *st, off_t off)
 {
-	char *d;
+	char *d, *b = buf;
 
 	local_count[TOTAL]++;
 
@@ -211,15 +211,22 @@ filler(void *buf, const char *name, const struct stat *st, off_t off)
 			return (0);
 
 	if (S_ISDIR(st->st_mode)) {
-		d = malloc(strlen(buf) + 1 + strlen(name) + 1);
-		sprintf(d, "%s/%s", (char *)buf, name);
+		d = malloc(strlen(b) + 1 + strlen(name) + 1);
+		if (b[0] == '/' && b[1] == '\0')
+			sprintf(d, "/%s", name);
+		else
+			sprintf(d, "%s/%s", b, name);
 		dir_list_push(d);
 		free(d);
 	}
 	if (st->st_mode & CHFS_S_IFREP)
 		return (0);
-	if (find(name, st) && !opt.quiet)
-		printf("%s/%s\n", (char *)buf, name);
+	if (find(name, st) && !opt.quiet) {
+		if (b[0] == '/' && b[1] == '\0')
+			printf("/%s\n", name);
+		else
+			printf("%s/%s\n", b, name);
+	}
 	return (0);
 }
 

@@ -34,10 +34,38 @@ skip_slash(const char *p)
 	return (p);
 }
 
-#define MAX_DEPTH	50
+static char *path_cwd = NULL;
+
+/* 'path' should be a malloc'ed string */
+void
+path_set_cwd(char *path, const char *diag)
+{
+	free(path_cwd);
+	path_cwd = path;
+	log_info("%s: path=%s", diag, path ? path : "(NULL)");
+}
 
 char *
-canonical_path(const char *path)
+path_get_cwd()
+{
+	return (path_cwd);
+}
+
+static int
+path_cwd_len()
+{
+	if (path_cwd == NULL)
+		return (0);
+	return (strlen(path_cwd) + 1);
+}
+
+#define MAX_DEPTH	50
+
+/*
+ * if fullpath == 1, return full path
+ */
+static char *
+canonical_path_internal(const char *path, int fullpath)
 {
 	struct entry {
 		const char *s;
@@ -46,6 +74,10 @@ canonical_path(const char *path)
 	int depth = 0, i, l;
 	const char *p = path;
 	char *pp;
+	int relpath = 0;
+
+	if (fullpath && path_cwd && !IS_SLASH_OR_NULL(p[0]))
+		relpath = 1;
 
 	p = skip_slash(p);
 	while (*p) {
@@ -69,12 +101,20 @@ canonical_path(const char *path)
 		if (i < depth - 1)
 			l++;
 	}
+	if (relpath)
+		l += path_cwd_len();
 	pp = malloc(l + 1);
 	if (pp == NULL) {
 		errno = ENOMEM;
 		return (NULL);
 	}
-	for (l = 0, i = 0; i < depth; ++i) {
+	l = 0;
+	if (relpath) {
+		strcpy(pp, path_get_cwd());
+		strcat(pp, "/");
+		l += path_cwd_len();
+	}
+	for (i = 0; i < depth; ++i) {
 		strncpy(&pp[l], d[i].s, d[i].l);
 		l += d[i].l;
 		if (i < depth - 1)
@@ -82,6 +122,18 @@ canonical_path(const char *path)
 	}
 	pp[l] = '\0';
 	return (pp);
+}
+
+char *
+canonical_path(const char *path)
+{
+	return (canonical_path_internal(path, 0));
+}
+
+char *
+canonical_fullpath(const char *path)
+{
+	return (canonical_path_internal(path, 1));
 }
 
 static char *backend_path = NULL;
@@ -99,6 +151,7 @@ path_set_subdir_path(const char *path)
 	log_debug("path_set_subdir_path: %s", p);
 	subdir_path = strdup(p);
 	subdir_pathlen = strlen(p);
+	path_set_cwd(strdup(p), "path_set_subdir_path");
 }
 
 void

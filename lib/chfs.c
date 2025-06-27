@@ -937,7 +937,7 @@ int
 chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,
 	int chunk_size)
 {
-	char *p = canonical_path(path);
+	char *p = canonical_fullpath(path);
 	hg_return_t ret;
 	int16_t cache_flags = FLAGS_FROM_MODE(flags);
 	uint32_t emode = MODE_FLAGS(mode, cache_flags);
@@ -1025,7 +1025,7 @@ static void root_stat(struct stat *st);
 int
 chfs_open(const char *path, int32_t flags)
 {
-	char *p = canonical_path(path);
+	char *p = canonical_fullpath(path);
 	struct fs_stat st;
 	hg_return_t ret;
 	int fd = -1, err;
@@ -1127,17 +1127,6 @@ chfs_close(int fd)
 	return (clear_fd(fd));
 }
 
-static char *chfs_cwd = NULL;
-
-/* 'path' should be a malloc'ed string */
-static void
-set_cwd(char *path, const char *diag)
-{
-	free(chfs_cwd);
-	chfs_cwd = path;
-	log_info("%s: path=%s", diag, path ? path : "(NULL)");
-}
-
 static char *
 cat_path(const char *dir, const char *path)
 {
@@ -1175,9 +1164,9 @@ chfs_path_at(int fd, const char *path)
 		return (strdup(path));
 
 	if (fd == AT_FDCWD) {
-		if (chfs_cwd == NULL)
+		if (path_get_cwd() == NULL)
 			return (strdup(path));
-		return (cat_path(chfs_cwd, path));
+		return (cat_path(path_get_cwd(), path));
 	}
 	tab = get_fd_table(fd);
 	if (tab == NULL || !S_ISDIR(tab->mode)) {
@@ -1190,24 +1179,16 @@ chfs_path_at(int fd, const char *path)
 int
 chfs_chdir(const char *path)
 {
-	char *p = canonical_path(path), *pp;
+	char *pp = canonical_fullpath(path);
 	size_t psize;
 	struct fs_stat st;
 	hg_return_t ret;
 	int err, save_errno;
 	static const char diag[] = "chfs_chdir";
 
-	if (p == NULL) {
+	if (pp == NULL) {
 		errno = ENOENT;
 		return (-1);
-	}
-	if (path[0] == '\0' || path[0] == '/')
-		pp = p;
-	else {
-		pp = chfs_path_at(AT_FDCWD, p);
-		free(p);
-		if (pp == NULL)
-			return (-1);
 	}
 	psize = strlen(pp) + 1;
 	ret = chfs_rpc_inode_stat(pp, psize, chfs_chunk_size, &st, &err);
@@ -1224,7 +1205,7 @@ chfs_chdir(const char *path)
 		errno = ENOTDIR;
 		return (-1);
 	}
-	set_cwd(pp, diag);
+	path_set_cwd(pp, diag);
 	return (0);
 }
 
@@ -1242,8 +1223,8 @@ chfs_fchdir(int fd)
 		errno = ENOTDIR;
 		return (-1);
 	}
-	set_cwd(strdup(tab->path), diag);
-	if (chfs_cwd == NULL)
+	path_set_cwd(strdup(tab->path), diag);
+	if (path_get_cwd() == NULL)
 		return (-1);
 	return (0);
 }
@@ -1676,6 +1657,9 @@ chfs_read(int fd, void *buf, size_t size)
 	return (s);
 }
 
+static int
+chfs_stat_internal(char *p, struct stat *st);
+
 off_t
 chfs_seek(int fd, off_t off, int whence)
 {
@@ -1700,7 +1684,7 @@ chfs_seek(int fd, off_t off, int whence)
 		break;
 	case SEEK_END:
 		pos = fd_pos_get(fd);
-		if (chfs_stat(tab->path, &sb) == 0) {
+		if (chfs_stat_internal(tab->path, &sb) == 0) {
 			if (pos < sb.st_size)
 				pos = sb.st_size;
 			pos = fd_pos_set(fd, pos + off);
@@ -1723,7 +1707,7 @@ chfs_unlink_chunk_all(char *path, int index);
 int
 chfs_unlink(const char *path)
 {
-	char *p = canonical_path(path);
+	char *p = canonical_fullpath(path);
 	hg_return_t ret;
 	int err, i;
 	size_t psize;
@@ -1762,7 +1746,7 @@ chfs_unlink(const char *path)
 int
 chfs_mkdir(const char *path, mode_t mode)
 {
-	char *p = canonical_path(path);
+	char *p = canonical_fullpath(path);
 	hg_return_t ret;
 	int err;
 	static const char diag[] = "chfs_mkdir";
@@ -1791,7 +1775,7 @@ chfs_mkdir(const char *path, mode_t mode)
 int
 chfs_rmdir(const char *path)
 {
-	char *p = canonical_path(path);
+	char *p = canonical_fullpath(path);
 	hg_return_t ret;
 	int err;
 	static const char diag[] = "chfs_rmdir";
@@ -1827,7 +1811,7 @@ chfs_symlink(const char *target, const char *path)
 		errno = ENOENT;
 		return (-1);
 	}
-	p = canonical_path(path);
+	p = canonical_fullpath(path);
 	if (p == NULL)
 		return (-1);
 	if (p[0] == '\0') {
@@ -1851,7 +1835,7 @@ chfs_symlink(const char *target, const char *path)
 int
 chfs_readlink(const char *path, char *buf, size_t size)
 {
-	char *p = canonical_path(path), *bp;
+	char *p = canonical_fullpath(path), *bp;
 	size_t s = size;
 	hg_return_t ret;
 	int err;
@@ -1897,10 +1881,10 @@ root_stat(struct stat *st)
 
 #include "murmur3.h"
 
-int
-chfs_stat(const char *path, struct stat *st)
+/* p should be canonical path */
+static int
+chfs_stat_internal(char *p, struct stat *st)
 {
-	char *p = canonical_path(path);
 	struct fs_stat sb;
 	size_t psize;
 	void *pi;
@@ -1913,16 +1897,14 @@ chfs_stat(const char *path, struct stat *st)
 		return (-1);
 	if (p[0] == '\0') {
 		root_stat(st);
-		free(p);
 		log_info("%s: path=/", diag);
 		return (0);
 	}
 	ret = chfs_rpc_inode_stat(p, strlen(p) + 1, chfs_chunk_size, &sb, &err);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
-		free(p);
 		chfs_set_errno(ret, err, diag);
 		save_errno = errno;
-		log_info("%s: path=%s: %s", diag, path, strerror(errno));
+		log_info("%s: path=%s: %s", diag, p, strerror(errno));
 		errno = save_errno;
 		return (-1);
 	}
@@ -1938,8 +1920,7 @@ chfs_stat(const char *path, struct stat *st)
 	MurmurHash3_x86_32(p, strlen(p) + 1, 1234, &ino);
 	st->st_ino = ino;
 	if (!S_ISREG(st->st_mode) || sb.size != sb.chunk_size) {
-		free(p);
-		log_info("%s (1): path=%s", diag, path);
+		log_info("%s (1): path=%s", diag, p);
 		return (0);
 	}
 	for (j = 0, i = 1;;) {
@@ -1966,9 +1947,18 @@ chfs_stat(const char *path, struct stat *st)
 		i *= 2;
 	}
 	st->st_blocks = NUM_BLOCKS(st->st_size);
-	free(p);
-	log_info("%s (2): path=%s", diag, path);
+	log_info("%s (2): path=%s", diag, p);
 	return (0);
+}
+
+int
+chfs_stat(const char *path, struct stat *st)
+{
+	char *p = canonical_fullpath(path);
+	int ret = chfs_stat_internal(p, st);
+
+	free(p);
+	return (ret);
 }
 
 int
@@ -1978,13 +1968,13 @@ chfs_fstat(int fd, struct stat *st)
 
 	if (tab == NULL)
 		return (-1);
-	return (chfs_stat(tab->path, st));
+	return (chfs_stat_internal(tab->path, st));
 }
 
 int
 chfs_access(const char *path, int mode)
 {
-	char *p = canonical_path(path);
+	char *p = canonical_fullpath(path);
 	struct fs_stat sb;
 	hg_return_t ret;
 	int err;
@@ -2006,10 +1996,9 @@ chfs_access(const char *path, int mode)
 	return (0);
 }
 
-int
-chfs_truncate(const char *path, off_t len)
+static int
+chfs_truncate_internal(char *p, off_t len)
 {
-	char *p;
 	struct fs_stat sb;
 	size_t psize, index, local_len;
 	void *pi;
@@ -2022,18 +2011,15 @@ chfs_truncate(const char *path, off_t len)
 		errno = EINVAL;
 		return (-1);
 	}
-	p = canonical_path(path);
 	if (p == NULL)
 		return (-1);
 	if (p[0] == '\0') {
-		free(p);
 		errno = EINVAL;
 		return (-1);
 	}
 	ret = chfs_rpc_inode_stat(p, strlen(p) + 1, chfs_chunk_size, &sb, &err);
 	mode = MODE_MASK(sb.mode);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS || !S_ISREG(mode)) {
-		free(p);
 		chfs_set_errno(ret, err, diag);
 		if (errno == 0 && !S_ISREG(sb.mode))
 			errno = EINVAL;
@@ -2046,7 +2032,6 @@ chfs_truncate(const char *path, off_t len)
 	ret = chfs_rpc_truncate(pi, psize, local_len, &err);
 	free(pi);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
-		free(p);
 		chfs_set_errno(ret, err, diag);
 		return (-1);
 	}
@@ -2059,9 +2044,18 @@ chfs_truncate(const char *path, off_t len)
 		if (ret != HG_SUCCESS || err != KV_SUCCESS)
 			break;
 	}
-	free(p);
-	log_info("%s: path=%s len=%ld", diag, path, len);
+	log_info("%s: path=%s len=%ld", diag, p, len);
 	return (0);
+}
+
+int
+chfs_truncate(const char *path, off_t len)
+{
+	char *p = canonical_fullpath(path);
+	int ret = chfs_truncate_internal(p, len);
+
+	free(p);
+	return (ret);
 }
 
 int
@@ -2075,7 +2069,7 @@ chfs_ftruncate(int fd, off_t len)
 		errno = EISDIR;
 		return (-1);
 	}
-	return (chfs_truncate(tab->path, len));
+	return (chfs_truncate_internal(tab->path, len));
 }
 
 static int
@@ -2159,11 +2153,11 @@ backend_readdir(const char *path, void *buf,
 	return (0);
 }
 
-int
-chfs_readdir(const char *path, void *buf,
+static int
+chfs_readdir_internal(const char *p, void *buf,
 	int (*filler)(void *, const char *, const struct stat *, off_t))
 {
-	char *p = canonical_path(path), *bp;
+	char *bp;
 	node_list_t node_list;
 	hg_return_t ret;
 	int err, i, ii, di;
@@ -2188,16 +2182,26 @@ chfs_readdir(const char *path, void *buf,
 			continue;
 	}
 	ring_list_copy_free(&node_list);
-	free(p);
-	log_info("chfs_readdir: path=%s", path);
+	log_info("chfs_readdir: path=%s", p);
 	return (0);
+}
+
+int
+chfs_readdir(const char *path, void *buf,
+	int (*filler)(void *, const char *, const struct stat *, off_t))
+{
+	char *p = canonical_fullpath(path);
+	int ret = chfs_readdir_internal(p, buf, filler);
+
+	free(p);
+	return (ret);
 }
 
 int
 chfs_readdir_index(const char *path, int index, void *buf,
 	int (*filler)(void *, const char *, const struct stat *, off_t))
 {
-	char *p = canonical_path(path), *target;
+	char *p = canonical_fullpath(path), *target;
 	int err;
 
 	if (p == NULL)
@@ -2268,7 +2272,7 @@ chfs_linux_getdents64(int fd, char dirp[], size_t count)
 	}
 	ABT_mutex_lock(tab->mutex);
 	if (tab->pos == 0) {
-		chfs_readdir(tab->path, tab, getdents_filler);
+		chfs_readdir_internal(tab->path, tab, getdents_filler);
 		tab->buf_size = tab->pos;
 		tab->pos = 0;
 	}
