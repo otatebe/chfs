@@ -54,7 +54,7 @@ path_get_cwd()
 static int
 path_cwd_len()
 {
-	if (path_cwd == NULL)
+	if (path_cwd == NULL || path_cwd[0] == '\0')
 		return (0);
 	return (strlen(path_cwd) + 1);
 }
@@ -109,7 +109,7 @@ canonical_path_internal(const char *path, int fullpath)
 		return (NULL);
 	}
 	l = 0;
-	if (relpath) {
+	if (relpath && path_cwd_len() > 0) {
 		strcpy(pp, path_get_cwd());
 		strcat(pp, "/");
 		l += path_cwd_len();
