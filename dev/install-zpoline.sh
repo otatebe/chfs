@@ -3,7 +3,7 @@
 set -eu
 
 echo Install CHFS-Zpoline
-cd ..
+cd
 
 set -x
 PKG=chfs-zpoline
