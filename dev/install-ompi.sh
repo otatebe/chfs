@@ -12,7 +12,7 @@ cd
 #git pull > /dev/null || :
 #./autogen.pl
 
-OMPI=openmpi-4.1.6
+OMPI=openmpi-4.1.8
 [ -d $OMPI ] || {
 	[ -f $OMPI.tar.bz2 ] || wget https://download.open-mpi.org/release/open-mpi/v4.1/$OMPI.tar.bz2
 	tar xfp $OMPI.tar.bz2
@@ -23,6 +23,6 @@ cd $OMPI
 
 [ -d build ] || mkdir build
 cd build
-../configure --enable-mpirun-prefix-by-default --with-pmix=/usr/lib/x86_64-linux-gnu/pmix2 --with-io-romio-flags=--with-file-system=chfs --prefix $HOME/local > /dev/null
+../configure --enable-mpirun-prefix-by-default --with-pmix=/usr/lib/x86_64-linux-gnu/pmix2 --with-io-romio-flags=--with-file-system=chfs+ufs+testfs --prefix $HOME/local > /dev/null
 make -j $(nproc) > /dev/null
 make install > /dev/null
