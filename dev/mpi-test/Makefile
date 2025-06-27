@@ -1,4 +1,5 @@
 CC = mpicc
+CFLAGS = -g
 PROGS = bcast open
 
 all: $(PROGS)
