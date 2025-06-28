@@ -16,7 +16,8 @@ trap 'rm -f $BACKEND/test-*' 0 1 2 15
 test/test
 
 # stagein
-(cd $BACKEND; chstagein README)
+(cd $BACKEND && chstagein README && mv README README.bak &&
+	cat $MDIR/README && mv README.bak README)
 
 # cache
 cp ~/chfs/configure $BACKEND

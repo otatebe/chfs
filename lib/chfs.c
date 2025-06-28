@@ -933,11 +933,10 @@ chfs_rpc_inode_stat(void *key, size_t key_size, size_t chunk_size,
 	return (ret);
 }
 
-int
-chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,
+static int
+chfs_create_chunk_size_internal(char *p, int32_t flags, mode_t mode,
 	int chunk_size)
 {
-	char *p = canonical_fullpath(path);
 	hg_return_t ret;
 	int16_t cache_flags = FLAGS_FROM_MODE(flags);
 	uint32_t emode = MODE_FLAGS(mode, cache_flags);
@@ -947,20 +946,17 @@ chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,
 	if (p == NULL)
 		return (-1);
 	if (p[0] == '\0' || chunk_size <= 0) {
-		free(p);
 		errno = EINVAL;
 		return (-1);
 	}
 	emode |= S_IFREG;
 	fd = create_fd(p, emode, chunk_size);
 	if (fd < 0) {
-		free(p);
 		errno = ENOMEM;
 		return (-1);
 	}
 	ret = chfs_rpc_inode_create(p, strlen(p) + 1, emode, chunk_size, &err);
 	log_info("%s: path=%s fd=%d", diag, p, fd);
-	free(p);
 	if (ret == HG_SUCCESS && (err == KV_SUCCESS || err == KV_ERR_NO_SPACE))
 		return (fd);
 
@@ -970,9 +966,27 @@ chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,
 }
 
 int
+chfs_create_chunk_size(const char *path, int32_t flags, mode_t mode,
+	int chunk_size)
+{
+	char *p = canonical_fullpath(path);
+	int ret = chfs_create_chunk_size_internal(p, flags, mode, chunk_size);
+
+	free(p);
+	return (ret);
+}
+
+int
 chfs_create(const char *path, int32_t flags, mode_t mode)
 {
 	return (chfs_create_chunk_size(path, flags, mode, chfs_chunk_size));
+}
+
+static int
+chfs_create_internal(char *path, int32_t flags, mode_t mode)
+{
+	return (chfs_create_chunk_size_internal(path, flags, mode,
+			chfs_chunk_size));
 }
 
 #ifdef CLIENT_CACHING
@@ -1743,10 +1757,9 @@ chfs_unlink(const char *path)
 	return (0);
 }
 
-int
-chfs_mkdir(const char *path, mode_t mode)
+static int
+chfs_mkdir_internal(char *p, mode_t mode)
 {
-	char *p = canonical_fullpath(path);
 	hg_return_t ret;
 	int err;
 	static const char diag[] = "chfs_mkdir";
@@ -1754,22 +1767,30 @@ chfs_mkdir(const char *path, mode_t mode)
 	if (p == NULL)
 		return (-1);
 	if (p[0] == '\0') {
-		free(p);
 		errno = EEXIST;
 		log_info("%s: path=/ mode=%o: %s", diag, mode, strerror(errno));
 		return (-1);
 	}
 	mode |= S_IFDIR;
 	ret = chfs_rpc_inode_create(p, strlen(p) + 1, mode, 0, &err);
-	free(p);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
 		chfs_set_errno(ret, err, diag);
-		log_info("%s: path=%s mode=%o: %s", diag, path, mode,
-				strerror(errno));
+		log_info("%s: path=%s mode=%o: %s", diag, p, mode,
+			strerror(errno));
 		return (-1);
 	}
-	log_info("%s: path=%s mode=%o", diag, path, mode);
+	log_info("%s: path=%s mode=%o", diag, p, mode);
 	return (0);
+}
+
+int
+chfs_mkdir(const char *path, mode_t mode)
+{
+	char *p = canonical_fullpath(path);
+	int ret = chfs_mkdir_internal(p, mode);
+
+	free(p);
+	return (ret);
 }
 
 int
@@ -1798,10 +1819,9 @@ chfs_rmdir(const char *path)
 	return (0);
 }
 
-int
-chfs_symlink(const char *target, const char *path)
+static int
+chfs_symlink_internal(const char *target, char *p)
 {
-	char *p;
 	mode_t mode;
 	hg_return_t ret;
 	int err, len;
@@ -1811,11 +1831,9 @@ chfs_symlink(const char *target, const char *path)
 		errno = ENOENT;
 		return (-1);
 	}
-	p = canonical_fullpath(path);
 	if (p == NULL)
 		return (-1);
 	if (p[0] == '\0') {
-		free(p);
 		errno = EINVAL;
 		return (-1);
 	}
@@ -1823,13 +1841,22 @@ chfs_symlink(const char *target, const char *path)
 	len = strlen(target);
 	ret = chfs_rpc_inode_create_data(p, strlen(p) + 1, mode, len + 1,
 		target, len + 1, &err);
-	free(p);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
 		chfs_set_errno(ret, err, diag);
 		return (-1);
 	}
-	log_info("%s: target=%s path=%s", diag, target, path);
+	log_info("%s: target=%s path=%s", diag, target, p);
 	return (0);
+}
+
+int
+chfs_symlink(const char *target, const char *path)
+{
+	char *p = canonical_fullpath(path);
+	int ret = chfs_symlink_internal(target, p);
+
+	free(p);
+	return (ret);
 }
 
 int
@@ -2400,7 +2427,7 @@ chfs_set_stagein_buf_size(int buf_size)
 }
 
 static int
-stagein_reg(const char *src, const char *dst, mode_t mode)
+stagein_reg(const char *src, char *dst, mode_t mode)
 {
 	int s, d, r, rr, st = -1;
 	char *buf;
@@ -2415,7 +2442,7 @@ stagein_reg(const char *src, const char *dst, mode_t mode)
 	if ((s = open(src, O_RDONLY)) == -1)
 		goto free_buf;
 
-	d = chfs_create(dst, O_WRONLY | CHFS_O_CACHE, mode);
+	d = chfs_create_internal(dst, O_WRONLY | CHFS_O_CACHE, mode);
 	if (d < 0)
 		goto close_s;
 
@@ -2462,14 +2489,14 @@ chfs_stagein(const char *path)
 	if (S_ISREG(sb.st_mode))
 		st = stagein_reg(src, dst, sb.st_mode);
 	else if (S_ISDIR(sb.st_mode)) {
-		st = chfs_mkdir(dst, sb.st_mode | 0700 | CHFS_O_CACHE);
+		st = chfs_mkdir_internal(dst, sb.st_mode | 0700 | CHFS_O_CACHE);
 		if (st == -1 && errno == EEXIST)
 			st = 0;
 	} else if (S_ISLNK(sb.st_mode)) {
 		st = readlink(src, sym_buf, sizeof sym_buf);
 		if (st > 0) {
 			sym_buf[st] = '\0';
-			st = chfs_symlink(sym_buf, dst);
+			st = chfs_symlink_internal(sym_buf, dst);
 		}
 	} else
 		errno = ENOTSUP;
