@@ -2400,7 +2400,7 @@ chfs_set_stagein_buf_size(int buf_size)
 }
 
 static int
-stagein_reg(const char *src, const char *dst, mode_t mode)
+stagein_reg(const char *path, mode_t mode)
 {
 	int s, d, r, rr, st = -1;
 	char *buf;
@@ -2412,10 +2412,10 @@ stagein_reg(const char *src, const char *dst, mode_t mode)
 		errno = ENOMEM;
 		return (-1);
 	}
-	if ((s = open(src, O_RDONLY)) == -1)
+	if ((s = open(path, O_RDONLY)) == -1)
 		goto free_buf;
 
-	d = chfs_create(dst, O_WRONLY | CHFS_O_CACHE, mode);
+	d = chfs_create(path, O_WRONLY | CHFS_O_CACHE, mode);
 	if (d < 0)
 		goto close_s;
 
@@ -2441,43 +2441,29 @@ free_buf:
 int
 chfs_stagein(const char *path)
 {
-	char *src = canonical_path(path), *dst;
 	char sym_buf[PATH_MAX];
 	struct stat sb;
 	int st = -1;
 
-	if (src == NULL)
+	if (path == NULL)
 		return (-1);
-	if (src[0] == '\0')
-		return (0);
 
-	dst = path_subdir(src);
-	if (dst == NULL) {
-		errno = ENOMEM;
-		goto free_src;
-	}
-	if (lstat(src, &sb) == -1)
-		goto free_dst;
-
+	if (lstat(path, &sb) == -1)
+		return (-1);
 	if (S_ISREG(sb.st_mode))
-		st = stagein_reg(src, dst, sb.st_mode);
+		st = stagein_reg(path, sb.st_mode);
 	else if (S_ISDIR(sb.st_mode)) {
-		st = chfs_mkdir(dst, sb.st_mode | 0700 | CHFS_O_CACHE);
+		st = chfs_mkdir(path, sb.st_mode | 0700 | CHFS_O_CACHE);
 		if (st == -1 && errno == EEXIST)
 			st = 0;
 	} else if (S_ISLNK(sb.st_mode)) {
-		st = readlink(src, sym_buf, sizeof sym_buf);
+		st = readlink(path, sym_buf, sizeof sym_buf);
 		if (st > 0) {
 			sym_buf[st] = '\0';
-			st = chfs_symlink(sym_buf, dst);
+			st = chfs_symlink(sym_buf, path);
 		}
 	} else
 		errno = ENOTSUP;
-
-free_dst:
-	free(dst);
-free_src:
-	free(src);
 
 	log_info("chfs_stagein: path=%s", path);
 	return (st);
