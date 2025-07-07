@@ -1,3 +1,20 @@
+# Release note for CHFS/Cache 3.1.0 (2025/7/7)
+
+## New API
+- chfs_chdir()
+- chfs_fchdir()
+- chfs_path_at()
+- chfs_linux_getdents64()
+
+## Updated features
+- relative path support.  default current working directory is subdir
+- chfsctl - execute chfsd in parallel
+- chfsctl - -ssh option to specify a remote shell
+- chfsctl - -D option deprecated
+- chfsctl - -P option to enable profiling for pmemkv backend
+- chfs_open() - support O_DIRECTORY and O_PATH flags
+- chfs_stat() - fake ino
+
 # Release note for CHFS/Cache 3.0.3 (2024/10/16)
 
 ## New API

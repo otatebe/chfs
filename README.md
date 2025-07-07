@@ -1,8 +1,8 @@
-# CHFS/Cache - Parallel caching file system for node-local storages
+# CHFS - Parallel caching file system for node-local storages
 
-CHFS is a parallel consistent hashing file system created instantly using node-local storages such as persistent memory and NVMe SSD.  It exploits the performance of persistent memory using persistent in-memory key-value store pmemkv.  For NVMe SSD, it uses the POSIX backend.  It supports RDMA high performance data access.
+CHFS is a parallel caching file system created instantly using node-local storages such as persistent memory and NVMe SSD.  It exploits the performance of persistent memory using persistent in-memory key-value store pmemkv.  For NVMe SSD, it uses a POSIX backend.  It supports RDMA high performance data access.
 
-CHFS/Cache provides a caching mechanism against a backend parallel file system.  Files in the backend parallel file system are automatically cached on demand or manually staged-in.  Output files are automatically flushed by I/O-aware flushing to maximize the performance of CHFS/Cache.
+CHFS provides a caching mechanism against a backend parallel file system.  Files in the backend parallel file system are automatically cached on demand or manually staged-in.  Output files are automatically flushed by I/O-aware flushing to maximize the performance of CHFS.
 
 ## Quick installation steps
 
@@ -89,7 +89,7 @@ The backend directory typically in a parallel file system can be specified by th
 
 `chstagein` can be executed with and without mpirun.  The output files will be flushed automatically to the backend directory.  It is possible to ensure flushing all dirty files by `chfs_sync()` or `chfsctl stop`.
 
-A pmem obj pool should be created with the layout pmemkv by `pmempool create -l pmemkv obj /dev/dax0.0`.  For user-level access, the permission of the device should be modified; bad block check should be disabled by `pmempool feature --disable CHECK_BAD_BLOCKS /dev/dax0.0`.
+For devdax device, a pmem obj pool should be created with the layout pmemkv by `pmempool create -l pmemkv obj /dev/dax0.0`.  For user-level access, the permission of the device should be modified, and bad block check should be disabled by `pmempool feature --disable CHECK_BAD_BLOCKS /dev/dax0.0`.
 
 chfsctl outputs the setting of CHFS_SERVER, CHFS_BACKEND_PATH, and CHFS_SUBDIR_PATH environment variables, which are used to execute chfuse and CHFS commands.
 
@@ -97,7 +97,7 @@ For details, see [manual page of chfsctl](doc/chfsctl.1.md).
 
 ### Mount the CHFS
 
-CHFS is mounted by the chfsctl command.  If you need to mount it on other hosts, chfuse command is used;
+CHFS is mounted by the -m option of chfsctl command.  If you need to mount it on other hosts, chfuse command is used;
 
 ```console
 % chfuse <mount_point>
@@ -124,9 +124,10 @@ POSIX programs can access CHFS using CHFS-zpoline interception library without m
 
 ### How to use CHFS-zpoline
 
-When using CHFS-zpoline, CHFS is virtually mounted on /chfs.
+When using CHFS-zpoline, CHFS is virtually mounted on /chfs.  Or, you can access CHFS by a relative path.
 
 ```console
+% sudo sysctl vm.mmap_min_addr=0
 % export LIBZPHOOK=/usr/local/lib/libcz.so
 % LD_PRELOAD=/usr/local/lib/libzpoline.so program ...
 ```
@@ -160,20 +161,20 @@ When you use pmemkv, devdax is desirable.  When you use fsdax, the following env
 
 ## Open MPI with CHFS ADIO
 
-ROMIO ADIO for CHFS is available.  With the ROMIO ADIO for CHFS, MPI-IO applications can access CHFS without any source code modification.  You can access CHFS by chfs:/path/name.
+ROMIO ADIO for CHFS is available.  With the ROMIO ADIO for CHFS, MPI-IO applications can access CHFS without any source code modification.  You can access CHFS by chfs:$MDIR/path/name or by specifying 'ROMIO_FSTYPE_FORCE=chfs:', where $MDIR is a mount directory of CHFS.
 
 ### Installation
 
 ```console
 % apt install gfortran bzip2 flex libpmix-dev libnl-3-dev libibverbs-dev
-% wget https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.6.tar.bz2
-% tar xfp openmpi-4.1.6.tar.bz2
-% cd openmpi-4.1.6
+% wget https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.8.tar.bz2
+% tar xfp openmpi-4.1.8.tar.bz2
+% cd openmpi-4.1.8
 % wget https://raw.githubusercontent.com/otatebe/chfs/cache/dev/ompi/ad_chfs.patch
 % patch -p1 < ad_chfs.patch
 % (cd ompi/mca/io/romio321/romio/ && ./autogen.sh)
 % mkdir build && cd build
-% ../configure --enable-mpirun-prefix-by-default --with-pmix=/usr/lib/x86_64-linux-gnu/pmix2
+% ../configure --enable-mpirun-prefix-by-default --with-pmix=/usr/lib/x86_64-linux-gnu/pmix2 --with-io-romio-flags=--with-file-system=chfs+ufs+testfs
 % make -j $(nproc)
 # make install
 ```
@@ -212,7 +213,7 @@ ROMIO ADIO for CHFS is available.  With the ROMIO ADIO for CHFS, MPI-IO applicat
 % mpirun -x CHFS_SERVER -x CHFS_BACKEND_PATH -x CHFS_SUBDIR_PATH ior -a CHFS [--chfs.chunk_size=SIZE]
 ```
 
-Large chunk size, i.e. 1 MiB, should be specified for best performance.  If you are using Open MPI with CHFS ADIO, it is possible to use the MPIIO backend by `-a MPIIO` with `chfs:/path/name`.
+Large chunk size, i.e. 1 MiB, should be specified for best performance.  If you are using Open MPI with CHFS ADIO, it is possible to use the MPIIO backend by `-a MPIIO` with `chfs:$MDIR/file` or with '-x ROMIO_FSTYPE_FORCE=chfs:' and a relative path, where $MDIR is a mount directory of CHFS.  If you are using CHFS-zpoline, it is possible to use POSIX backend with a relative path or /chfs$MDIR/file.
 
 ## CHFS API
 
@@ -272,3 +273,5 @@ int chfs_stagein(const char *path);
 1. Osamu Tatebe, Hiroki Ohtsuji, "[Caching Support for CHFS Node-local Persistent Memory File System](https://doi.org/10.1109/IPDPSW55747.2022.00182)", Proceedings of 3rd Workshop on Extreme-Scale Storage and Analysis (ESSA 2022), pp.1103-1110, 2022
 
 1. Osamu Tatebe, Kohei Hiraga, Hiroki Ohtsuji, "[I/O-Aware Flushing for HPC Caching Filesystem](https://doi.org/10.1109/CLUSTERWorkshops61457.2023.00012)", Proceedings of 3rd Workshop on Re-envisioning Extreme-Scale I/O for Emerging Hybrid HPC Workloads (REX-IO), pp.11-17, 2023
+
+1. Haruka Miyauchi, Sohei Koyama (advisor), Osamu Tatebe (advisor), "[Design of Reliable and Efficient Syscall Hooking Library for a Parallel File System](https://sc24.supercomputing.org/proceedings/poster/poster_pages/post287.html)", The International Conference for High Performance Computing, Networking, Storage, and Analysis (SC), ACM Student Research Competition Undergraduate, Atlanta GA, November 19-21, 2024
