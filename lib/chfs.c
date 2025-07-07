@@ -1738,8 +1738,8 @@ chfs_unlink(const char *path)
 	}
 	if (i == UNLINK_CHUNK_SIZE)
 		chfs_unlink_chunk_all(p, UNLINK_CHUNK_SIZE);
+	log_info("%s: path=%s", diag, p);
 	free(p);
-	log_info("%s: path=%s", diag, path);
 	return (0);
 }
 
@@ -1761,14 +1761,15 @@ chfs_mkdir(const char *path, mode_t mode)
 	}
 	mode |= S_IFDIR;
 	ret = chfs_rpc_inode_create(p, strlen(p) + 1, mode, 0, &err);
-	free(p);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
+		free(p);
 		chfs_set_errno(ret, err, diag);
 		log_info("%s: path=%s mode=%o: %s", diag, path, mode,
 				strerror(errno));
 		return (-1);
 	}
-	log_info("%s: path=%s mode=%o", diag, path, mode);
+	log_info("%s: path=%s mode=%o", diag, p, mode);
+	free(p);
 	return (0);
 }
 
@@ -1789,12 +1790,13 @@ chfs_rmdir(const char *path)
 	}
 	/* XXX check child entries */
 	ret = chfs_rpc_remove(p, strlen(p) + 1, &err);
-	free(p);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
+		free(p);
 		chfs_set_errno(ret, err, diag);
 		return (-1);
 	}
-	log_info("%s: path=%s", diag, path);
+	log_info("%s: path=%s", diag, p);
+	free(p);
 	return (0);
 }
 
@@ -1823,12 +1825,13 @@ chfs_symlink(const char *target, const char *path)
 	len = strlen(target);
 	ret = chfs_rpc_inode_create_data(p, strlen(p) + 1, mode, len + 1,
 		target, len + 1, &err);
-	free(p);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
+		free(p);
 		chfs_set_errno(ret, err, diag);
 		return (-1);
 	}
-	log_info("%s: target=%s path=%s", diag, target, path);
+	log_info("%s: target=%s path=%s", diag, target, p);
+	free(p);
 	return (0);
 }
 
@@ -1857,14 +1860,15 @@ chfs_readlink(const char *path, char *buf, size_t size)
 		free(p);
 		return (s);
 	}
-	free(p);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
+		free(p);
 		chfs_set_errno(ret, err, diag);
 		return (-1);
 	}
 	if (s > 1 && buf[s - 1] == '\0')
 		--s;
-	log_info("%s: path=%s", diag, path);
+	log_info("%s: path=%s", diag, p);
+	free(p);
 	return (s);
 }
 
@@ -1991,8 +1995,8 @@ chfs_access(const char *path, int mode)
 			return (-1);
 		}
 	}
+	log_info("%s: path=%s", diag, p);
 	free(p);
-	log_info("%s: path=%s", diag, path);
 	return (0);
 }
 
@@ -2210,8 +2214,8 @@ chfs_readdir_index(const char *path, int index, void *buf,
 	if (target && filler)
 		fs_rpc_readdir_replica(target, p, buf, filler, &err);
 	free(target);
+	log_info("chfs_readdir_index: path=%s index=%d", p, index);
 	free(p);
-	log_info("chfs_readdir_index: path=%s index=%d", path, index);
 	return (0);
 }
 
