@@ -282,11 +282,15 @@ fs_open(const char *path, int flags, mode_t mode, size_t *chunk_size,
 	if (fd == -1)
 		return (-errno);
 	if (flags & O_CREAT) {
+		if ((mode & S_IWUSR) == 0)
+			chmod(path, mode | S_IWUSR);
 		r = set_metadata(path, *chunk_size, *cache_flags);
 		if (r < 0)
 			close(fd);
 		else if (set_metadata_p)
 			*set_metadata_p = 1;
+		if ((mode & S_IWUSR) == 0)
+			chmod(path, mode);
 	}
 	return (r < 0 ? r : fd);
 }
