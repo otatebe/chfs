@@ -104,6 +104,12 @@ fi
 
 CHFS_OPTIONS=
 if [ "X$BEDIR" != X ]; then
+	[ -d "$BEDIR" ] || err $BEDIR: no such directory
+	case $BEDIR in
+		/*) ;;
+		*) BEDIR=$PWD/$BEDIR ;;
+	esac
+	[ -d "$BEDIR" ] || err $BEDIR: no such directory
 	CHFS_OPTIONS="-b $BEDIR"
 	export CHFS_BACKEND_PATH="$BEDIR"
 	if [ "X$MDIR" != X ]; then
@@ -329,7 +335,11 @@ if [ "X$BEDIR" != X ]; then
 	echo -n " CHFS_BACKEND_PATH=\"$BEDIR\"; export CHFS_BACKEND_PATH;"
 	if [ "X$MDIR" != X ]; then
 		echo -n " CHFS_SUBDIR_PATH=\"$MDIR\"; export CHFS_SUBDIR_PATH;"
+	else
+		echo -n " unset CHFS_SUBDIR_PATH;"
 	fi
+else
+	echo -n " unset CHFS_BACKEND_PATH; unset CHFS_SUBDIR_PATH"
 fi
 echo
 CHFS_SERVER="$(chlist -c -n $NUM_SERVS)"; export CHFS_SERVER
