@@ -29,34 +29,37 @@ next_token(const char *p, int *s)
 static const char *
 skip_slash(const char *p)
 {
+	if (p == NULL)
+		return (NULL);
+
 	while (*p == '/')
 		++p;
 	return (p);
 }
 
-static char *path_cwd = NULL;
+static char *cwd_path = NULL;
+static int cwd_pathlen;
 
-/* 'path' should be a malloc'ed string */
 void
 path_set_cwd(char *path, const char *diag)
 {
-	free(path_cwd);
-	path_cwd = path;
-	log_info("%s: path=%s", diag, path ? path : "(NULL)");
+	const char *p = skip_slash(path);
+
+	if (p == NULL)
+		return;
+	free(cwd_path);
+	cwd_path = strdup(p);
+	if (cwd_path == NULL || cwd_path[0] == '\0')
+		cwd_pathlen = 0;
+	else
+		cwd_pathlen = strlen(p) + 1;
+	log_info("%s: cwd=%s", diag, p);
 }
 
 char *
 path_get_cwd()
 {
-	return (path_cwd);
-}
-
-static int
-path_cwd_len()
-{
-	if (path_cwd == NULL || path_cwd[0] == '\0')
-		return (0);
-	return (strlen(path_cwd) + 1);
+	return (cwd_path);
 }
 
 #define MAX_DEPTH	50
@@ -76,7 +79,7 @@ canonical_path_internal(const char *path, int fullpath)
 	char *pp;
 	int relpath = 0;
 
-	if (fullpath && path_cwd && !IS_SLASH_OR_NULL(p[0]))
+	if (fullpath && cwd_path && !IS_SLASH_OR_NULL(p[0]))
 		relpath = 1;
 
 	p = skip_slash(p);
@@ -102,17 +105,17 @@ canonical_path_internal(const char *path, int fullpath)
 			l++;
 	}
 	if (relpath)
-		l += path_cwd_len();
+		l += cwd_pathlen;
 	pp = malloc(l + 1);
 	if (pp == NULL) {
 		errno = ENOMEM;
 		return (NULL);
 	}
 	l = 0;
-	if (relpath && path_cwd_len() > 0) {
-		strcpy(pp, path_get_cwd());
+	if (relpath && cwd_pathlen > 0) {
+		strcpy(pp, cwd_path);
 		strcat(pp, "/");
-		l += path_cwd_len();
+		l += cwd_pathlen;
 	}
 	for (i = 0; i < depth; ++i) {
 		strncpy(&pp[l], d[i].s, d[i].l);
@@ -151,7 +154,6 @@ path_set_subdir_path(const char *path)
 	log_debug("path_set_subdir_path: %s", p);
 	subdir_path = strdup(p);
 	subdir_pathlen = strlen(p);
-	path_set_cwd(strdup(p), "path_set_subdir_path");
 }
 
 void
@@ -193,7 +195,8 @@ path_backend(const char *path)
 	if (s == NULL)
 		return (NULL);
 	strcpy(s, backend_path);
-	strcat(s, "/");
+	if (backend_pathlen > 0 && backend_path[backend_pathlen - 1] != '/')
+		strcat(s, "/");
 	strcat(s, p);
 
 	return (s);

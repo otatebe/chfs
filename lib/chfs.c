@@ -273,8 +273,13 @@ chfs_init(const char *server)
 		chfs_set_node_list_cache_timeout(atoi(timeout));
 
 	bpath = getenv("CHFS_SUBDIR_PATH");
-	if (!IS_NULL_STRING(bpath))
+	if (!IS_NULL_STRING(bpath)) {
 		path_set_subdir_path(bpath);
+		path_set_cwd(bpath, "chfs_init");
+	} else if ((bpath = get_current_dir_name()) != NULL) {
+		path_set_cwd(bpath, "chfs_init");
+		free(bpath);
+	}
 
 	bpath = getenv("CHFS_BACKEND_PATH");
 	if (!IS_NULL_STRING(bpath))
@@ -1136,13 +1141,14 @@ cat_path(const char *dir, const char *path)
 		errno = EINVAL;
 		return (NULL);
 	}
-	pp = malloc(strlen(dir) + 1 + strlen(p) + 1);
+	pp = malloc(1 + strlen(dir) + 1 + strlen(p) + 1);
 	if (pp == NULL) {
 		free(p);
 		return (NULL);
 	}
-	strcpy(pp, dir);
-	if (pp[0] != '\0' && p[0] != '\0')
+	strcpy(pp, "/");
+	strcat(pp, dir);
+	if (dir[0] != '\0' && p[0] != '\0')
 		strcat(pp, "/");
 	if (p[0] != '\0')
 		strcat(pp, p);
@@ -1206,6 +1212,7 @@ chfs_chdir(const char *path)
 		return (-1);
 	}
 	path_set_cwd(pp, diag);
+	free(pp);
 	return (0);
 }
 
@@ -1223,7 +1230,7 @@ chfs_fchdir(int fd)
 		errno = ENOTDIR;
 		return (-1);
 	}
-	path_set_cwd(strdup(tab->path), diag);
+	path_set_cwd(tab->path, diag);
 	if (path_get_cwd() == NULL)
 		return (-1);
 	return (0);
