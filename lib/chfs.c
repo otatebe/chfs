@@ -1846,9 +1846,10 @@ int
 chfs_readlink(const char *path, char *buf, size_t size)
 {
 	char *p = canonical_fullpath(path), *bp;
-	size_t s = size;
+	size_t s = size, psize;
+	struct fs_stat st;
 	hg_return_t ret;
-	int err;
+	int err, save_errno;
 	static const char diag[] = "chfs_readlink";
 
 	if (p == NULL)
@@ -1858,7 +1859,22 @@ chfs_readlink(const char *path, char *buf, size_t size)
 		errno = EINVAL;
 		return (-1);
 	}
-	ret = chfs_rpc_inode_read(p, strlen(p) + 1, buf, &s, 0,
+	psize = strlen(p) + 1;
+	ret = chfs_rpc_inode_stat(p, psize, chfs_chunk_size, &st, &err);
+	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
+		free(p);
+		chfs_set_errno(ret, err, diag);
+		save_errno = errno;
+		log_info("%s: path=%s: %s", diag, path, strerror(errno));
+		errno = save_errno;
+		return (-1);
+	} else if (!S_ISLNK(MODE_MASK(st.mode))) {
+		free(p);
+		log_info("%s: path=%s: %s", diag, path, strerror(EINVAL));
+		errno = EINVAL;
+		return (-1);
+	}
+	ret = chfs_rpc_inode_read(p, psize, buf, &s, 0,
 			0777 | S_IFLNK, chfs_chunk_size, &err);
 	if (ret == HG_SUCCESS && err == KV_ERR_NO_ENTRY &&
 		((bp = path_backend(p)) != NULL)) {
@@ -2261,7 +2277,7 @@ getdents_filler(void *buf, const char *name, const struct stat *st, off_t off)
 	d->d_ino = st->st_ino;
 	d->d_off = 0;
 	d->d_reclen = reclen;
-	d->d_type = st->st_mode << 12;
+	d->d_type = st->st_mode >> 12;
 	strcpy(d->d_name, name);
 	tab->pos += reclen;
 	return (0);
