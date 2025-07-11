@@ -98,7 +98,8 @@ backend_stat(char *path, size_t psize, size_t chunk_size, struct fs_stat *st)
 		r = KV_ERR_NO_BACKEND_PATH;
 		goto out;
 	}
-	if (stat(bp, &sb) == -1) {
+	if (lstat(bp, &sb) == -1) {
+		printf("backend_stat: path=%s: %s\n", bp, strerror(errno));
 		r = fs_err(-errno, diag);
 		free(bp);
 		goto out;
