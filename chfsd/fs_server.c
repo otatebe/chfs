@@ -59,7 +59,7 @@ fs_server_init(margo_instance_id mid, char *db_dir, size_t db_size, int timeout,
 		inode_read);
 #ifndef USE_ZERO_COPY_READ_RDMA
 	read_rdma_rpc = MARGO_REGISTER(mid, "inode_read_rdma",
-		fs_write_rdma_in_t, kv_get_rdma_out_t, inode_read_rdma);
+		fs_read_rdma_in_t, kv_get_rdma_out_t, inode_read_rdma);
 #endif
 	copy_rdma_rpc = MARGO_REGISTER(mid, "inode_copy_rdma",
 		fs_copy_rdma_in_t, int32_t, inode_copy_rdma);
@@ -408,7 +408,7 @@ inode_read(hg_handle_t h)
 	if (target && strcmp(env.self, target) != 0) {
 		ret = fs_rpc_inode_read(target, in.key.v, in.key.s,
 			out.value.v, &out.value.s, in.offset,
-			in.mode, in.chunk_size, &out.err);
+			in.chunk_size, &out.err);
 		if (ret != HG_SUCCESS) {
 			log_error("%s (rpc_read) %s:%d: %s", diag,
 				(char *)in.key.v, index,
@@ -467,7 +467,7 @@ static void
 inode_read_rdma(hg_handle_t h)
 {
 	hg_return_t ret;
-	fs_write_rdma_in_t in;
+	fs_read_rdma_in_t in;
 	kv_get_rdma_out_t out;
 	char *target;
 	margo_instance_id mid = margo_hg_handle_get_instance(h);
@@ -503,7 +503,7 @@ inode_read_rdma(hg_handle_t h)
 	if (target && strcmp(env.self, target) != 0) {
 		ret = fs_rpc_inode_read_rdma_bulk(target, in.key.v, in.key.s,
 			in.client, in.value, &out.value_size, in.offset,
-			in.mode, in.chunk_size, &out.err);
+			in.chunk_size, &out.err);
 		if (ret != HG_SUCCESS) {
 			log_error("%s (rpc_read_rdma_bulk) %s:%d: %s", diag,
 				(char *)in.key.v, index,

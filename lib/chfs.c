@@ -800,7 +800,7 @@ chfs_rpc_inode_write(void *key, size_t key_size, const void *buf, size_t *size,
 
 static hg_return_t
 chfs_async_rpc_inode_read(void *key, size_t key_size, void *buf, size_t size,
-	size_t offset, uint32_t mode, size_t chunk_size, fs_request_t *rp)
+	size_t offset, size_t chunk_size, fs_request_t *rp)
 {
 	char *target;
 	hg_return_t ret;
@@ -814,11 +814,11 @@ chfs_async_rpc_inode_read(void *key, size_t key_size, void *buf, size_t size,
 		}
 		if (size <= chfs_rdma_thresh)
 			ret = fs_async_rpc_inode_read(target, key, key_size,
-				size, offset, mode, chunk_size, rp);
+				size, offset, chunk_size, rp);
 		else
 			ret = fs_async_rpc_inode_read_rdma(target, key,
 				key_size, chfs_client, buf, size, offset,
-				mode, chunk_size, rp);
+				chunk_size, rp);
 		if (ret == HG_SUCCESS)
 			break;
 
@@ -843,14 +843,14 @@ chfs_async_rpc_inode_read_wait(void *buf, size_t *size, int *errp,
 
 static hg_return_t
 chfs_rpc_inode_read(void *key, size_t key_size, void *buf, size_t *size,
-	size_t offset, uint32_t mode, size_t chunk_size, int *errp)
+	size_t offset, size_t chunk_size, int *errp)
 {
 	hg_return_t ret;
 	fs_request_t req;
 	static const char diag[] = "rpc_inode_read";
 
 	ret = chfs_async_rpc_inode_read(key, key_size, buf, *size, offset,
-		mode, chunk_size, &req);
+		chunk_size, &req);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (async_rpc): %s", diag, HG_Error_to_string(ret));
 		return (ret);
@@ -1432,7 +1432,6 @@ chfs_pread_internal_sync(int fd, char *buf, size_t size, off_t offset)
 	char *path;
 	hg_return_t ret;
 	int index, local_pos, chunk_size, err;
-	uint32_t emode;
 	size_t s = size, psize;
 	ssize_t ss = 0;
 #ifdef CLIENT_CACHING
@@ -1449,7 +1448,6 @@ chfs_pread_internal_sync(int fd, char *buf, size_t size, off_t offset)
 	}
 
 	chunk_size = tab->chunk_size;
-	emode = MODE_FLAGS(tab->mode, tab->cache_flags);
 	index = offset / chunk_size;
 	local_pos = offset % chunk_size;
 
@@ -1457,7 +1455,7 @@ chfs_pread_internal_sync(int fd, char *buf, size_t size, off_t offset)
 	if (path == NULL)
 		return (-1);
 	ret = chfs_rpc_inode_read(path, psize, buf, &s, local_pos,
-			emode, chunk_size, &err);
+			chunk_size, &err);
 #ifdef CLIENT_CACHING
 	if (ret == HG_SUCCESS && err == KV_ERR_NO_ENTRY &&
 		(bdata = backend_read_cache(path, psize, chunk_size,
@@ -1500,7 +1498,6 @@ chfs_pread_internal_async(int fd, char *buf, size_t size, off_t offset)
 	struct fd_table *tab = get_fd_table(fd);
 	char *path, *p;
 	int index, local_pos, pos, chunk_size, nchunks, i, err;
-	uint32_t emode;
 	size_t psize, s, ss = 0, sss, may_hole;
 	struct {
 		size_t s;
@@ -1521,7 +1518,6 @@ chfs_pread_internal_async(int fd, char *buf, size_t size, off_t offset)
 	}
 
 	chunk_size = tab->chunk_size;
-	emode = MODE_FLAGS(tab->mode, tab->cache_flags);
 	p = strdup(tab->path);
 	if (p == NULL)
 		return (-1);
@@ -1550,7 +1546,7 @@ chfs_pread_internal_async(int fd, char *buf, size_t size, off_t offset)
 		if (path == NULL)
 			break;
 		ret = chfs_async_rpc_inode_read(path, psize, buf + ss, req[i].s,
-			pos, emode, chunk_size, &req[i].r);
+			pos, chunk_size, &req[i].r);
 		free(path);
 		if (ret != HG_SUCCESS)
 			break;
@@ -1874,8 +1870,7 @@ chfs_readlink(const char *path, char *buf, size_t size)
 		errno = EINVAL;
 		return (-1);
 	}
-	ret = chfs_rpc_inode_read(p, psize, buf, &s, 0,
-			0777 | S_IFLNK, chfs_chunk_size, &err);
+	ret = chfs_rpc_inode_read(p, psize, buf, &s, 0, chfs_chunk_size, &err);
 	if (ret == HG_SUCCESS && err == KV_ERR_NO_ENTRY &&
 		((bp = path_backend(p)) != NULL)) {
 		s = readlink(bp, buf, size);

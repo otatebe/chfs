@@ -25,13 +25,11 @@ fs_async_rpc_inode_write_wait(size_t *size, int *errp, fs_request_t *rp);
 
 hg_return_t
 fs_rpc_inode_read(const char *server, void *key, size_t key_size, void *buf,
-	size_t *size, size_t offset, uint32_t mode, size_t chunk_size,
-	int *errp);
+	size_t *size, size_t offset, size_t chunk_size, int *errp);
 
 hg_return_t
 fs_async_rpc_inode_read(const char *server, void *key, size_t key_size,
-	size_t size, size_t offset, uint32_t mode, size_t chunk_size,
-	fs_request_t *rp);
+	size_t size, size_t offset, size_t chunk_size, fs_request_t *rp);
 
 hg_return_t
 fs_async_rpc_inode_read_wait(void *buf, size_t *size, int *errp,
@@ -68,17 +66,17 @@ fs_async_rpc_inode_write_rdma_wait(hg_size_t *size, int *errp,
 hg_return_t
 fs_rpc_inode_read_rdma_bulk(const char *server, void *key, size_t key_size,
 	char *client, hg_bulk_t buf, hg_size_t *size, size_t offset,
-	uint32_t mode, size_t chunk_size, int *errp);
+	size_t chunk_size, int *errp);
 
 hg_return_t
 fs_rpc_inode_read_rdma(const char *server, void *key, size_t key_size,
 	char *client, void *buf, hg_size_t *size, size_t offset,
-	uint32_t mode, size_t chunk_size, int *errp);
+	size_t chunk_size, int *errp);
 
 hg_return_t
 fs_async_rpc_inode_read_rdma_bulk(const char *server, void *key,
 	size_t key_size, char *client, hg_bulk_t buf, hg_size_t size,
-	size_t offset, uint32_t mode, size_t chunk_size, fs_request_t *rp);
+	size_t offset, size_t chunk_size, fs_request_t *rp);
 
 hg_return_t
 fs_async_rpc_inode_read_rdma_bulk_wait(hg_size_t *size, int *errp,
@@ -87,7 +85,7 @@ fs_async_rpc_inode_read_rdma_bulk_wait(hg_size_t *size, int *errp,
 hg_return_t
 fs_async_rpc_inode_read_rdma(const char *server, void *key, size_t key_size,
 	char *client, void *buf, hg_size_t size, size_t offset,
-	uint32_t mode, size_t chunk_size, fs_request_t *rp);
+	size_t chunk_size, fs_request_t *rp);
 
 hg_return_t
 fs_async_rpc_inode_read_rdma_wait(hg_size_t *size, int *errp, fs_request_t *rp);
