@@ -1,8 +1,5 @@
 #!/bin/sh
 
-set -eux
-
-. ./test-env.sh
-
 # chfsctl stop
-chfsctl -h hosts -m $MDIR stop
+[ X$MDIR = X ] && OPT= || OPT="-m $MDIR"
+chfsctl -h hosts $OPT stop
