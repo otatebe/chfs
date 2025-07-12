@@ -179,7 +179,7 @@ test_symlink(char *p1, char *p2)
 	printf("test_symlink: %s %s: ", p1, p2);
 	fflush(stdout);
 	_(chfs_symlink(p1, p2));
-	_(chfs_stat(p2, &sb));
+	_(chfs_lstat(p2, &sb));
 	assert(S_ISLNK(sb.st_mode));
 
 	r = chfs_readlink(p2, b, len);
