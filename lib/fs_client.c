@@ -79,7 +79,7 @@ err:
 
 hg_return_t
 fs_rpc_inode_stat(const char *server, void *key, size_t key_size,
-	size_t chunk_size, struct fs_stat *st, int *errp)
+	size_t chunk_size, uint32_t flag, struct fs_stat *st, int *errp)
 {
 	hg_handle_t h;
 	fs_stat_in_t in;
@@ -94,6 +94,7 @@ fs_rpc_inode_stat(const char *server, void *key, size_t key_size,
 	in.key.v = key;
 	in.key.s = key_size;
 	in.chunk_size = chunk_size;
+	in.flag = flag;
 	ret = margo_forward_timed(h, &in, fs_rpc_timeout_msec);
 	if (ret != HG_SUCCESS) {
 		log_error("%s (forward): %s", diag, HG_Error_to_string(ret));

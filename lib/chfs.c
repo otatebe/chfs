@@ -912,7 +912,7 @@ chfs_rpc_remove(void *key, size_t key_size, int *errp)
 
 static hg_return_t
 chfs_rpc_inode_stat(void *key, size_t key_size, size_t chunk_size,
-	struct fs_stat *st, int *errp)
+	uint32_t flag, struct fs_stat *st, int *errp)
 {
 	char *target;
 	hg_return_t ret;
@@ -925,7 +925,7 @@ chfs_rpc_inode_stat(void *key, size_t key_size, size_t chunk_size,
 			return (HG_PROTOCOL_ERROR);
 		}
 		ret = fs_rpc_inode_stat(target, key, key_size, chunk_size,
-				st, errp);
+				flag, st, errp);
 		if (ret == HG_SUCCESS)
 			break;
 
@@ -1057,7 +1057,7 @@ chfs_open(const char *path, int32_t flags)
 		return (fd);
 	}
 	psize = strlen(p) + 1;
-	ret = chfs_rpc_inode_stat(p, psize, chfs_chunk_size, &st, &err);
+	ret = chfs_rpc_inode_stat(p, psize, chfs_chunk_size, 0, &st, &err);
 #ifdef CLIENT_CACHING
 	if (ret == HG_SUCCESS && err == KV_ERR_NO_ENTRY) {
 		st.chunk_size = chfs_chunk_size;
@@ -1197,7 +1197,7 @@ chfs_chdir(const char *path)
 		return (-1);
 	}
 	psize = strlen(pp) + 1;
-	ret = chfs_rpc_inode_stat(pp, psize, chfs_chunk_size, &st, &err);
+	ret = chfs_rpc_inode_stat(pp, psize, chfs_chunk_size, 0, &st, &err);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
 		free(pp);
 		chfs_set_errno(ret, err, diag);
@@ -1661,7 +1661,7 @@ chfs_read(int fd, void *buf, size_t size)
 }
 
 static int
-chfs_stat_internal(char *p, struct stat *st);
+chfs_stat_internal(char *p, uint32_t flag, struct stat *st);
 
 off_t
 chfs_seek(int fd, off_t off, int whence)
@@ -1687,7 +1687,7 @@ chfs_seek(int fd, off_t off, int whence)
 		break;
 	case SEEK_END:
 		pos = fd_pos_get(fd);
-		if (chfs_stat_internal(tab->path, &sb) == 0) {
+		if (chfs_stat_internal(tab->path, 0, &sb) == 0) {
 			if (pos < sb.st_size)
 				pos = sb.st_size;
 			pos = fd_pos_set(fd, pos + off);
@@ -1856,7 +1856,7 @@ chfs_readlink(const char *path, char *buf, size_t size)
 		return (-1);
 	}
 	psize = strlen(p) + 1;
-	ret = chfs_rpc_inode_stat(p, psize, chfs_chunk_size, &st, &err);
+	ret = chfs_rpc_inode_stat(p, psize, chfs_chunk_size, 1, &st, &err);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
 		free(p);
 		chfs_set_errno(ret, err, diag);
@@ -1905,7 +1905,7 @@ root_stat(struct stat *st)
 
 /* p should be canonical path */
 static int
-chfs_stat_internal(char *p, struct stat *st)
+chfs_stat_internal(char *p, uint32_t flag, struct stat *st)
 {
 	struct fs_stat sb;
 	size_t psize;
@@ -1922,7 +1922,8 @@ chfs_stat_internal(char *p, struct stat *st)
 		log_info("%s: path=/", diag);
 		return (0);
 	}
-	ret = chfs_rpc_inode_stat(p, strlen(p) + 1, chfs_chunk_size, &sb, &err);
+	ret = chfs_rpc_inode_stat(p, strlen(p) + 1, chfs_chunk_size, flag,
+		&sb, &err);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS) {
 		chfs_set_errno(ret, err, diag);
 		save_errno = errno;
@@ -1949,7 +1950,8 @@ chfs_stat_internal(char *p, struct stat *st)
 		pi = path_index(p, j + i, &psize);
 		if (pi == NULL)
 			break;
-		ret = chfs_rpc_inode_stat(pi, psize, sb.chunk_size, &sb, &err);
+		ret = chfs_rpc_inode_stat(pi, psize, sb.chunk_size, 0,
+			&sb, &err);
 		free(pi);
 		if (ret != HG_SUCCESS)
 			break;
@@ -1977,7 +1979,17 @@ int
 chfs_stat(const char *path, struct stat *st)
 {
 	char *p = canonical_fullpath(path);
-	int ret = chfs_stat_internal(p, st);
+	int ret = chfs_stat_internal(p, 0, st);
+
+	free(p);
+	return (ret);
+}
+
+int
+chfs_lstat(const char *path, struct stat *st)
+{
+	char *p = canonical_fullpath(path);
+	int ret = chfs_stat_internal(p, 1, st);
 
 	free(p);
 	return (ret);
@@ -1990,7 +2002,7 @@ chfs_fstat(int fd, struct stat *st)
 
 	if (tab == NULL)
 		return (-1);
-	return (chfs_stat_internal(tab->path, st));
+	return (chfs_stat_internal(tab->path, 0, st));
 }
 
 int
@@ -2005,7 +2017,7 @@ chfs_access(const char *path, int mode)
 	if (p == NULL)
 		return (-1);
 	if (p[0]) {
-		ret = chfs_rpc_inode_stat(p, strlen(p) + 1, chfs_chunk_size,
+		ret = chfs_rpc_inode_stat(p, strlen(p) + 1, chfs_chunk_size, 0,
 			&sb, &err);
 		if (ret != HG_SUCCESS || err != KV_SUCCESS) {
 			free(p);
@@ -2039,7 +2051,8 @@ chfs_truncate_internal(char *p, off_t len)
 		errno = EINVAL;
 		return (-1);
 	}
-	ret = chfs_rpc_inode_stat(p, strlen(p) + 1, chfs_chunk_size, &sb, &err);
+	ret = chfs_rpc_inode_stat(p, strlen(p) + 1, chfs_chunk_size, 0,
+		&sb, &err);
 	mode = MODE_MASK(sb.mode);
 	if (ret != HG_SUCCESS || err != KV_SUCCESS || !S_ISREG(mode)) {
 		chfs_set_errno(ret, err, diag);

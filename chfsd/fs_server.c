@@ -166,7 +166,7 @@ inode_stat(hg_handle_t h)
 	target = ring_list_lookup(in.key.v, in.key.s);
 	if (target && strcmp(env.self, target) != 0) {
 		ret = fs_rpc_inode_stat(target, in.key.v, in.key.s,
-				in.chunk_size, &sb, &out.err);
+				in.chunk_size, in.flag, &sb, &out.err);
 		if (ret != HG_SUCCESS) {
 			log_error("%s (rpc_stat) %s:%d: %s", diag,
 				(char *)in.key.v, index,
@@ -174,10 +174,10 @@ inode_stat(hg_handle_t h)
 			out.err = KV_ERR_SERVER_DOWN;
 		}
 	} else {
-		out.err = fs_inode_stat(in.key.v, in.key.s, &sb);
+		out.err = fs_inode_stat(in.key.v, in.key.s, in.flag, &sb);
 		if (out.err == KV_ERR_NO_ENTRY) {
 			out.err = backend_stat(in.key.v, in.key.s,
-					in.chunk_size, &sb);
+					in.chunk_size, in.flag, &sb);
 			if (out.err == KV_ERR_NO_BACKEND_PATH)
 				out.err = KV_ERR_NO_ENTRY;
 		}
@@ -725,7 +725,7 @@ inode_truncate(hg_handle_t h)
 	} else {
 		err = fs_inode_truncate(in.key.v, in.key.s, in.len);
 		if (err == KV_ERR_NO_ENTRY) {
-			err = backend_stat(in.key.v, in.key.s, 0, NULL);
+			err = backend_stat(in.key.v, in.key.s, 0, 0, NULL);
 			if (err == KV_ERR_NO_BACKEND_PATH)
 				err = KV_ERR_NO_ENTRY;
 		}

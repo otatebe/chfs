@@ -391,7 +391,7 @@ fs_inode_create_stat(char *key, size_t key_size, struct fs_stat *st,
 }
 
 int
-fs_inode_stat(char *key, size_t key_size, struct fs_stat *st)
+fs_inode_stat(char *key, size_t key_size, uint32_t flag, struct fs_stat *st)
 {
 	char *p;
 	struct stat sb;
@@ -403,8 +403,8 @@ fs_inode_stat(char *key, size_t key_size, struct fs_stat *st)
 	if (p == NULL)
 		return (KV_ERR_NO_MEMORY);
 
-	log_debug("%s: %s", diag, p);
-	r = lstat(p, &sb);
+	log_debug("%s: %s %d", diag, p, flag);
+	r = (flag ? lstat : stat)(p, &sb);
 	if (r == -1) {
 		r = -errno;
 		goto err;

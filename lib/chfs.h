@@ -34,6 +34,7 @@ int chfs_unlink(const char *path);
 int chfs_mkdir(const char *path, mode_t mode);
 int chfs_rmdir(const char *path);
 int chfs_stat(const char *path, struct stat *st);
+int chfs_lstat(const char *path, struct stat *st);
 int chfs_fstat(int fd, struct stat *st);
 int chfs_access(const char *path, int mode);
 int chfs_readdir(const char *path, void *buf,

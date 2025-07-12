@@ -26,7 +26,7 @@ MERCURY_GEN_PROC(fs_create_in_t,
 
 MERCURY_GEN_PROC(fs_stat_in_t,
 	((kv_byte_t)(key))\
-	((uint64_t)(chunk_size)))
+	((uint64_t)(chunk_size))((uint32_t)(flag)))
 
 MERCURY_GEN_PROC(fs_stat_out_t,
 	 ((int32_t)(err))((fs_stat_t)(st)))

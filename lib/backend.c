@@ -86,7 +86,8 @@ backend_write_key(const char *key, mode_t mode,
 }
 
 int
-backend_stat(char *path, size_t psize, size_t chunk_size, struct fs_stat *st)
+backend_stat(char *path, size_t psize, size_t chunk_size, uint32_t flag,
+	struct fs_stat *st)
 {
 	int r = KV_SUCCESS;
 	char *bp;
@@ -98,7 +99,7 @@ backend_stat(char *path, size_t psize, size_t chunk_size, struct fs_stat *st)
 		r = KV_ERR_NO_BACKEND_PATH;
 		goto out;
 	}
-	if (lstat(bp, &sb) == -1) {
+	if ((flag ? lstat : stat)(bp, &sb) == -1) {
 		r = fs_err(-errno, diag);
 		free(bp);
 		goto out;
@@ -143,7 +144,7 @@ backend_read(char *path, size_t psize, size_t chunk_size,
 		return (NULL);
 	if ((bp = path_backend(path)) == NULL)
 		goto err_free_buf;
-	if (backend_stat(path, psize, chunk_size, st) != KV_SUCCESS) {
+	if (backend_stat(path, psize, chunk_size, 0, st) != KV_SUCCESS) {
 		free(bp);
 		goto err_free_buf;
 	}

@@ -118,7 +118,7 @@ fs_inode_create_stat(char *key, size_t key_size, struct fs_stat *st,
 }
 
 int
-fs_inode_stat(char *key, size_t key_size, struct fs_stat *stat)
+fs_inode_stat(char *key, size_t key_size, uint32_t flag, struct fs_stat *stat)
 {
 	struct inode inode;
 	size_t s;

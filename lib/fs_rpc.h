@@ -8,7 +8,7 @@ fs_rpc_inode_create(const char *server, void *key, size_t key_size,
 
 hg_return_t
 fs_rpc_inode_stat(const char *server, void *key, size_t key_size,
-	size_t chunk_size, struct fs_stat *st, int *errp);
+	size_t chunk_size, uint32_t flag, struct fs_stat *st, int *errp);
 
 hg_return_t
 fs_rpc_inode_write(const char *server, void *key, size_t key_size,
