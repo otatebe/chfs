@@ -1,8 +1,8 @@
 # CHFS - Parallel caching file system for node-local storages
 
-CHFS is a parallel caching file system created instantly using node-local storages such as persistent memory and NVMe SSD.  It exploits the performance of persistent memory using persistent in-memory key-value store pmemkv.  For NVMe SSD, it uses a POSIX backend.  It supports RDMA high performance data access.
+CHFS is a parallel caching file system that is created instantly using node-local storage, such as persistent memory and NVMe SSD, across multiple compute nodes.  It leverages the performance of persistent memory with a persistent in-memory key-value store pmemkv.  For NVMe SSDs, it uses a POSIX I/F.  CHFS leverages RDMA for high performance data access.
 
-CHFS provides a caching mechanism against a backend parallel file system.  Files in the backend parallel file system are automatically cached on demand or manually staged-in.  Output files are automatically flushed by I/O-aware flushing to maximize the performance of CHFS.
+CHFS provides a caching mechanism against a backend parallel file system.  Files in the backend parallel file system are automatically cached on demand or manually staged-in.  Output files are automatically flushed by I/O-aware flushing that maximizes the performance of CHFS.
 
 ## Quick installation steps
 
@@ -80,7 +80,7 @@ To use chfs, `spack load chfs` is required.
 
 This executes chfsd servers and mounts the CHFS at /mount/point on hosts specified by the hostfile.  The -p option specifies a communication protocol.  The -c option specifies a devdax device or a scratch directory on each host.
 
-The backend directory typically in a parallel file system can be specified by the -b option.  Files in the backend directory can be transparently accessed at the CHFS mount directory.  For efficient access, files can be staged-in by `chstagein` command beforehand.  This is an example to stage-in all files in the backend directory.
+The backend directory typically in a parallel file system can be specified by the -b option.  Files in the backend directory can be transparently accessed at the CHFS mount directory when the -m option is specified.  If all files in the backend file system need to be accessed, you can specify / as a backend directory.  For efficient access, files can be staged-in by `chstagein` command beforehand.  This is an example to stage-in all files in the backend directory.
 
 ```console
 % cd /back/end/path
@@ -88,6 +88,8 @@ The backend directory typically in a parallel file system can be specified by th
 ```
 
 `chstagein` can be executed with and without mpirun.  The output files will be flushed automatically to the backend directory.  It is possible to ensure flushing all dirty files by `chfs_sync()` or `chfsctl stop`.
+
+The -m option specifies the mount directory of CHFS.  When this option is specified, the subdirectory of CHFS that is the same directory as the mount directory is mounted.  That is, files in CHFS can be accessed using the same directory path by POSIX I/F via chfuse and CHFS APIs.
 
 For devdax device, a pmem obj pool should be created with the layout pmemkv by `pmempool create -l pmemkv obj /dev/dax0.0`.  For user-level access, the permission of the device should be modified, and bad block check should be disabled by `pmempool feature --disable CHECK_BAD_BLOCKS /dev/dax0.0`.
 
@@ -100,7 +102,14 @@ For details, see [manual page of chfsctl](doc/chfsctl.1.md).
 CHFS is mounted by the -m option of chfsctl command.  If you need to mount it on other hosts, chfuse command is used;
 
 ```console
-% chfuse <mount_point>
+% chfuse -o direct_io /mount/point
+```
+
+When you want to mount the subdirectory of CHFS the same way chfsctl mount, use subdir module like this.
+
+```console
+% export CHFS_SUBDIR_PATH=/mount/point
+% chfuse -o direct_io,modules=subdir,subdir=$CHFS_SUBDIR_PATH $CHFS_SUBDIR_PATH
 ```
 
 CHFS_SERVER and other environment variables, which are the output of chfsctl command, should be defined.
@@ -109,7 +118,7 @@ For details, see [manual page of chfuse](doc/chfuse.1.md).
 
 ## POSIX interface for CHFS
 
-POSIX programs can access CHFS using CHFS-zpoline interception library without modification.
+POSIX programs can access CHFS using CHFS-zpoline interception library without source-code modification and without mounting CHFS by chfuse.
 
 ### Install CHFS-zpoline
 
@@ -124,12 +133,13 @@ POSIX programs can access CHFS using CHFS-zpoline interception library without m
 
 ### How to use CHFS-zpoline
 
-When using CHFS-zpoline, CHFS is virtually mounted on /chfs.  Or, you can access CHFS by a relative path.
+When using CHFS-zpoline, CHFS is virtually mounted on /chfs, or / when specifying cached directories using LIBZPDIRS.  When LIBZPDIRS is specified, files in the specified directories are hooked.  Also you can access CHFS by a relative path.
 
 ```console
 % sudo sysctl vm.mmap_min_addr=0
-% export LIBZPHOOK=/usr/local/lib/libcz.so
-% LD_PRELOAD=/usr/local/lib/libzpoline.so program ...
+% export LIBZPHOOK=$PREFIX/lib/libcz.so
+% export LIBZPDIRS="$PWD /data"
+% LD_PRELOAD=$PREFIX/lib/libzpoline.so program ...
 ```
 
 ## CHFS commands
@@ -255,6 +265,7 @@ int chfs_mkdir(const char *path, mode_t mode);
 int chfs_rmdir(const char *path);
 int chfs_stat(const char *path, struct stat *st);
 int chfs_fstat(int fd, struct stat *st);
+int chfs_lstat(const char *path, struct stat *st);
 int chfs_access(const char *path, int mode);
 int chfs_readdir(const char *path, void *buf,
         int (*filler)(void *, const char *, const struct stat *, off_t));
