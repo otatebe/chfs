@@ -10,13 +10,14 @@
 #include "log.h"
 
 static void
-backend_cache_local(char *path, size_t psize, char *buf, size_t *sizep,
+backend_cache_local(char *path, size_t psize, char *buf, size_t size,
 	mode_t mode, size_t chunk_size)
 {
-	int err;
+	size_t ss = size;
+	int index = key_index(path, psize), err;
 	static const char diag[] = "backend_cache_local";
 
-	err = fs_inode_write(path, psize, buf, sizep, 0,
+	err = fs_inode_write(path, psize, buf, &ss, 0,
 			mode | CHFS_O_CACHE, chunk_size);
 	if (err != KV_SUCCESS) {
 		if (err == KV_ERR_NO_SPACE)
@@ -24,7 +25,18 @@ backend_cache_local(char *path, size_t psize, char *buf, size_t *sizep,
 					kv_err_string(err));
 		else
 			log_error("%s: %s: %s", diag, path, kv_err_string(err));
+		return;
 	}
+	if (size != ss) {
+		err = fs_inode_remove(path, psize);
+		if (err == KV_SUCCESS)
+			log_info("%s: %s: partial cache removed", diag, path);
+		else
+			log_error("%s: %s: partial cache cannot be removed: "
+				"%s", diag, path, kv_err_string(err));
+		return;
+	}
+	log_debug("%s: path=%s index=%d size=%ld", diag, path, index, size);
 }
 
 char *
@@ -34,15 +46,13 @@ backend_read_cache_local(char *path, size_t psize, size_t chunk_size,
 	size_t s;
 	struct fs_stat st;
 	char *buf = backend_read(path, psize, chunk_size, &st, &s);
-	int index = key_index(path, psize);
 
 	if (buf != NULL) {
-		backend_cache_local(path, psize, buf, &s, st.mode, chunk_size);
+		backend_cache_local(path, psize, buf, s, st.mode, chunk_size);
 		if (size)
 			*size = s;
 		if (stp)
 			*stp = st;
-		log_debug("cache: path=%s index=%d size=%ld", path, index, s);
 	}
 	return (buf);
 }
