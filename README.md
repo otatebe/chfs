@@ -105,7 +105,7 @@ CHFS is mounted by the -m option of chfsctl command.  If you need to mount it on
 % chfuse -o direct_io /mount/point
 ```
 
-When you want to mount the subdirectory of CHFS the same way chfsctl mount, use subdir module like this.
+When you want to mount the subdirectory of CHFS the same way chfsctl mounts, use subdir module like this.
 
 ```console
 % export CHFS_SUBDIR_PATH=/mount/point
