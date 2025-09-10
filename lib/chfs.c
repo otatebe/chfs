@@ -1175,7 +1175,7 @@ chfs_path_at(int fd, const char *path)
 		return (cat_path(path_get_cwd(), path));
 	}
 	tab = get_fd_table(fd);
-	if (tab == NULL || !S_ISDIR(tab->mode)) {
+	if (tab == NULL) {
 		errno = EBADF;
 		return (NULL);
 	}
