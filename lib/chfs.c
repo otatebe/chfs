@@ -2267,6 +2267,7 @@ getdents_filler(void *buf, const char *name, const struct stat *st, off_t off)
 	struct fd_table *tab = buf;
 	struct linux_dirent64 *d;
 	unsigned short reclen = offsetof(struct linux_dirent64, d_name);
+	uint32_t ino;
 
 	reclen = (reclen + strlen(name) + 2 + DIRENT_ALIGN) & ~DIRENT_ALIGN;
 	if (tab->buf_size < tab->pos + reclen) {
@@ -2282,7 +2283,8 @@ getdents_filler(void *buf, const char *name, const struct stat *st, off_t off)
 		tab->buf_size = bsize;
 	}
 	d = (struct linux_dirent64 *)&tab->buf[tab->pos];
-	d->d_ino = st->st_ino;
+	MurmurHash3_x86_32(name, strlen(name) + 1, 1234, &ino);
+	d->d_ino = ino;
 	d->d_off = 0;
 	d->d_reclen = reclen;
 	d->d_type = st->st_mode >> 12;
