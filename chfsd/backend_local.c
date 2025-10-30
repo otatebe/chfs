@@ -11,14 +11,15 @@
 
 static void
 backend_cache_local(char *path, size_t psize, char *buf, size_t size,
-	mode_t mode, size_t chunk_size)
+	struct fs_stat *st, size_t chunk_size)
 {
 	size_t ss = size;
+	struct timespec times[2];
 	int index = key_index(path, psize), err;
 	static const char diag[] = "backend_cache_local";
 
 	err = fs_inode_write(path, psize, buf, &ss, 0,
-			mode | CHFS_O_CACHE, chunk_size);
+			st->mode | CHFS_O_CACHE, chunk_size);
 	if (err != KV_SUCCESS) {
 		if (err == KV_ERR_NO_SPACE)
 			log_notice("%s: %s: %s", diag, path,
@@ -35,6 +36,9 @@ backend_cache_local(char *path, size_t psize, char *buf, size_t size,
 			log_error("%s: %s: partial cache cannot be removed: "
 				"%s", diag, path, kv_err_string(err));
 		return;
+	} else {
+		times[0] = times[1] = st->mtime;
+		fs_inode_utimensat(path, psize, times);
 	}
 	log_debug("%s: path=%s index=%d size=%ld", diag, path, index, size);
 }
@@ -48,7 +52,7 @@ backend_read_cache_local(char *path, size_t psize, size_t chunk_size,
 	char *buf = backend_read(path, psize, chunk_size, &st, &s);
 
 	if (buf != NULL) {
-		backend_cache_local(path, psize, buf, s, st.mode, chunk_size);
+		backend_cache_local(path, psize, buf, s, &st, chunk_size);
 		if (size)
 			*size = s;
 		if (stp)

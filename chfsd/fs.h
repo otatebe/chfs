@@ -8,6 +8,7 @@ int fs_inode_create(char *key, size_t key_size, uint32_t uid, uint32_t gid,
 int fs_inode_create_stat(char *key, size_t key_size, struct fs_stat *st,
 	const void *buf, size_t size);
 int fs_inode_stat(char *key, size_t key_size, uint32_t, struct fs_stat *stat);
+int fs_inode_utimensat(char *key, size_t key_size, struct timespec times[2]);
 int fs_inode_write(char *key, size_t key_size, const void *buf,
 	size_t *size, off_t offset, uint32_t mode, size_t chunk_size);
 int fs_inode_read(char *key, size_t key_size, void *buf, size_t *size,

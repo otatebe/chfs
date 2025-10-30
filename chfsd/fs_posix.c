@@ -431,6 +431,23 @@ err:
 }
 
 int
+fs_inode_utimensat(char *key, size_t key_size, struct timespec times[2])
+{
+	char *p;
+	int r;
+	static const char diag[] = "fs_inode_utimensat";
+
+	p = key_to_path(key, key_size);
+	if (p == NULL)
+		return (KV_ERR_NO_MEMORY);
+
+	log_debug("%s: %s", diag, p);
+	r = utimensat(AT_FDCWD, p, times, AT_SYMLINK_NOFOLLOW);
+	free(p);
+	return (fs_err(r, diag));
+}
+
+int
 fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 	off_t offset, uint32_t emode, size_t chunk_size)
 {

@@ -140,6 +140,21 @@ fs_inode_stat(char *key, size_t key_size, uint32_t flag, struct fs_stat *stat)
 	return (KV_SUCCESS);
 }
 
+int
+fs_inode_utimensat(char *key, size_t key_size, struct timespec times[2])
+{
+	size_t s;
+	int r;
+	static const char diag[] = "fs_inode_utimensat";
+
+	s = sizeof(times[1]);
+	r = kv_update(key, key_size, offsetof(struct inode, mtime), &times[1],
+		&s);
+	if (r != KV_SUCCESS)
+		log_error("%s: %s: %s", diag, key, kv_err_string(r));
+	return (r);
+}
+
 static int
 fs_inode_update_size(char *key, size_t key_size, size_t size)
 {
