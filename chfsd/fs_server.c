@@ -209,6 +209,22 @@ destroy:
 }
 DEFINE_MARGO_RPC_HANDLER(inode_stat)
 
+static int
+fs_write(char *key, size_t key_size, const void *buf, size_t *size,
+	off_t offset, uint32_t emode, size_t chunk_size)
+{
+	struct fs_stat sb;
+	char *bdata;
+
+	if (offset > 0 && fs_inode_stat(key, key_size, 1, &sb) != KV_SUCCESS) {
+		bdata = backend_read_cache_local(key, key_size, chunk_size,
+			NULL, NULL);
+		free(bdata);
+	}
+	return (fs_inode_write(key, key_size, buf, size, offset, emode,
+			chunk_size));
+}
+
 static void
 inode_write(hg_handle_t h)
 {
@@ -242,7 +258,7 @@ inode_write(hg_handle_t h)
 			out.err = KV_ERR_SERVER_DOWN;
 		}
 	} else
-		out.err = fs_inode_write(in.key.v, in.key.s, in.value.v,
+		out.err = fs_write(in.key.v, in.key.s, in.value.v,
 			&out.value_size, in.offset, in.mode, in.chunk_size);
 	free(target);
 	if (out.err != KV_SUCCESS)
@@ -341,7 +357,7 @@ inode_write_rdma(hg_handle_t h)
 			log_error("%s (bulk_free): %s", diag,
 				HG_Error_to_string(ret));
 		if (out.err == 0)
-			out.err = fs_inode_write(in.key.v, in.key.s, buf,
+			out.err = fs_write(in.key.v, in.key.s, buf,
 				&out.value_size, in.offset, in.mode,
 				in.chunk_size);
 free_buf:
