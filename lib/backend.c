@@ -28,7 +28,7 @@ backend_write(char *dst, int flags, mode_t mode,
 	clock_gettime(CLOCK_REALTIME, &ts1);
 	fd = open(dst, flags, mode);
 	if (fd == -1) {
-		fs_mkdir_parent(dst);
+		fs_mkdir_parent(dst, NULL);
 		fd = open(dst, flags, mode);
 	}
 	clock_gettime(CLOCK_REALTIME, &ts2);

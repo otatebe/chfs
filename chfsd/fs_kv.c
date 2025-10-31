@@ -346,11 +346,11 @@ flush_cb(const char *value, size_t value_size, void *arg)
 		goto regular_file;
 
 	if (S_ISDIR(mode))
-		r = fs_mkdir_p(a->dst, mode);
+		r = fs_mkdir_p(a->dst, mode, NULL);
 	else if (S_ISLNK(mode)) {
 		r = symlink(value + fs_msize, a->dst);
 		if (r == -1) {
-			fs_mkdir_parent(a->dst);
+			fs_mkdir_parent(a->dst, NULL);
 			r = symlink(value + fs_msize, a->dst);
 		}
 	} else {

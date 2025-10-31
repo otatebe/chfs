@@ -8,14 +8,25 @@
 
 #define DIR_LEVEL 20
 
+static int
+fs_mkdir(char *path, mode_t mode, int (*func)(const char *))
+{
+	int r;
+
+	r = mkdir(path, mode);
+	if (r == 0 && func)
+		func(path);
+	return (r);
+}
+
 int
-fs_mkdir_p(char *path, mode_t mode)
+fs_mkdir_p(char *path, mode_t mode, int (*func)(const char *))
 {
 	int r, p = strlen(path) - 1, pos[DIR_LEVEL], i;
 	static const char diag[] = "fs_mkdir_p";
 
 	log_debug("%s: %s", diag, path);
-	r = mkdir(path, mode);
+	r = fs_mkdir(path, mode, func);
 	if (r == 0 || errno != ENOENT)
 		return (r);
 	while (p > 0 && path[p] == '/')
@@ -29,7 +40,7 @@ fs_mkdir_p(char *path, mode_t mode)
 		path[p] = '\0';
 
 		log_debug("%s: [%d] %s", diag, i, path);
-		r = mkdir(path, mode);
+		r = fs_mkdir(path, mode, func);
 		if (r == -1) {
 			if (errno == ENOENT)
 				continue;
@@ -38,7 +49,7 @@ fs_mkdir_p(char *path, mode_t mode)
 		}
 		for (; i >= 0; --i) {
 			path[pos[i]] = '/';
-			r = mkdir(path, mode);
+			r = fs_mkdir(path, mode, func);
 			if (r == -1 && errno != EEXIST)
 				return (r);
 		}
@@ -71,13 +82,13 @@ fs_dirname(const char *path)
 }
 
 void
-fs_mkdir_parent(const char *path)
+fs_mkdir_parent(const char *path, int (*func)(const char *))
 {
 	char *d = fs_dirname(path);
 
 	if (d != NULL) {
 		/* fs_mkdir_p() may fail due to race condition */
-		fs_mkdir_p(d, 0755);
+		fs_mkdir_p(d, 0755, func);
 		free(d);
 	}
 }

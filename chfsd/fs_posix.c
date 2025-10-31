@@ -76,7 +76,7 @@ fs_inode_init(char *dir, int niothreads)
 
 	r = chdir(dir);
 	if (r == -1 && errno == ENOENT) {
-		r = fs_mkdir_p(dir, 0755);
+		r = fs_mkdir_p(dir, 0755, NULL);
 		if (r == 0)
 			r = chdir(dir);
 	}
@@ -263,6 +263,12 @@ fs_inode_dirty(int fd, const char *p)
 }
 
 static int
+set_cache_flag(const char *path)
+{
+	return (set_metadata(path, 0, CHFS_FS_CACHE));
+}
+
+static int
 fs_open(const char *path, int flags, mode_t mode, size_t *chunk_size,
 	int16_t *cache_flags, int *set_metadata_p)
 {
@@ -275,7 +281,7 @@ fs_open(const char *path, int flags, mode_t mode, size_t *chunk_size,
 	}
 	fd = open(path, flags, mode);
 	if (fd == -1 && ((flags & O_ACCMODE) != O_RDONLY)) {
-		fs_mkdir_parent(path);
+		fs_mkdir_parent(path, set_cache_flag);
 		flags |= O_CREAT;
 		fd = open(path, flags, mode);
 	}
@@ -326,7 +332,7 @@ fs_inode_create(char *key, size_t key_size, uint32_t uid, uint32_t gid,
 			close(fd);
 		}
 	} else if (S_ISDIR(mode)) {
-		r = fs_mkdir_p(p, mode);
+		r = fs_mkdir_p(p, mode, NULL);
 		if (r == -1)
 			r = -errno;
 		else
@@ -334,7 +340,7 @@ fs_inode_create(char *key, size_t key_size, uint32_t uid, uint32_t gid,
 	} else if (S_ISLNK(mode)) {
 		r = symlink(buf, p);
 		if (r == -1) {
-			fs_mkdir_parent(p);
+			fs_mkdir_parent(p, NULL);
 			r = symlink(buf, p);
 		}
 		if (r == -1)
@@ -769,14 +775,14 @@ fs_inode_flush(void *key, size_t key_size)
 		goto regular_file;
 
 	if (S_ISDIR(sb.st_mode))
-		r = fs_mkdir_p(dst, sb.st_mode);
+		r = fs_mkdir_p(dst, sb.st_mode, NULL);
 	else if (S_ISLNK(sb.st_mode)) {
 		r = readlink(p, sym_buf, sizeof sym_buf);
 		if (r > 0) {
 			sym_buf[r] = '\0';
 			r = symlink(sym_buf, dst);
 			if (r == -1) {
-				fs_mkdir_parent(dst);
+				fs_mkdir_parent(dst, NULL);
 				r = symlink(sym_buf, dst);
 			}
 		}
