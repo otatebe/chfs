@@ -29,7 +29,7 @@ static size_t chfs_rdma_thresh = 32768;
 static int chfs_rpc_timeout_msec = 30000;	/* 30 seconds */
 static int chfs_node_list_cache_timeout = 120;	/* 120 seconds */
 static int chfs_async_access = 0;
-static int chfs_buf_size = 0;
+static int chfs_buf_size = -1;	/* if not set, set this to the chunk size */
 static int initialized = 0;
 
 static ABT_mutex fd_mutex;
@@ -68,6 +68,14 @@ chfs_set_buf_size(int buf_size)
 {
 	log_info("chfs_set_buf_size: %d", buf_size);
 	chfs_buf_size = buf_size;
+}
+
+static void
+chfs_set_default_buf_size()
+{
+	if (chfs_buf_size == -1)
+		chfs_buf_size = chfs_chunk_size;
+	log_info("chfs_set_default_buf_size: %d", chfs_buf_size);
 }
 
 void
@@ -259,6 +267,8 @@ chfs_init(const char *server)
 	size = getenv("CHFS_BUF_SIZE");
 	if (!IS_NULL_STRING(size))
 		chfs_set_buf_size(atoi(size));
+	/* if not set, set buf_size to the chunk size */
+	chfs_set_default_buf_size();
 
 	rdma_thresh = getenv("CHFS_RDMA_THRESH");
 	if (!IS_NULL_STRING(rdma_thresh))
