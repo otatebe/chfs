@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <margo.h>
 #include "config.h"
+#include "path.h"
 #include "ring.h"
 #include "ring_types.h"
 #include "ring_rpc.h"
@@ -216,7 +217,8 @@ fs_write(char *key, size_t key_size, const void *buf, size_t *size,
 	struct fs_stat sb;
 	char *bdata;
 
-	if (offset > 0 && fs_inode_stat(key, key_size, 1, &sb) != KV_SUCCESS) {
+	if (path_backend_root() && offset > 0 &&
+		fs_inode_stat(key, key_size, 1, &sb) != KV_SUCCESS) {
 		bdata = backend_read_cache_local(key, key_size, chunk_size,
 			NULL, NULL);
 		free(bdata);

@@ -201,3 +201,9 @@ path_backend(const char *path)
 
 	return (s);
 }
+
+char *
+path_backend_root()
+{
+	return (backend_path);
+}
