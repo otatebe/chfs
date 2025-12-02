@@ -77,7 +77,7 @@ Here is an example to execute chfsd on host listed in hostfile, which utilizes t
 
     % eval `chfsctl -h hostfile -p verbs -c /dev/dax0.0 -b /back/end/dir -m /tmp/chfs start`
 
-Here is an example to execute two chfsds on host listed in hostfile.  One is executed on CPU 0 and utilizes the devdax device /dev/dax0.0 and InfiniBand interface mlx5_0, the other is executed on CPU 1 and utilizes /dev/dax0.1 and mlx5_1.  Except the last execution -M option is required.  The second or later execution of chfctl requires -A option.
+The following example shows how to execute two chfsds on the hosts listed in the hostfile.  One is executed on CPU 0 and utilizes the devdax device /dev/dax0.0 and InfiniBand interface mlx5_0, the other is executed on CPU 1 and utilizes /dev/dax0.1 and mlx5_1.  The -M option is required for all executions except the final one.  Second or subsequent executions of chfsctl require the -A option.
 
     % eval `chfsctl -h hostfile -p verbs -c /dev/dax0.0 -C 0 -I mlx5_0 -b /back/end/dir -m /tmp/chfs -M start`
     % eval `chfsctl -h hostfile -p verbs -c /dev/dax1.0 -C 1 -I mlx5_1 -b /back/end/dir -m /tmp/chfs -A start`
