@@ -18,7 +18,8 @@ CHFSD="chfsd"
 NO_SERVER=true
 SUDO=
 NUM_SERVS=32
-TIMEOUT=30
+TIMEOUT=100
+SLEEP_TIME=0.1
 NUM_FLUSH_THREADS=1
 NO_MOUNT=false
 EXEC_INTERVAL=0
@@ -127,7 +128,7 @@ wait_chfsd_shutdown() {
 	export CHFS_RPC_TIMEOUT_MSEC
 	while chlist > /dev/null 2>&1
 	do
-		sleep 1
+		sleep $SLEEP_TIME
 	done
 }
 
@@ -295,7 +296,7 @@ do
 				if does_exist $host $SERVER_INFO_FILE; then
 					break
 				fi
-				sleep 1
+				sleep $SLEEP_TIME
 				timeout=$((timeout - 1))
 			done
 			[ $timeout -eq 0 ] && err $CHFSD: timeout
@@ -305,6 +306,12 @@ do
 			NO_SERVER=false
 			CHFS_SERVER="$SERVER"; export CHFS_SERVER
 		fi
+		timeout=$TIMEOUT
+		while [ $timeout -gt 0 -a $(chlist | wc -l) -lt $nservers ]; do
+			sleep $SLEEP_TIME
+			timeout=$((timeout - 1))
+		done
+		[ $timeout -eq 0 ] && err $CHFSD: timeout
 		if ! $NO_SERVER; then
 			set $(chlist | awk '{ print $1 }')
 			MAX_JOBS=$#
@@ -327,8 +334,8 @@ fi
 if $NO_SERVER; then err no server executed; fi
 timeout=$TIMEOUT
 while [ $timeout -gt 0 -a $(chlist | wc -l) -lt $nservers ]; do
+	sleep $SLEEP_TIME
 	timeout=$((timeout - 1))
-	sleep 1;
 done
 echo -n "CHFS_SERVER=\"$(chlist -c -n $NUM_SERVS)\"; export CHFS_SERVER;"
 if [ "X$BEDIR" != X ]; then
