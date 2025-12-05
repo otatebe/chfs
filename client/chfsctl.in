@@ -307,13 +307,15 @@ do
 			CHFS_SERVER="$SERVER"; export CHFS_SERVER
 		fi
 		timeout=$TIMEOUT
-		while [ $timeout -gt 0 -a $(chlist | wc -l) -lt $nservers ]; do
+		SERVERS="$(chlist | awk '{ print $1 }')"
+		while [ $timeout -gt 0 -a "X$SERVERS" = X ]; do
 			sleep $SLEEP_TIME
+			SERVERS="$(chlist | awk '{ print $1 }')"
 			timeout=$((timeout - 1))
 		done
 		[ $timeout -eq 0 ] && err $CHFSD: timeout
 		if ! $NO_SERVER; then
-			set $(chlist | awk '{ print $1 }')
+			set $SERVERS
 			MAX_JOBS=$#
 		fi
 
