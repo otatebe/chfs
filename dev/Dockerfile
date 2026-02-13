@@ -86,7 +86,7 @@ RUN cd \
  && tar zxfp v$MERCURY_VER.tar.gz \
  && cd mercury-$MERCURY_VER \
  && mkdir build && cd build \
- && cmake -DNA_USE_OFI:BOOL=ON -DMERCURY_USE_BOOST_PP:BOOL=ON -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_BUILD_TYPE:STRING=Debug .. \
+ && cmake -DNA_USE_OFI:BOOL=ON -DMERCURY_USE_SELF_FORWARD:BOOL=ON -DMERCURY_USE_BOOST_PP:BOOL=ON -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_BUILD_TYPE:STRING=Debug .. \
  && make -j $(nproc) && make install \
  && ldconfig
 
@@ -101,15 +101,14 @@ RUN cd \
  && make -j $(nproc) && make install \
  && ldconfig
 
-ARG MARGO_VER=0.21.0
+ARG MARGO_VER=0.22.1
 
 RUN cd \
  && wget https://github.com/mochi-hpc/mochi-margo/archive/refs/tags/v$MARGO_VER.tar.gz \
  && tar zxfp v$MARGO_VER.tar.gz \
  && cd mochi-margo-$MARGO_VER \
- && ./prepare.sh \
  && mkdir build && cd build \
- && ../configure \
+ && cmake -DENABLE_TESTS=ON .. \
  && make -j $(nproc) && make install \
  && ldconfig
 
