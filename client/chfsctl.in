@@ -14,7 +14,8 @@ DBSIZE=$((1024 * 1024 * 1024))
 LOG_DIR=
 IFACE=default
 VNAME=default
-CHFSD="chfsd"
+CHFSD="@sbindir@/chfsd"
+CHFUSE="@bindir@/chfuse"
 NO_SERVER=true
 SUDO=
 NUM_SERVS=32
@@ -26,6 +27,7 @@ EXEC_INTERVAL=0
 NUMACTL_OPT=
 PROFILE=
 SSH=ssh
+XENV=
 
 program=$(basename $0)
 
@@ -243,7 +245,7 @@ cat_file() {
 	h=$1
 	f=$2
 
-	if [ "X$h" = Xlocalhost ]; then
+	if [ "X$h" = Xlocalhost -o "X$h" = X$(hostname) ]; then
 		cat $f
 	else
 		$SSH $h cat $f
@@ -273,11 +275,11 @@ do
 	[ $IFACE = default ] && HOPT= || HOPT="-h $IFACE"
 	COPT="-c $DBDIR"
 	[ "X$LOG_DIR" = X ] && LOPT= || LOPT="-l $LOG_DIR/$host-$IFACE-$VNAME"
-	if [ "X$host" = Xlocalhost ]; then
+	if [ "X$host" = Xlocalhost -o "X$host" = X$(hostname) ]; then
 		$SUDO $NUMACTL $CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $NOPT "$1" & pids[$p]=$!
 	else
 		[ "X$LOG_DIR" != X ] && $SSH $host $SUDO mkdir -p $LOG_DIR
-		$SSH $host PATH=\"$PATH\" $XENV $SUDO $NUMACTL $CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $NOPT \"$1\" & pids[$p]=$!
+		$SSH $host $XENV $SUDO $NUMACTL $CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $NOPT \"$1\" & pids[$p]=$!
 	fi
 
 	shift
@@ -352,6 +354,7 @@ else
 fi
 echo
 CHFS_SERVER="$(chlist -c -n $NUM_SERVS)"; export CHFS_SERVER
+CHFS_SERVER1="$(chlist -c -n 1)"
 if ! $NO_MOUNT && [ X"$MDIR" != X ]; then
 	if [ $(chlist | wc -l) -lt $nservers ]; then
 		echo >&2 "$program: timeout, $(chlist | wc -l) of $nservers servers are running.  you may need chmkdir $MDIR manually"
@@ -360,13 +363,13 @@ if ! $NO_MOUNT && [ X"$MDIR" != X ]; then
 
 	if [ "X$HOSTS" = Xlocalhost ]; then
 		mkdir -p "$MDIR"
-		chfuse -o direct_io,modules=subdir,subdir="$MDIR" "$MDIR"
+		$CHFUSE -o direct_io,modules=subdir,subdir="$MDIR" "$MDIR"
 		HOSTS=
 	fi
 	for host in $HOSTS
 	do
 		$SSH $host mkdir -p "$MDIR"
-		$SSH $host PATH=\"$PATH\" $XENV CHFS_SERVER=\"$CHFS_SERVER\" CHFS_LOG_PRIORITY=$CHFS_LOG_PRIORITY CHFS_CHUNK_SIZE=$CHFS_CHUNK_SIZE CHFS_BUF_SIZE=$CHFS_BUF_SIZE CHFS_LOOKUP_LOCAL=$CHFS_LOOKUP_LOCAL CHFS_RDMA_THRESH=$CHFS_RDMA_THRESH CHFS_RPC_TIMEOUT_MSEC=$CHFS_RPC_TIMEOUT_MSEC CHFS_NODE_LIST_CACHE_TIMEOUT=$CHFS_NODE_LIST_CACHE_TIMEOUT CHFS_BACKEND_PATH=$CHFS_BACKEND_PATH CHFS_SUBDIR_PATH=$CHFS_SUBDIR_PATH chfuse -o direct_io,modules=subdir,subdir="$MDIR" "$MDIR"
+		$SSH $host env $XENV CHFS_LOG_PRIORITY=$CHFS_LOG_PRIORITY CHFS_CHUNK_SIZE=$CHFS_CHUNK_SIZE CHFS_BUF_SIZE=$CHFS_BUF_SIZE CHFS_LOOKUP_LOCAL=$CHFS_LOOKUP_LOCAL CHFS_RDMA_THRESH=$CHFS_RDMA_THRESH CHFS_RPC_TIMEOUT_MSEC=$CHFS_RPC_TIMEOUT_MSEC CHFS_NODE_LIST_CACHE_TIMEOUT=$CHFS_NODE_LIST_CACHE_TIMEOUT CHFS_BACKEND_PATH=$CHFS_BACKEND_PATH CHFS_SUBDIR_PATH=$CHFS_SUBDIR_PATH $CHFUSE --server=$CHFS_SERVER1 -o direct_io,modules=subdir,subdir="$MDIR" "$MDIR"
 	done
 fi
 [ $(chlist | wc -l) -lt $nservers ] && echo >&2 $program: warning: $(chlist | wc -l) out of $nservers servers running
