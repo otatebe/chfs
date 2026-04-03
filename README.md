@@ -18,7 +18,7 @@ CHFS provides a caching mechanism against a backend parallel file system.  Files
 ### Install Spack
 
 ```console
-% git clone -c feature.manyFiles=true --depth 1 https://github.com/spack/spack.git
+% git clone --depth=2 https://github.com/spack/spack.git
 % . spack/share/spack/setup-env.sh
 ```
 
@@ -26,10 +26,14 @@ For details, see <https://spack.readthedocs.io/>
 
 ### Install Mochi-margo
 
+<!-- >
 ```console
 % git clone https://github.com/mochi-hpc/mochi-spack-packages.git
 % spack repo add mochi-spack-packages
-% spack external find autoconf automake libtool cmake m4 rdma-core pkgconf
+```
+< -->
+```console
+% spack external find autoconf automake libtool cmake m4 rdma-core pkgconf gmake
 % spack install mochi-margo ^mercury~boostsys ^libfabric fabrics=rxm,sockets,tcp,udp,verbs
 ```
 
@@ -40,9 +44,11 @@ For details, see <https://mochi.readthedocs.io/>
 ```console
 % git clone https://github.com/otatebe/chfs.git
 % cd chfs
-% spack load mochi-margo
 % autoreconf -i
-% ./configure [--prefix=PREFIX] [--enable-zero-copy-read-rdma]
+% mkdir build
+% cd build
+% spack load mochi-margo
+% ../configure [--prefix=PREFIX]
 % make
 # make install
 ```
