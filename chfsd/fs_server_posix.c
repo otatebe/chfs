@@ -16,8 +16,6 @@
 #include "fs.h"
 #include "log.h"
 
-static char *self;
-
 DECLARE_MARGO_RPC_HANDLER(inode_readdir)
 
 void
@@ -34,8 +32,6 @@ fs_server_init_more(margo_instance_id mid, char *db_dir, size_t db_size,
 
 	fs_client_init_more_internal(read_rdma_rpc, readdir_rpc);
 	fs_inode_init(db_dir, niothreads);
-
-	self = ring_get_self();
 }
 
 void

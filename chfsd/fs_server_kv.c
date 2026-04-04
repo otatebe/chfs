@@ -22,10 +22,10 @@
 
 #ifdef USE_ZERO_COPY_READ_RDMA
 DECLARE_MARGO_RPC_HANDLER(inode_read_rdma)
+static char *self;
 #endif
 DECLARE_MARGO_RPC_HANDLER(inode_readdir)
 
-static char *self;
 
 void
 fs_server_init_more(margo_instance_id mid, char *db_dir, size_t db_size,
@@ -36,14 +36,13 @@ fs_server_init_more(margo_instance_id mid, char *db_dir, size_t db_size,
 #ifdef USE_ZERO_COPY_READ_RDMA
 	read_rdma_rpc = MARGO_REGISTER(mid, "inode_read_rdma",
 		fs_read_rdma_in_t, kv_get_rdma_out_t, inode_read_rdma);
+	self = ring_get_self();
 #endif
 	readdir_rpc = MARGO_REGISTER(mid, "inode_readdir", hg_string_t,
 		fs_readdir_out_t, inode_readdir);
 
 	fs_client_init_more_internal(read_rdma_rpc, readdir_rpc);
 	kv_init(db_dir, "cmap", "kv.db", db_size);
-
-	self = ring_get_self();
 }
 
 void
@@ -80,7 +79,7 @@ read_rdma_cb(const char *value, size_t value_size, void *arg)
 		value_size = a->value_size;
 	if (value_size == 0)
 		goto finish;
-	v += a->offset;
+	v = (char *)v + a->offset;
 	ret = margo_bulk_create(a->mid, 1, &v, &value_size, HG_BULK_READ_ONLY,
 		&bulk);
 	if (ret != HG_SUCCESS) {
@@ -372,7 +371,8 @@ copy_all_cb(const char *key, size_t key_size, const char *value,
 {
 	char *target;
 	struct fs_stat sb;
-	int ret, err;
+	hg_return_t ret;
+	int err;
 
 	memset(&sb, 0, sizeof(sb));
 	target = ring_list_lookup(key, key_size);
