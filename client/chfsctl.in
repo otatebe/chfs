@@ -279,7 +279,8 @@ do
 		$SUDO $NUMACTL $CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $NOPT "$1" & pids[$p]=$!
 	else
 		[ "X$LOG_DIR" != X ] && $SSH $host $SUDO mkdir -p $LOG_DIR
-		$SSH $host $XENV $SUDO $NUMACTL $CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $NOPT \"$1\" & pids[$p]=$!
+		[ "X$XENV" = X ] && E= || E=env
+		$SSH $host $E $XENV $SUDO $NUMACTL $CHFSD $CHFS_OPTIONS $COPT $LOPT $HOPT $NOPT \"$1\" & pids[$p]=$!
 	fi
 
 	shift
