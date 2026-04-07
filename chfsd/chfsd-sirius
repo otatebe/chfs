@@ -1,0 +1,17 @@
+#!/bin/sh
+# chfsd wrapper for Sirius (PACS12.0)
+# usage:
+# eval `chfsctl -wrapper chfsd-sirius -ssh pbs_tmrsh -h $PBS_NODEFILE -p verbs start`
+
+CHFSD=$(dirname $0)/chfsd
+
+[ X"$PBS_NIC_IDS" = X ] && PBS_NIC_IDS="0 1 2 3"
+for i in $PBS_NIC_IDS
+do
+	SCR=/scr$i/$PBS_JOBID
+	[ -d $SCR ] || continue
+	[ -f $SCR/$PBS_JOBID ] && continue
+	touch $SCR/$PBS_JOBID
+	exec numactl -N $i $CHFSD $* -c $SCR/spool -h mlx5_$i
+done
+exit 1

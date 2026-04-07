@@ -2,6 +2,7 @@ if USE_PMEMKV
 bin_PROGRAMS = chkvdump
 endif
 sbin_PROGRAMS = chfsd
+sbin_SCRIPTS = chfsd-sirius
 noinst_HEADERS = ring.h ring_rpc.h fs.h kv.h host.h fs_kv.h fs_hook.h \
 		backend_local.h flush.h lock.h profile.h
 

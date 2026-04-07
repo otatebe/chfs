@@ -42,7 +42,7 @@ usage() {
 	echo >&2 "	[-b backend_dir] [-f #flush_threads] [-p proto] [-s db_size] [-N vname]"
 	echo >&2 "	[-I interface] [-i interval] [-C socket#] [-L log_dir] [-A]"
 	echo >&2 "	[-n #servers for CHFS_SERVER] [-x env] [-O options]"
-	echo >&2 "	[-NUMACTL options] [-ssh ssh_cmd] [-P]"
+	echo >&2 "	[-NUMACTL options] [-ssh ssh_cmd] [-wrapper chfsd_wrapper] [-P]"
 	echo >&2 "	start | stop | status | kill | clean"
 	exit 1
 }
@@ -75,6 +75,7 @@ while [ $# -gt 0 ]; do
 		    esac ;;
 	    -NUMACTL) shift; NUMACTL_OPT="$NUMACTL_OPT $1" ;;
 	    -ssh) shift; SSH="$1" ;;
+	    -wrapper) shift; CHFSD="$(dirname $CHFSD)/$1" ;;
 	    -*) echo "unknown option: $1"
 		usage ;;
 	    *) usage ;;
@@ -366,6 +367,7 @@ if ! $NO_MOUNT && [ X"$MDIR" != X ]; then
 		$CHFUSE -o direct_io,modules=subdir,subdir="$MDIR" "$MDIR"
 		HOSTS=
 	fi
+	HOSTS="$(echo $HOSTS | tr ' ' '\n' | uniq)"
 	for host in $HOSTS
 	do
 		$SSH $host mkdir -p "$MDIR"
