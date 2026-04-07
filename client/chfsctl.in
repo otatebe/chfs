@@ -144,6 +144,7 @@ stop_chfs() {
 		$SUDO pkill $PKILL_FLAG chfsd
 		HOSTS=
 	fi
+	HOSTS="$(echo $HOSTS | tr ' ' '\n' | uniq)"
 	p=0
 	for host in $HOSTS
 	do
@@ -183,6 +184,7 @@ clean_chfs() {
 		rm -rf $DBDIR/*
 		HOSTS=
 	fi
+	HOSTS="$(echo $HOSTS | tr ' ' '\n' | uniq)"
 	p=0
 	for host in $HOSTS
 	do
@@ -212,6 +214,7 @@ status_chfs() {
 		ps -ef | grep chfuse | egrep -v grep
 		HOSTS=
 	fi
+	HOSTS="$(echo $HOSTS | tr ' ' '\n' | uniq)"
 	for host in $HOSTS
 	do
 		echo $host
