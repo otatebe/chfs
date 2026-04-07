@@ -1,7 +1,9 @@
 #!/bin/sh
 # chfsd wrapper for Sirius (PACS12.0)
 # usage:
-# eval `chfsctl -wrapper chfsd-sirius -ssh pbs_tmrsh -h $PBS_NODEFILE -p verbs start`
+#   eval `chfsctl -wrapper chfsd-sirius -ssh pbs_tmrsh -h $PBS_NODEFILE -p verbs start`
+# note:
+#   -C and -NUMACTL options cannot be used with this wrapper
 
 CHFSD=$(dirname $0)/chfsd
 
