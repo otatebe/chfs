@@ -1,4 +1,4 @@
-FROM ubuntu
+FROM ubuntu:24.04
 
 ARG USERNAME=foo
 ARG UID=1000
@@ -67,7 +67,7 @@ RUN cd \
  && make -j $(nproc) && make install \
  && ldconfig
 
-ARG LIBFABRIC_VER=1.22.0
+ARG LIBFABRIC_VER=2.5.1
 
 RUN cd \
  && wget https://github.com/ofiwg/libfabric/archive/refs/tags/v$LIBFABRIC_VER.tar.gz \
@@ -79,7 +79,7 @@ RUN cd \
  && make -j $(nproc) && make install \
  && ldconfig
 
-ARG MERCURY_VER=2.4.0
+ARG MERCURY_VER=2.4.1
 
 RUN cd \
  && wget https://github.com/mercury-hpc/mercury/archive/refs/tags/v$MERCURY_VER.tar.gz \
