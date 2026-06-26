@@ -3,6 +3,7 @@
 #include <string.h>
 #include <time.h>
 #include <abt.h>
+#include "key.h"
 #include "log.h"
 
 #include "profile.h"
@@ -52,16 +53,6 @@ static struct profile_list {
 } profile_list = {
 	NULL, &profile_list.head
 };
-
-static int
-key_index(char *key, size_t key_size)
-{
-	int index = 0, slen = strlen(key) + 1;
-
-	if (slen < key_size)
-		index = atoi(key + slen);
-	return (index);
-}
 
 static void
 profile_entry_free(struct entry *e)
