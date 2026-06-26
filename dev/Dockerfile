@@ -101,7 +101,7 @@ RUN cd \
  && make -j $(nproc) && make install \
  && ldconfig
 
-ARG MARGO_VER=0.23.1
+ARG MARGO_VER=0.24.0
 
 RUN cd \
  && wget https://github.com/mochi-hpc/mochi-margo/archive/refs/tags/v$MARGO_VER.tar.gz \
