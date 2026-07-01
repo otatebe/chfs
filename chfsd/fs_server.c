@@ -802,7 +802,8 @@ inode_remove(hg_handle_t h)
 	} else
 		err = fs_inode_remove(key.v, key.s);
 	free(target);
-	if (err != KV_SUCCESS)
+	/* when index > 0, KV_ERR_NO_ENTRY is norm */
+	if (err != KV_SUCCESS && index == 0)
 		log_error("%s: %s:%d: %s", diag, (char *)key.v, index,
 				kv_err_string(err));
 
