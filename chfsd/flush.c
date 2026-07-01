@@ -6,6 +6,7 @@
 #include <abt.h>
 #include "fs_hook.h"
 #include "fs.h"
+#include "key.h"
 #include "log.h"
 
 static int num_threads = 0;
@@ -63,16 +64,6 @@ flush_thread_term(void)
 	if (num_stopped_threads == num_threads)
 		ABT_cond_signal(wait_cond);
 	ABT_mutex_unlock(mutex);
-}
-
-static int
-key_index(char *key, size_t key_size)
-{
-	int index = 0, slen = strlen(key) + 1;
-
-	if (slen < key_size)
-		index = atoi(key + slen);
-	return (index);
 }
 
 static int
