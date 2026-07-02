@@ -70,14 +70,6 @@ chfs_set_buf_size(int buf_size)
 	chfs_buf_size = buf_size;
 }
 
-static void
-chfs_set_default_buf_size()
-{
-	if (chfs_buf_size == -1)
-		chfs_buf_size = chfs_chunk_size;
-	log_info("chfs_set_default_buf_size: %d", chfs_buf_size);
-}
-
 void
 chfs_set_rdma_thresh(size_t thresh)
 {
@@ -267,8 +259,6 @@ chfs_init(const char *server)
 	size = getenv("CHFS_BUF_SIZE");
 	if (!IS_NULL_STRING(size))
 		chfs_set_buf_size(atoi(size));
-	/* if not set, set buf_size to the chunk size */
-	chfs_set_default_buf_size();
 
 	rdma_thresh = getenv("CHFS_RDMA_THRESH");
 	if (!IS_NULL_STRING(rdma_thresh))
@@ -436,7 +426,7 @@ static int
 create_fd_unlocked(const char *path, uint32_t mode, int chunk_size)
 {
 	struct fd_table *tmp;
-	int fd, i;
+	int fd, i, buf_size;
 
 	for (fd = 0; fd < fd_table_size; ++fd)
 		if (fd_table[fd].path == NULL)
@@ -459,16 +449,14 @@ create_fd_unlocked(const char *path, uint32_t mode, int chunk_size)
 		log_error("create_fd: %s, no memory", path);
 		return (-1);
 	}
-	fd_table[fd].buf_size = 0;
-	if (chfs_buf_size > 0) {
-		fd_table[fd].buf = malloc(chfs_buf_size);
-		if (fd_table[fd].buf == NULL) {
-			free(fd_table[fd].path);
-			fd_table[fd].path = NULL;
-			log_error("create_fd: %s, no memory", path);
-			return (-1);
-		}
-		fd_table[fd].buf_size = chfs_buf_size;
+	buf_size = chunk_size > chfs_buf_size ? chunk_size : chfs_buf_size;
+	fd_table[fd].buf_size = buf_size;
+	fd_table[fd].buf = malloc(buf_size);
+	if (fd_table[fd].buf == NULL) {
+		free(fd_table[fd].path);
+		fd_table[fd].path = NULL;
+		log_error("create_fd: %s, no memory", path);
+		return (-1);
 	}
 	fd_table[fd].mode = MODE_MASK(mode);
 	fd_table[fd].cache_flags = FLAGS_FROM_MODE(mode);
