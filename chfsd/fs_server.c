@@ -216,15 +216,21 @@ fs_write(char *key, size_t key_size, const void *buf, size_t *size,
 {
 	struct fs_stat sb;
 	char *bdata;
+	int r;
+	static const char diag[] = "fs_write";
 
+	if (path_backend_root())
+		kv_lock(key, key_size, diag, *size, offset);
 	if (path_backend_root() && offset > 0 &&
 		fs_inode_stat(key, key_size, 1, &sb) != KV_SUCCESS) {
 		bdata = backend_read_cache_local(key, key_size, chunk_size,
 			NULL, NULL);
 		free(bdata);
 	}
-	return (fs_inode_write(key, key_size, buf, size, offset, emode,
-			chunk_size));
+	r = fs_inode_write(key, key_size, buf, size, offset, emode, chunk_size);
+	if (path_backend_root())
+		kv_unlock(key, key_size);
+	return (r);
 }
 
 static void
@@ -434,10 +440,12 @@ inode_read(hg_handle_t h)
 			out.err = KV_ERR_SERVER_DOWN;
 		}
 	} else {
-		kv_lock(in.key.v, in.key.s, diag, out.value.s, in.offset);
+		if (path_backend_root())
+			kv_lock(in.key.v, in.key.s, diag, out.value.s,
+				in.offset);
 		out.err = fs_inode_read(in.key.v, in.key.s, out.value.v,
 			&out.value.s, in.offset);
-		if (out.err == KV_ERR_NO_ENTRY) {
+		if (path_backend_root() && out.err == KV_ERR_NO_ENTRY) {
 			size_t cs;
 			char *bdata = backend_read_cache_local(
 				in.key.v, in.key.s, in.chunk_size, NULL, &cs);
@@ -454,7 +462,8 @@ inode_read(hg_handle_t h)
 				out.err = KV_SUCCESS;
 			}
 		}
-		kv_unlock(in.key.v, in.key.s);
+		if (path_backend_root())
+			kv_unlock(in.key.v, in.key.s);
 	}
 	free(target);
 	if (out.err != KV_SUCCESS && out.err != KV_ERR_NO_ENTRY)
@@ -535,10 +544,12 @@ inode_read_rdma(hg_handle_t h)
 			out.err = KV_ERR_NO_MEMORY;
 			goto free_target;
 		}
-		kv_lock(in.key.v, in.key.s, diag, out.value_size, in.offset);
+		if (path_backend_root())
+			kv_lock(in.key.v, in.key.s, diag, out.value_size,
+				in.offset);
 		out.err = fs_inode_read(in.key.v, in.key.s, buf,
 			&out.value_size, in.offset);
-		if (out.err == KV_ERR_NO_ENTRY) {
+		if (path_backend_root() && out.err == KV_ERR_NO_ENTRY) {
 			size_t cs;
 			char *bdata = backend_read_cache_local(
 				in.key.v, in.key.s, in.chunk_size, NULL, &cs);
@@ -555,7 +566,8 @@ inode_read_rdma(hg_handle_t h)
 				out.err = KV_SUCCESS;
 			}
 		}
-		kv_unlock(in.key.v, in.key.s);
+		if (path_backend_root())
+			kv_unlock(in.key.v, in.key.s);
 		if (out.err == KV_SUCCESS && out.value_size > 0) {
 			ret = margo_bulk_create(mid, 1, &buf, &out.value_size,
 				HG_BULK_READ_ONLY, &bulk);
