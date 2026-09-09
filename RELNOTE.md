@@ -1,3 +1,11 @@
+# Release note for CHFS/Cache 3.1.1 (2026/9/9)
+
+## Updated features
+- chfsd - -wrapper option to specify an execution wrapper.  chfsd-sirius is an example for the SIRIUS (PACS12.0) Supercomputer at University of Tsukuba
+- change the default value of CHFS_BUF_SIZE to the file's chunk size to improve performance
+- keep mtime of cached data
+- support writing unaligned data without reading it first
+
 # Release note for CHFS/Cache 3.1.0 (2025/7/14)
 
 ## New API
