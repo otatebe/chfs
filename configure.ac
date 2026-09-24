@@ -70,12 +70,12 @@ AC_ARG_WITH([fuse],
 save_PKG_CONFIG_PATH="$PKG_CONFIG_PATH"
 case $with_fuse in
   yes|no) ;;
-  /*) fuse_pc=$(find $with_fuse -maxdepth 4 -name fuse.pc | head -1)
+  /*) fuse_pc=$(find $with_fuse -maxdepth 4 -name fuse3.pc | head -1)
       if test x"$fuse_pc" != x; then
         export PKG_CONFIG_PATH=$(dirname $fuse_pc)
       fi ;;
 esac
-PKG_CHECK_MODULES([FUSE], [fuse])
+PKG_CHECK_MODULES([FUSE], [fuse3])
 export PKG_CONFIG_PATH="$save_PKG_CONFIG_PATH"
 
 AC_MSG_CHECKING([whether MD5 digest is used])

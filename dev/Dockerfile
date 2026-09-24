@@ -10,8 +10,8 @@ RUN apt-get update \
     cmake libtool pkgconf \
     libpmemobj-dev libmemkind-dev libtbb-dev rapidjson-dev \
     libjson-c-dev libboost-dev \
-    git fuse sudo vim curl wget \
-    libfuse-dev pandoc \
+    git fuse3 sudo vim curl wget \
+    libfuse3-dev pandoc \
     gfortran zip bzip2 flex libpmix-dev libnl-3-dev libibverbs-dev \
     gdb numactl \
     python3 python3-venv python3-pip \

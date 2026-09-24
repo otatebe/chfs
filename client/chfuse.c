@@ -1,4 +1,4 @@
-#define FUSE_USE_VERSION 26
+#define FUSE_USE_VERSION 31
 #include <fuse.h>
 #include <stdio.h>
 #include <errno.h>
@@ -10,14 +10,20 @@
 #include <stddef.h>
 #include "chfs.h"
 
-static void *
-chfuse_init(struct fuse_conn_info *conn)
-{
-	struct fuse_context *ctx = fuse_get_context();
-	const char *server = ctx->private_data;
+static struct options {
+	const char *server;
+	int direct_io;
+	int usage;
+	int version;
+} options;
 
+static void *
+chfuse_init(struct fuse_conn_info *conn, struct fuse_config *cfg)
+{
 	printf("init: CHFS version %s\n", chfs_version());
-	chfs_init(server);
+	if (options.direct_io)
+		cfg->direct_io = 1;
+	chfs_init(options.server);
 	return (NULL);
 }
 
@@ -29,7 +35,7 @@ chfuse_destroy(void *arg)
 }
 
 static int
-chfuse_getattr(const char *path, struct stat *st)
+chfuse_getattr(const char *path, struct stat *st, struct fuse_file_info *fi)
 {
 	int ret;
 
@@ -86,7 +92,7 @@ chfuse_release(const char *path, struct fuse_file_info *fi)
 }
 
 static int
-chfuse_truncate(const char *path, off_t size)
+chfuse_truncate(const char *path, off_t size, struct fuse_file_info *fi)
 {
 	int ret;
 
@@ -171,21 +177,36 @@ chfuse_rmdir(const char *path)
 	return (ret);
 }
 
+struct chfuse_readdir_arg {
+	void *buf;
+	fuse_fill_dir_t filler;
+};
+
+static int
+chfuse_filler(void *arg, const char *name, const struct stat *st, off_t off)
+{
+	struct chfuse_readdir_arg *a = arg;
+
+	return (a->filler(a->buf, name, st, off, 0));
+}
+
 static int
 chfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-	off_t offset, struct fuse_file_info *fi)
+	off_t offset, struct fuse_file_info *fi, enum fuse_readdir_flags flags)
 {
+	struct chfuse_readdir_arg a = { buf, filler };
 	int ret;
 
 	printf("readdir: %s\n", path);
-	ret = chfs_readdir(path, buf, filler);
+	ret = chfs_readdir(path, &a, chfuse_filler);
 	if (ret == -1)
 		return (-errno);
 	return (ret);
 }
 
 static int
-chfuse_utimens(const char *path, const struct timespec tv[2])
+chfuse_utimens(const char *path, const struct timespec tv[2],
+	struct fuse_file_info *fi)
 {
 	return (0);
 }
@@ -235,15 +256,10 @@ static const struct fuse_operations chfs_op = {
 	.readlink	= chfuse_readlink,
 };
 
-static struct options {
-	const char *server;
-	int usage;
-	int version;
-} options;
-
 #define OPTION(t, p) { t, offsetof(struct options, p), 1 }
 static const struct fuse_opt option_spec[] = {
 	OPTION("--server=%s", server),
+	OPTION("direct_io", direct_io),
 	OPTION("-h", usage),
 	OPTION("--help", usage),
 	OPTION("-V", version),
@@ -256,6 +272,7 @@ static void usage(const char *progname)
 	printf("usage: %s [options] <mountpoint>\n\n", progname);
 	printf("file-system specific options:\n"
 	       "    --server=<s>	server name\n"
+	       "    -o direct_io	use direct I/O\n"
 	       "\n");
 }
 
@@ -271,13 +288,14 @@ main(int argc, char *argv[])
 
 	if (options.usage) {
 		usage(argv[0]);
-		fuse_opt_add_arg(&args, "-ho");
+		fuse_opt_add_arg(&args, "--help");
+		args.argv[0][0] = '\0';
 	} else if (options.version) {
 		fprintf(stderr, "CHFS version %s\n", chfs_version());
 		fuse_opt_add_arg(&args, "--version");
 	}
 
-	ret = fuse_main(args.argc, args.argv, &chfs_op, (void *)options.server);
+	ret = fuse_main(args.argc, args.argv, &chfs_op, NULL);
 	fuse_opt_free_args(&args);
 	return (ret);
 }

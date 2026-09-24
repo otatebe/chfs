@@ -11,7 +11,7 @@ CHFS provides a caching mechanism against a backend parallel file system.  Files
 ```console
 # apt install gcc g++ automake cmake libtool pkgconf \
     rdma-core librdmacm-dev \
-    libfuse-dev fuse pandoc \
+    libfuse3-dev fuse3 pandoc \
     git python3 bzip2 xz-utils vim
 ```
 

@@ -15,6 +15,9 @@ chfuse - mount CHFS
 \--server=CHFS_SERVER
 : specifies a CHFS server.  The server can be specified by the CHFS_SERVER environment variable.
 
+-o direct_io
+: uses direct I/O.  Page cache is bypassed.
+
 # ENVIRONMENT
 CHFS_SERVER
 : server addresses separated by ','

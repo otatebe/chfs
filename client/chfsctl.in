@@ -139,7 +139,7 @@ stop_chfs() {
 	if [ "X$HOSTS" = Xlocalhost ]; then
 		[ "$mode" = kill ] && pkill $PKILL_FLAG chfuse
 		if ! $NO_MOUNT && [ X"$MDIR" != X ]; then
-			fusermount -u "$MDIR"
+			fusermount3 -u "$MDIR"
 		fi
 		$SUDO pkill $PKILL_FLAG chfsd
 		HOSTS=
@@ -150,7 +150,7 @@ stop_chfs() {
 	do
 		[ "$mode" = kill ] && $SSH $host pkill $PKILL_FLAG chfuse &
 		if ! $NO_MOUNT && [ X"$MDIR" != X ]; then
-			$SSH $host fusermount -u "$MDIR" &
+			$SSH $host fusermount3 -u "$MDIR" &
 		fi
 
 		p=$((p + 1))
