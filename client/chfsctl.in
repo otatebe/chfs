@@ -28,6 +28,7 @@ NUMACTL_OPT=
 PROFILE=
 SSH=ssh
 XENV=
+FUSE_OPT=
 
 program=$(basename $0)
 
@@ -41,7 +42,7 @@ usage() {
 	echo >&2 "usage: $program [-h hostfile] [-c scratch_dir] [-D] [-m mount_point] [-M]"
 	echo >&2 "	[-b backend_dir] [-f #flush_threads] [-p proto] [-s db_size] [-N vname]"
 	echo >&2 "	[-I interface] [-i interval] [-C socket#] [-L log_dir] [-A]"
-	echo >&2 "	[-n #servers for CHFS_SERVER] [-x env] [-O options]"
+	echo >&2 "	[-n #servers for CHFS_SERVER] [-x env] [-O chfsd_options] [-o fuse_options]"
 	echo >&2 "	[-NUMACTL options] [-ssh ssh_cmd] [-wrapper chfsd_wrapper] [-P]"
 	echo >&2 "	start | stop | status | kill | clean"
 	exit 1
@@ -65,6 +66,7 @@ while [ $# -gt 0 ]; do
 	    -n) shift; NUM_SERVS=$1 ;;
 	    -N) shift; VNAME=$1 ;;
 	    -O) shift; OPTIONS="$1" ;;
+	    -o) shift; FUSE_OPT="$FUSE_OPT,$1" ;;
 	    -p) shift; PROTO=$1 ;;
 	    -P) PROFILE=-Z ;;
 	    -s) shift; DBSIZE=$1 ;;
@@ -367,14 +369,14 @@ if ! $NO_MOUNT && [ X"$MDIR" != X ]; then
 
 	if [ "X$HOSTS" = Xlocalhost ]; then
 		mkdir -p "$MDIR"
-		$CHFUSE -o direct_io,modules=subdir,subdir="$MDIR" "$MDIR"
+		$CHFUSE -o direct_io,modules=subdir,subdir="$MDIR"$FUSE_OPT "$MDIR"
 		HOSTS=
 	fi
 	HOSTS="$(echo $HOSTS | tr ' ' '\n' | uniq)"
 	for host in $HOSTS
 	do
 		$SSH $host mkdir -p "$MDIR"
-		$SSH $host env $XENV CHFS_SERVER=\'$CHFS_SERVER\' CHFS_LOG_PRIORITY=$CHFS_LOG_PRIORITY CHFS_CHUNK_SIZE=$CHFS_CHUNK_SIZE CHFS_BUF_SIZE=$CHFS_BUF_SIZE CHFS_LOOKUP_LOCAL=$CHFS_LOOKUP_LOCAL CHFS_RDMA_THRESH=$CHFS_RDMA_THRESH CHFS_RPC_TIMEOUT_MSEC=$CHFS_RPC_TIMEOUT_MSEC CHFS_NODE_LIST_CACHE_TIMEOUT=$CHFS_NODE_LIST_CACHE_TIMEOUT CHFS_BACKEND_PATH=$CHFS_BACKEND_PATH CHFS_SUBDIR_PATH=$CHFS_SUBDIR_PATH $CHFUSE -o direct_io,modules=subdir,subdir="$MDIR" "$MDIR"
+		$SSH $host env $XENV CHFS_SERVER=\'$CHFS_SERVER\' CHFS_LOG_PRIORITY=$CHFS_LOG_PRIORITY CHFS_CHUNK_SIZE=$CHFS_CHUNK_SIZE CHFS_BUF_SIZE=$CHFS_BUF_SIZE CHFS_LOOKUP_LOCAL=$CHFS_LOOKUP_LOCAL CHFS_RDMA_THRESH=$CHFS_RDMA_THRESH CHFS_RPC_TIMEOUT_MSEC=$CHFS_RPC_TIMEOUT_MSEC CHFS_NODE_LIST_CACHE_TIMEOUT=$CHFS_NODE_LIST_CACHE_TIMEOUT CHFS_BACKEND_PATH=$CHFS_BACKEND_PATH CHFS_SUBDIR_PATH=$CHFS_SUBDIR_PATH $CHFUSE -o direct_io,modules=subdir,subdir="$MDIR"$FUSE_OPT "$MDIR"
 	done
 fi
 [ $(chlist | wc -l) -lt $nservers ] && echo >&2 $program: warning: $(chlist | wc -l) out of $nservers servers running

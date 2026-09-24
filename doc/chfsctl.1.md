@@ -63,8 +63,11 @@ chfsctl - manage CHFS servers
 -x environment_variable[=value]
 : exports the specified environment variable.  This option can be specified multiple times.
 
--O options
+-O chfsd_options
 : specifies options for chfsd.
+
+-o fuse_options
+: specifies comma-separated mount options for chfuse such as allow_root and allow_other.  This option can be specified multiple times.
 
 -ssh ssh_cmd
 : specifies a remote shell command.  Default is ssh.
