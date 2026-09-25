@@ -183,17 +183,19 @@ ROMIO ADIO for CHFS is available.  With the ROMIO ADIO for CHFS, MPI-IO applicat
 
 ```console
 % apt install gfortran bzip2 flex libpmix-dev libnl-3-dev libibverbs-dev
-% wget https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.8.tar.bz2
-% tar xfp openmpi-4.1.8.tar.bz2
-% cd openmpi-4.1.8
-% wget https://raw.githubusercontent.com/otatebe/chfs/cache/dev/ompi/ad_chfs.patch
-% patch -p1 < ad_chfs.patch
-% (cd ompi/mca/io/romio321/romio/ && ./autogen.sh)
+% wget https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-5.0.11.tar.bz2
+% tar xfp openmpi-5.0.11.tar.bz2
+% cd openmpi-5.0.11
+% wget https://raw.githubusercontent.com/otatebe/chfs/cache/dev/ompi/ad_chfs-5.0.patch
+% patch -p1 < ad_chfs-5.0.patch
+% (cd 3rd-party/romio341 && ./autogen.sh)
 % mkdir build && cd build
-% ../configure --enable-mpirun-prefix-by-default --with-pmix=/usr/lib/x86_64-linux-gnu/pmix2 --with-io-romio-flags=--with-file-system=chfs+ufs+testfs
+% ../configure --enable-prte-prefix-by-default --with-io-romio-flags=--with-file-system=chfs+ufs+testfs
 % make -j $(nproc)
 # make install
 ```
+
+For Open MPI 4.1.x, use [ad_chfs-4.1.patch](dev/ompi/ad_chfs-4.1.patch) instead, apply `./autogen.sh` in `ompi/mca/io/romio321/romio`, and specify `--mca io romio321` instead of `--mca io romio341` in the following.
 
 ### Install CHFS again with MPI for parallel find and parallel stage-in
 
@@ -207,8 +209,16 @@ ROMIO ADIO for CHFS is available.  With the ROMIO ADIO for CHFS, MPI-IO applicat
 ### How to use
 
 ```console
-% mpirun --mca io romio321 -x CHFS_SERVER -x CHFS_BACKEND_PATH -x CHFS_SUBDIR_PATH ...
+% mpirun --mca io romio341 -x CHFS_SERVER -x CHFS_BACKEND_PATH -x CHFS_SUBDIR_PATH ...
 ```
+
+### Limitations
+
+Since CHFS does not support file locking, the following features are not supported.  Shared file pointer operations return MPI_ERR_UNSUPPORTED_OPERATION, and MPI_File_set_atomicity() returns MPI_ERR_ARG.
+
+- Shared file pointers - MPI_File_{read,write}_shared(), MPI_File_{iread,iwrite}_shared(), MPI_File_{read,write}_ordered(), MPI_File_{read,write}_ordered_{begin,end}(), MPI_File_seek_shared(), MPI_File_get_position_shared(), and MPI_MODE_SEQUENTIAL
+- Atomic mode - MPI_File_set_atomicity()
+- Data sieving for writes - the romio_ds_write hint is always disabled
 
 ## IOR and mdtest
 

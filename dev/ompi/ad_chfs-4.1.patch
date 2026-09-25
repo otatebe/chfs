@@ -1,5 +1,5 @@
 diff --git a/ompi/mca/io/romio321/romio/adio/Makefile.mk b/ompi/mca/io/romio321/romio/adio/Makefile.mk
-index ffc05cb415..1c761d2f15 100644
+index ffc05cb..1c761d2 100644
 --- a/ompi/mca/io/romio321/romio/adio/Makefile.mk
 +++ b/ompi/mca/io/romio321/romio/adio/Makefile.mk
 @@ -24,6 +24,7 @@ noinst_HEADERS +=                      \
@@ -12,10 +12,10 @@ index ffc05cb415..1c761d2f15 100644
  include $(top_srcdir)/adio/ad_gpfs/pe/Makefile.mk
 diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/Makefile.mk b/ompi/mca/io/romio321/romio/adio/ad_chfs/Makefile.mk
 new file mode 100644
-index 0000000000..56354f2122
+index 0000000..c2d3f66
 --- /dev/null
 +++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/Makefile.mk
-@@ -0,0 +1,32 @@
+@@ -0,0 +1,33 @@
 +##
 +## Copyright (C) by Argonne National Laboratory
 +##     See COPYRIGHT in top-level directory
@@ -45,12 +45,13 @@ index 0000000000..56354f2122
 +    adio/ad_chfs/ad_chfs_resize.c \
 +    adio/ad_chfs/ad_chfs_hints.c  \
 +    adio/ad_chfs/ad_chfs_delete.c \
++    adio/ad_chfs/ad_chfs_features.c \
 +    adio/ad_chfs/ad_chfs.c
 +
 +endif BUILD_AD_CHFS
 diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs.c
 new file mode 100644
-index 0000000000..2645f3b5e4
+index 0000000..39edce3
 --- /dev/null
 +++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs.c
 @@ -0,0 +1,39 @@
@@ -88,17 +89,17 @@ index 0000000000..2645f3b5e4
 +    ADIOI_CHFS_Flush, /* Flush */
 +    ADIOI_CHFS_Resize,        /* Resize */
 +    ADIOI_CHFS_Delete,        /* Delete */
-+    ADIOI_GEN_Feature,  /* Features */
++    ADIOI_CHFS_Feature, /* Features */
 +    "CHFS: parallel and distributed file system for node-local persistent memory",
 +    ADIOI_GEN_IreadStridedColl, /* IreadStridedColl */
 +    ADIOI_GEN_IwriteStridedColl,        /* IwriteStridedColl */
 +};
 diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs.h b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs.h
 new file mode 100644
-index 0000000000..63306351d4
+index 0000000..ccffeed
 --- /dev/null
 +++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs.h
-@@ -0,0 +1,77 @@
+@@ -0,0 +1,76 @@
 +/*
 + * Copyright (C) by Argonne National Laboratory
 + *     See COPYRIGHT in top-level directory
@@ -171,14 +172,13 @@ index 0000000000..63306351d4
 +ADIO_Offset ADIOI_CHFS_SeekIndividual(ADIO_File fd, ADIO_Offset offset,
 +                                        int whence, int *error_code);
 +void ADIOI_CHFS_SetInfo(ADIO_File fd, MPI_Info users_info, int *error_code);
-+void ADIOI_CHFS_Get_shared_fp(ADIO_File fd, int size, ADIO_Offset * shared_fp, int *error_code);
-+void ADIOI_CHFS_Set_shared_fp(ADIO_File fd, ADIO_Offset offset, int *error_code);
 +void ADIOI_CHFS_Delete(const char *filename, int *error_code);
++int ADIOI_CHFS_Feature(ADIO_File fd, int flag);
 +
 +#endif /* AD_CHFS_H_INCLUDED */
 diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_close.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_close.c
 new file mode 100644
-index 0000000000..8c78f7de38
+index 0000000..8c78f7d
 --- /dev/null
 +++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_close.c
 @@ -0,0 +1,27 @@
@@ -211,7 +211,7 @@ index 0000000000..8c78f7de38
 +}
 diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_common.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_common.c
 new file mode 100644
-index 0000000000..4e2b47582f
+index 0000000..4e2b475
 --- /dev/null
 +++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_common.c
 @@ -0,0 +1,35 @@
@@ -252,7 +252,7 @@ index 0000000000..4e2b47582f
 +}
 diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_common.h b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_common.h
 new file mode 100644
-index 0000000000..8efb04d6f0
+index 0000000..8efb04d
 --- /dev/null
 +++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_common.h
 @@ -0,0 +1,8 @@
@@ -266,7 +266,7 @@ index 0000000000..8efb04d6f0
 +#endif
 diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_delete.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_delete.c
 new file mode 100644
-index 0000000000..1a933044be
+index 0000000..1a93304
 --- /dev/null
 +++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_delete.c
 @@ -0,0 +1,32 @@
@@ -304,7 +304,7 @@ index 0000000000..1a933044be
 +}
 diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_done.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_done.c
 new file mode 100644
-index 0000000000..8643a8f98a
+index 0000000..8643a8f
 --- /dev/null
 +++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_done.c
 @@ -0,0 +1,36 @@
@@ -346,7 +346,7 @@ index 0000000000..8643a8f98a
 +}
 diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_fcntl.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_fcntl.c
 new file mode 100644
-index 0000000000..279b1854f8
+index 0000000..279b185
 --- /dev/null
 +++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_fcntl.c
 @@ -0,0 +1,48 @@
@@ -398,9 +398,40 @@ index 0000000000..279b1854f8
 +      /* --END ERROR HANDLING-- */
 +  }
 +}
+diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_features.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_features.c
+new file mode 100644
+index 0000000..acb4881
+--- /dev/null
++++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_features.c
+@@ -0,0 +1,25 @@
++/*
++ * Copyright (C) by Argonne National Laboratory
++ *     See COPYRIGHT in top-level directory
++ */
++
++#include "adio.h"
++#include "ad_chfs.h"
++
++int ADIOI_CHFS_Feature(ADIO_File fd, int flag)
++{
++    switch (flag) {
++        case ADIO_TWO_PHASE:
++        case ADIO_SCALABLE_RESIZE:
++            return 1;
++        /* CHFS does not support file locking */
++        case ADIO_LOCKS:
++        case ADIO_SHARED_FP:
++        case ADIO_ATOMIC_MODE:
++        case ADIO_DATA_SIEVING_WRITES:
++        case ADIO_UNLINK_AFTER_CLOSE:
++        case ADIO_SCALABLE_OPEN:
++        default:
++            return 0;
++    }
++}
 diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_flush.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_flush.c
 new file mode 100644
-index 0000000000..11260faac8
+index 0000000..11260fa
 --- /dev/null
 +++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_flush.c
 @@ -0,0 +1,23 @@
@@ -427,35 +458,9 @@ index 0000000000..11260faac8
 +    *error_code = ADIOI_Err_create_code(myname, fd->filename, errno);
 +  }
 +}
-diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_getsh.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_getsh.c
-new file mode 100644
-index 0000000000..98f4d90ff9
---- /dev/null
-+++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_getsh.c
-@@ -0,0 +1,20 @@
-+/*
-+ * Copyright (C) by Argonne National Laboratory
-+ *     See COPYRIGHT in top-level directory
-+ */
-+
-+#include "ad_chfs.h"
-+#include "adioi.h"
-+
-+void ADIOI_CHFS_Get_shared_fp(ADIO_File fd, int size, ADIO_Offset * shared_fp, int *error_code)
-+{
-+#ifdef DEBUG
-+    int myrank, nprocs;
-+    MPI_Comm_size(fd->comm, &nprocs);
-+    MPI_Comm_rank(fd->comm, &myrank);
-+    FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_Get_shared_fp called on %s\n",
-+            myrank, nprocs, fd->filename);
-+#endif
-+
-+    *error_code = MPI_SUCCESS;
-+}
 diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_hints.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_hints.c
 new file mode 100644
-index 0000000000..c80a394d05
+index 0000000..c80a394
 --- /dev/null
 +++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_hints.c
 @@ -0,0 +1,23 @@
@@ -484,7 +489,7 @@ index 0000000000..c80a394d05
 +}
 diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_init.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_init.c
 new file mode 100644
-index 0000000000..3f43dc1416
+index 0000000..3f43dc1
 --- /dev/null
 +++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_init.c
 @@ -0,0 +1,72 @@
@@ -562,7 +567,7 @@ index 0000000000..3f43dc1416
 +}
 diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_iread.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_iread.c
 new file mode 100644
-index 0000000000..521577560c
+index 0000000..5215775
 --- /dev/null
 +++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_iread.c
 @@ -0,0 +1,59 @@
@@ -627,7 +632,7 @@ index 0000000000..521577560c
 +}
 diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_iwrite.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_iwrite.c
 new file mode 100644
-index 0000000000..8645411a21
+index 0000000..8645411
 --- /dev/null
 +++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_iwrite.c
 @@ -0,0 +1,65 @@
@@ -698,7 +703,7 @@ index 0000000000..8645411a21
 +}
 diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_open.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_open.c
 new file mode 100644
-index 0000000000..4427e6c094
+index 0000000..4427e6c
 --- /dev/null
 +++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_open.c
 @@ -0,0 +1,78 @@
@@ -782,7 +787,7 @@ index 0000000000..4427e6c094
 +}
 diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_rdcoll.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_rdcoll.c
 new file mode 100644
-index 0000000000..69fb8740f4
+index 0000000..69fb874
 --- /dev/null
 +++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_rdcoll.c
 @@ -0,0 +1,26 @@
@@ -814,7 +819,7 @@ index 0000000000..69fb8740f4
 +}
 diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_read.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_read.c
 new file mode 100644
-index 0000000000..b1b7942c25
+index 0000000..b1b7942
 --- /dev/null
 +++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_read.c
 @@ -0,0 +1,93 @@
@@ -913,7 +918,7 @@ index 0000000000..b1b7942c25
 +}
 diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_resize.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_resize.c
 new file mode 100644
-index 0000000000..623ac677a5
+index 0000000..623ac67
 --- /dev/null
 +++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_resize.c
 @@ -0,0 +1,35 @@
@@ -954,7 +959,7 @@ index 0000000000..623ac677a5
 +}
 diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_seek.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_seek.c
 new file mode 100644
-index 0000000000..92aecc70d6
+index 0000000..92aecc7
 --- /dev/null
 +++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_seek.c
 @@ -0,0 +1,82 @@
@@ -1040,36 +1045,9 @@ index 0000000000..92aecc70d6
 +
 +    return off;
 +}
-diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_setsh.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_setsh.c
-new file mode 100644
-index 0000000000..315e1d06a4
---- /dev/null
-+++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_setsh.c
-@@ -0,0 +1,21 @@
-+/*
-+ * Copyright (C) by Argonne National Laboratory
-+ *     See COPYRIGHT in top-level directory
-+ */
-+
-+#include "ad_chfs.h"
-+#include "adioi.h"
-+
-+void ADIOI_CHFS_Set_shared_fp(ADIO_File fd, ADIO_Offset offset, int *error_code)
-+{
-+    int myrank, nprocs;
-+
-+    *error_code = MPI_SUCCESS;
-+
-+#ifdef DEBUG
-+    MPI_Comm_size(fd->comm, &nprocs);
-+    MPI_Comm_rank(fd->comm, &myrank);
-+    FPRINTF(stdout, "[%d/%d] ADIOI_CHFS_Set_shared_fp called on %s\n",
-+            myrank, nprocs, fd->filename);
-+#endif
-+}
 diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_wait.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_wait.c
 new file mode 100644
-index 0000000000..0b0e7f6102
+index 0000000..0b0e7f6
 --- /dev/null
 +++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_wait.c
 @@ -0,0 +1,39 @@
@@ -1114,7 +1092,7 @@ index 0000000000..0b0e7f6102
 +}
 diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_wrcoll.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_wrcoll.c
 new file mode 100644
-index 0000000000..413251a753
+index 0000000..413251a
 --- /dev/null
 +++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_wrcoll.c
 @@ -0,0 +1,26 @@
@@ -1146,7 +1124,7 @@ index 0000000000..413251a753
 +}
 diff --git a/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_write.c b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_write.c
 new file mode 100644
-index 0000000000..4e257681df
+index 0000000..4e25768
 --- /dev/null
 +++ b/ompi/mca/io/romio321/romio/adio/ad_chfs/ad_chfs_write.c
 @@ -0,0 +1,100 @@
@@ -1251,7 +1229,7 @@ index 0000000000..4e257681df
 +                         status, error_code);
 +}
 diff --git a/ompi/mca/io/romio321/romio/adio/common/ad_fstype.c b/ompi/mca/io/romio321/romio/adio/common/ad_fstype.c
-index 4ffa79f8d9..ba3fdc0077 100644
+index 4ffa79f..ba3fdc0 100644
 --- a/ompi/mca/io/romio321/romio/adio/common/ad_fstype.c
 +++ b/ompi/mca/io/romio321/romio/adio/common/ad_fstype.c
 @@ -572,6 +572,9 @@ static void ADIO_FileSysType_prefix(const char *filename, int *fstype, int *erro
@@ -1282,7 +1260,7 @@ index 4ffa79f8d9..ba3fdc0077 100644
      }
      *error_code = MPI_SUCCESS;
 diff --git a/ompi/mca/io/romio321/romio/adio/include/adio.h b/ompi/mca/io/romio321/romio/adio/include/adio.h
-index b320fe2788..76260ed118 100644
+index b320fe2..76260ed 100644
 --- a/ompi/mca/io/romio321/romio/adio/include/adio.h
 +++ b/ompi/mca/io/romio321/romio/adio/include/adio.h
 @@ -305,6 +305,7 @@ typedef struct {
@@ -1294,7 +1272,7 @@ index b320fe2788..76260ed118 100644
  #define ADIO_SEEK_SET            SEEK_SET
  #define ADIO_SEEK_CUR            SEEK_CUR
 diff --git a/ompi/mca/io/romio321/romio/adio/include/adioi_fs_proto.h b/ompi/mca/io/romio321/romio/adio/include/adioi_fs_proto.h
-index e3af917082..be60303b83 100644
+index e3af917..be60303 100644
 --- a/ompi/mca/io/romio321/romio/adio/include/adioi_fs_proto.h
 +++ b/ompi/mca/io/romio321/romio/adio/include/adioi_fs_proto.h
 @@ -89,4 +89,9 @@ extern struct ADIOI_Fns_struct ADIO_GRIDFTP_operations;
@@ -1308,7 +1286,7 @@ index e3af917082..be60303b83 100644
 +
  #endif
 diff --git a/ompi/mca/io/romio321/romio/configure.ac b/ompi/mca/io/romio321/romio/configure.ac
-index 6d40359beb..7af033bf15 100644
+index 6d40359..7af033b 100644
 --- a/ompi/mca/io/romio321/romio/configure.ac
 +++ b/ompi/mca/io/romio321/romio/configure.ac
 @@ -196,7 +196,7 @@ dnl An m4 macro for use with m4_foreach_w and friends.  You should modify this
