@@ -55,27 +55,6 @@ For details, see <https://mochi.readthedocs.io/>
 
 If you use the pmemkv backend, install [pmemkv](https://github.com/pmem/pmemkv) and specify `--with-pmemkv` in configure.
 
-## Quick installation steps by Spack
-
-### Install development kits and required tools
-
-see above
-
-### Install Spack
-
-see above
-
-### Install CHFS
-
-```console
-% git clone https://github.com/tsukuba-hpcs/spack-packages
-% spack repo add spack-packages
-% spack external find autoconf automake libtool cmake m4 rdma-core pkgconf libfuse
-% spack install chfs~pmemkv ^mercury~boostsys
-```
-
-To use chfs, `spack load chfs` is required.
-
 ## How to create file system
 
 ### Create CHFS
