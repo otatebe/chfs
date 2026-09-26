@@ -12,7 +12,7 @@ RUN apt-get update \
     libjson-c-dev libboost-dev \
     git fuse3 sudo vim curl wget \
     libfuse3-dev pandoc \
-    gfortran zip bzip2 flex libpmix-dev libnl-3-dev libibverbs-dev \
+    gfortran zip bzip2 flex libibverbs-dev \
     gdb numactl \
     python3 python3-venv python3-pip \
     binutils-dev
