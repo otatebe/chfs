@@ -161,7 +161,7 @@ ROMIO ADIO for CHFS is available.  With the ROMIO ADIO for CHFS, MPI-IO applicat
 ### Installation
 
 ```console
-% apt install gfortran bzip2 flex libpmix-dev libnl-3-dev libibverbs-dev
+% apt install gfortran wget
 % wget https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-5.0.11.tar.bz2
 % tar xfp openmpi-5.0.11.tar.bz2
 % cd openmpi-5.0.11
