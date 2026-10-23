@@ -1,3 +1,11 @@
+# Release note for CHFS/Cache 3.1.2 (2026/10/23)
+
+## Updated features
+- chfuse - migrate to FUSE 3.  libfuse3-dev and fuse3 are required instead of libfuse-dev and fuse
+- chfsctl - -o option to specify mount options for chfuse
+- ROMIO ADIO for CHFS - support Open MPI 5.0.x (ad_chfs-5.0.patch).  ad_chfs.patch is renamed to ad_chfs-4.1.patch for Open MPI 4.1.x
+- ROMIO ADIO for CHFS (Open MPI 5.0.x) - shared file pointer operations return MPI_ERR_UNSUPPORTED_OPERATION, and MPI_File_set_atomicity() returns MPI_ERR_ARG, since CHFS does not support file locking
+
 # Release note for CHFS/Cache 3.1.1 (2026/9/9)
 
 ## Updated features
