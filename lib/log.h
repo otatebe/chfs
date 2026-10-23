@@ -1,7 +1,9 @@
 #ifdef __GNUC__
 #define LOG_PRINTF_ARG(M, N) __attribute__((__format__(__printf__, M, N)))
+#define LOG_NORETURN __attribute__((__noreturn__))
 #else
 #define LOG_PRINTF_ARG(M, N)
+#define LOG_NORETURN
 #endif
 
 void log_message(int, const char *, ...) LOG_PRINTF_ARG(2, 3);
@@ -11,7 +13,7 @@ void log_notice(const char *, ...) LOG_PRINTF_ARG(1, 2);
 void log_info(const char *, ...) LOG_PRINTF_ARG(1, 2);
 void log_debug(const char *, ...) LOG_PRINTF_ARG(1, 2);
 
-void log_fatal(const char *, ...) LOG_PRINTF_ARG(1, 2);
+void log_fatal(const char *, ...) LOG_PRINTF_ARG(1, 2) LOG_NORETURN;
 
 void log_syslog_open(const char *, int, int);
 int log_file_open(const char *);
