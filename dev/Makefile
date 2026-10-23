@@ -12,3 +12,9 @@ up:
 
 down:
 	docker compose down
+
+down-volume:
+	docker compose down -v
+
+clean:
+	docker compose down -v --rmi all

@@ -48,3 +48,15 @@
 - shutdown containers (in a host)
 
       $ make down
+
+- shutdown containers and remove volumes (in a host)
+
+      $ make down-volume
+
+  This removes the volume for `~/local`.  Next time, install everything again by `sh install.sh`.
+
+- shutdown containers and remove volumes and the docker image (in a host)
+
+      $ make clean
+
+  Next time, start from `make build`.
