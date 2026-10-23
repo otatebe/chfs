@@ -1,8 +1,8 @@
-# CHFS - Parallel caching file system for node-local storages
+# CHFS - Parallel caching file system for node-local storage
 
-CHFS is a parallel caching file system that is created instantly using node-local storage, such as persistent memory and NVMe SSD, across multiple compute nodes.  It leverages the performance of persistent memory with a persistent in-memory key-value store pmemkv.  For NVMe SSDs, it uses a POSIX I/F.  CHFS leverages RDMA for high performance data access.
+CHFS is a parallel caching file system that is created instantly using node-local storage, such as persistent memory and NVMe SSD, across multiple compute nodes.  It leverages the performance of persistent memory using pmemkv, a persistent in-memory key-value store.  For NVMe SSDs, it uses the POSIX interface.  CHFS leverages RDMA for high-performance data access.
 
-CHFS provides a caching mechanism against a backend parallel file system.  Files in the backend parallel file system are automatically cached on demand or manually staged-in.  Output files are automatically flushed by I/O-aware flushing that maximizes the performance of CHFS.
+CHFS provides a caching mechanism against a backend parallel file system.  Files in the backend parallel file system are automatically cached on demand or manually staged in.  Output files are automatically flushed by I/O-aware flushing that maximizes the performance of CHFS.
 
 ## Quick installation steps
 
@@ -63,47 +63,47 @@ If you use the pmemkv backend, install [pmemkv](https://github.com/pmem/pmemkv) 
 % eval `chfsctl [-h hostfile] [-p verbs] [-c /dev/dax0.0] [-b /back/end/path] [-m /mount/point] start`
 ```
 
-This executes chfsd servers and mounts the CHFS at /mount/point on hosts specified by the hostfile.  The -p option specifies a communication protocol.  The -c option specifies a devdax device or a scratch directory on each host.
+This executes chfsd servers and mounts CHFS at /mount/point on hosts specified by the hostfile.  The -p option specifies a communication protocol.  The -c option specifies a devdax device or a scratch directory on each host.
 
-The backend directory typically in a parallel file system can be specified by the -b option.  Files in the backend directory can be transparently accessed at the CHFS mount directory when the -m option is specified.  If all files in the backend file system need to be accessed, you can specify / as a backend directory.  For efficient access, files can be staged-in by `chstagein` command beforehand.  This is an example to stage-in all files in the backend directory.
+The backend directory, typically in a parallel file system, can be specified by the -b option.  Files in the backend directory can be transparently accessed at the CHFS mount directory when the -m option is specified.  If all files in the backend file system need to be accessed, you can specify / as a backend directory.  For efficient access, files can be staged in beforehand by the `chstagein` command.  The following example stages in all files in the backend directory.
 
 ```console
 % cd /back/end/path
 % find . | xargs [ mpirun ... ] chstagein
 ```
 
-`chstagein` can be executed with and without mpirun.  The output files will be flushed automatically to the backend directory.  It is possible to ensure flushing all dirty files by `chfs_sync()` or `chfsctl stop`.
+`chstagein` can be executed with and without mpirun.  The output files will be flushed automatically to the backend directory.  To ensure that all dirty files are flushed, use `chfs_sync()` or `chfsctl stop`.
 
-The -m option specifies the mount directory of CHFS.  When this option is specified, the subdirectory of CHFS that is the same directory as the mount directory is mounted.  That is, files in CHFS can be accessed using the same directory path by POSIX I/F via chfuse and CHFS APIs.
+The -m option specifies the mount directory of CHFS.  When this option is specified, the CHFS subdirectory with the same path as the mount directory is mounted.  That is, files in CHFS can be accessed using the same path both through the POSIX interface via chfuse and through the CHFS API.
 
-For devdax device, a pmem obj pool should be created with the layout pmemkv by `pmempool create -l pmemkv obj /dev/dax0.0`.  For user-level access, the permission of the device should be modified, and bad block check should be disabled by `pmempool feature --disable CHECK_BAD_BLOCKS /dev/dax0.0`.
+For a devdax device, a pmem obj pool should be created with the layout pmemkv by `pmempool create -l pmemkv obj /dev/dax0.0`.  For user-level access, the permissions of the device should be changed, and bad block check should be disabled by `pmempool feature --disable CHECK_BAD_BLOCKS /dev/dax0.0`.
 
-chfsctl outputs the setting of CHFS_SERVER, CHFS_BACKEND_PATH, and CHFS_SUBDIR_PATH environment variables, which are used to execute chfuse and CHFS commands.
+chfsctl outputs the settings of the CHFS_SERVER, CHFS_BACKEND_PATH, and CHFS_SUBDIR_PATH environment variables, which are used to execute chfuse and CHFS commands.
 
 For details, see [manual page of chfsctl](doc/chfsctl.1.md).
 
 ### Mount the CHFS
 
-CHFS is mounted by the -m option of chfsctl command.  If you need to mount it on other hosts, chfuse command is used;
+CHFS is mounted by the -m option of the chfsctl command.  To mount it on other hosts, use the chfuse command.
 
 ```console
 % chfuse -o direct_io /mount/point
 ```
 
-When you want to mount the subdirectory of CHFS the same way chfsctl mounts, use subdir module like this.
+To mount the CHFS subdirectory in the same way as chfsctl, use the subdir module as follows.
 
 ```console
 % export CHFS_SUBDIR_PATH=/mount/point
 % chfuse -o direct_io,modules=subdir,subdir=$CHFS_SUBDIR_PATH $CHFS_SUBDIR_PATH
 ```
 
-CHFS_SERVER and other environment variables, which are the output of chfsctl command, should be defined.
+CHFS_SERVER and other environment variables output by the chfsctl command should be defined.
 
 For details, see [manual page of chfuse](doc/chfuse.1.md).
 
 ## POSIX interface for CHFS
 
-POSIX programs can access CHFS using CHFS-zpoline interception library without source-code modification and without mounting CHFS by chfuse.
+POSIX programs can access CHFS using the CHFS-zpoline system call interception library without source-code modification and without mounting CHFS by chfuse.
 
 ### Install CHFS-zpoline
 
@@ -118,7 +118,7 @@ POSIX programs can access CHFS using CHFS-zpoline interception library without s
 
 ### How to use CHFS-zpoline
 
-When using CHFS-zpoline, CHFS is virtually mounted on /chfs, or / when specifying cached directories using LIBZPDIRS.  When LIBZPDIRS is specified, files in the specified directories are hooked.  Also you can access CHFS by a relative path.
+When using CHFS-zpoline, CHFS is virtually mounted on /chfs, or / when specifying cached directories using LIBZPDIRS.  When LIBZPDIRS is specified, accesses to files in the specified directories are hooked.  CHFS can also be accessed by a relative path.
 
 ```console
 % sudo sysctl vm.mmap_min_addr=0
@@ -136,7 +136,7 @@ When using CHFS-zpoline, CHFS is virtually mounted on /chfs, or / when specifyin
 - [chstagein(1)](doc/chstagein.1.md) - stage-in files to CHFS
 - [chfsd(8)](doc/chfsd.8.md) - CHFS server, which is usually executed by chfsctl
 
-## Environment variable
+## Environment variables
 
 - CHFS_SERVER - server addresses separated by ','
 - CHFS_BACKEND_PATH - backend path
@@ -152,13 +152,13 @@ When using CHFS-zpoline, CHFS is virtually mounted on /chfs, or / when specifyin
 - CHFS_NODE_LIST_CACHE_TIMEOUT - node list cache timeout in seconds
 - CHFS_LOG_PRIORITY - maximum log priority to report
 
-When you use pmemkv, devdax is desirable.  When you use fsdax, the following environment variable is recommended to touch every page of the persistent memory pool, while the start up time of chfsd becomes slow.
+When you use pmemkv, devdax is preferable.  When you use fsdax, the following environment variable is recommended to touch every page of the persistent memory pool, although it slows down the startup of chfsd.
 
 - PMEMOBJ_CONF="prefault.at_open=1;prefault.at_create=1"
 
 ## Open MPI with CHFS ADIO
 
-ROMIO ADIO for CHFS is available.  With the ROMIO ADIO for CHFS, MPI-IO applications can access CHFS without any source code modification.  You can access CHFS by chfs:$MDIR/path/name or by specifying 'ROMIO_FSTYPE_FORCE=chfs:', where $MDIR is a mount directory of CHFS.
+ROMIO ADIO for CHFS is available.  With the ROMIO ADIO for CHFS, MPI-IO applications can access CHFS without any source code modification.  You can access CHFS by `chfs:$MDIR/path/name` or by specifying `ROMIO_FSTYPE_FORCE=chfs:`, where $MDIR is the mount directory of CHFS.
 
 ### Installation
 
@@ -176,11 +176,11 @@ ROMIO ADIO for CHFS is available.  With the ROMIO ADIO for CHFS, MPI-IO applicat
 # make install
 ```
 
-For Open MPI 4.1.x, use [ad_chfs-4.1.patch](dev/ompi/ad_chfs-4.1.patch) instead, apply `./autogen.sh` in `ompi/mca/io/romio321/romio`, and specify `--mca io romio321` instead of `--mca io romio341` in the following.
+For Open MPI 4.1.x, use [ad_chfs-4.1.patch](dev/ompi/ad_chfs-4.1.patch) instead, run `./autogen.sh` in `ompi/mca/io/romio321/romio`, and specify `--mca io romio321` instead of `--mca io romio341` in the following.
 
 ### Install CHFS again with MPI for parallel find and parallel stage-in
 
-Make sure that mpicc of the installed Open MPI is in the PATH.
+Make sure that the mpicc of the installed Open MPI is in your PATH.
 
 ```console
 % cd chfs/build
@@ -223,7 +223,7 @@ Since CHFS does not support file locking, the following features are not support
 % mpirun -x CHFS_SERVER -x CHFS_BACKEND_PATH -x CHFS_SUBDIR_PATH ior -a CHFS [--chfs.chunk_size=SIZE]
 ```
 
-Large chunk size, i.e. 1 MiB, should be specified for best performance.  If you are using Open MPI with CHFS ADIO, it is possible to use the MPIIO backend by `-a MPIIO` with `chfs:$MDIR/file` or with '-x ROMIO_FSTYPE_FORCE=chfs:' and a relative path, where $MDIR is a mount directory of CHFS.  If you are using CHFS-zpoline, it is possible to use POSIX backend with a relative path or /chfs$MDIR/file.
+A large chunk size, e.g., 1 MiB, should be specified for the best performance.  If you are using Open MPI with CHFS ADIO, you can use the MPIIO backend by `-a MPIIO` with `chfs:$MDIR/file`, or with `-x ROMIO_FSTYPE_FORCE=chfs:` and a relative path, where $MDIR is the mount directory of CHFS.  If you are using CHFS-zpoline, you can use the POSIX backend with a relative path or `/chfs$MDIR/file`.
 
 ## CHFS API
 

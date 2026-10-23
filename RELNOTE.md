@@ -75,7 +75,7 @@
 
 # Release note for CHFS/Cache 3.0.0 (2023/9/11)
 
-CHFS/Cache is a parallel caching file system for node-local storages based on CHFS ad hoc parallel file system.  It provides a caching mechanism against a backend parallel file system.  Files in the backend parallel file system are automatically cached.  Output files are automatically flushed.
+CHFS/Cache is a parallel caching file system for node-local storage based on CHFS ad hoc parallel file system.  It provides a caching mechanism against a backend parallel file system.  Files in the backend parallel file system are automatically cached.  Output files are automatically flushed.
 
 ## How to create file system
 
@@ -155,7 +155,7 @@ Osamu Tatebe, Hiroki Ohtsuji, "[Caching Support for CHFS Node-local Persistent M
 
 # Release note for CHFS 1.0.0 (2022/3/29)
 
-CHFS is a parallel consistent hashing file system created instantly using node-local storages such as persistent memory and NVMe SSD.  It exploits the performance of persistent memory using persistent in-memory key-value store pmemkv.  For NVMe SSD, it uses the POSIX backend.  It supports InfiniBand verbs for high performance data access.
+CHFS is a parallel consistent hashing file system created instantly using node-local storage such as persistent memory and NVMe SSD.  It exploits the performance of persistent memory using persistent in-memory key-value store pmemkv.  For NVMe SSD, it uses the POSIX backend.  It supports InfiniBand verbs for high performance data access.
 
 ## How to create file system
 
