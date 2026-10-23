@@ -134,11 +134,13 @@ When using CHFS-zpoline, CHFS is virtually mounted on /chfs, or / when specifyin
 - [chrmdir(1)](doc/chrmdir.1.md) - remove a directory in CHFS
 - [chfind(1)](doc/chfind.1.md) - search for files in CHFS
 - [chstagein(1)](doc/chstagein.1.md) - stage-in files to CHFS
+- [chfsd(8)](doc/chfsd.8.md) - CHFS server, which is usually executed by chfsctl
 
 ## Environment variable
 
 - CHFS_SERVER - server addresses separated by ','
 - CHFS_BACKEND_PATH - backend path
+- CHFS_SUBDIR_PATH - current working directory in CHFS
 - CHFS_CHUNK_SIZE - chunk size
 - CHFS_ASYNC_ACCESS - set 1 to enable asynchronous accesses
 - CHFS_BUF_SIZE - buffer size
@@ -178,9 +180,12 @@ For Open MPI 4.1.x, use [ad_chfs-4.1.patch](dev/ompi/ad_chfs-4.1.patch) instead,
 
 ### Install CHFS again with MPI for parallel find and parallel stage-in
 
+Make sure that mpicc of the installed Open MPI is in the PATH.
+
 ```console
-% cd chfs
-% ./configure [--prefix=PREFIX] [--enable-zero-copy-read-rdma]
+% cd chfs/build
+% spack load mochi-margo
+% ../configure [--prefix=PREFIX] [--enable-zero-copy-read-rdma]
 % make
 # make install
 ```
@@ -266,6 +271,7 @@ int chfs_readdir(const char *path, void *buf,
         int (*filler)(void *, const char *, const struct stat *, off_t));
 int chfs_readdir_index(const char *path, int index, void *buf,
         int (*filler)(void *, const char *, const struct stat *, off_t));
+int chfs_linux_getdents64(int fd, char dirp[], size_t count);
 int chfs_symlink(const char *target, const char *path);
 int chfs_readlink(const char *path, char *buf, size_t size);
 void chfs_sync();
