@@ -45,7 +45,7 @@ static struct fd_table {
 	off_t buf_off, buf_pos;
 	int buf_dirty;
 	ABT_mutex mutex;
-} *fd_table;
+} **fd_table;	/* entries are not moved when the table is expanded */
 
 void
 chfs_set_chunk_size(int chunk_size)
@@ -91,21 +91,31 @@ chfs_set_node_list_cache_timeout(int timeout)
 	chfs_node_list_cache_timeout = timeout;
 }
 
-static void
-fd_table_init()
+static int
+fd_table_entry_init(int start, int end)
 {
 	int i;
 
+	for (i = start; i < end; ++i) {
+		fd_table[i] = malloc(sizeof(*fd_table[i]));
+		if (fd_table[i] == NULL)
+			return (-1);
+		fd_table[i]->path = NULL;
+		fd_table[i]->buf = NULL;
+		ABT_mutex_create(&fd_table[i]->mutex);
+	}
+	return (0);
+}
+
+static void
+fd_table_init()
+{
 	fd_table_size = 100;
 	fd_table = malloc(sizeof(*fd_table) * fd_table_size);
 	if (fd_table == NULL)
 		log_fatal("fd_table_init: no memory");
-
-	for (i = 0; i < fd_table_size; ++i) {
-		fd_table[i].path = NULL;
-		fd_table[i].buf = NULL;
-		ABT_mutex_create(&fd_table[i].mutex);
-	}
+	if (fd_table_entry_init(0, fd_table_size))
+		log_fatal("fd_table_init: no memory");
 	ABT_mutex_create(&fd_mutex);
 }
 
@@ -115,11 +125,11 @@ fd_table_term()
 	int i;
 
 	for (i = 0; i < fd_table_size; ++i) {
-		free(fd_table[i].path);
-		fd_table[i].path = NULL;
-		free(fd_table[i].buf);
-		fd_table[i].buf = NULL;
-		ABT_mutex_free(&fd_table[i].mutex);
+		free(fd_table[i]->path);
+		free(fd_table[i]->buf);
+		ABT_mutex_free(&fd_table[i]->mutex);
+		free(fd_table[i]);
+		fd_table[i] = NULL;
 	}
 	fd_table_size = 0;
 	free(fd_table);
@@ -425,11 +435,11 @@ chfs_version(void)
 static int
 create_fd_unlocked(const char *path, uint32_t mode, int chunk_size)
 {
-	struct fd_table *tmp;
+	struct fd_table **tmp, *tab;
 	int fd, i, buf_size;
 
 	for (fd = 0; fd < fd_table_size; ++fd)
-		if (fd_table[fd].path == NULL)
+		if (fd_table[fd]->path == NULL)
 			break;
 	if (fd == fd_table_size) {
 		tmp = realloc(fd_table,
@@ -437,33 +447,37 @@ create_fd_unlocked(const char *path, uint32_t mode, int chunk_size)
 		if (tmp == NULL)
 			return (-1);
 		fd_table = tmp;
-		fd_table_size *= 2;
-		for (i = fd; i < fd_table_size; ++i) {
-			fd_table[i].path = NULL;
-			fd_table[i].buf = NULL;
-			ABT_mutex_create(&fd_table[i].mutex);
+		if (fd_table_entry_init(fd, fd_table_size * 2)) {
+			for (i = fd; i < fd_table_size * 2 && fd_table[i]; ++i) {
+				ABT_mutex_free(&fd_table[i]->mutex);
+				free(fd_table[i]);
+			}
+			log_error("create_fd: %s, no memory", path);
+			return (-1);
 		}
+		fd_table_size *= 2;
 	}
-	fd_table[fd].path = strdup(path);
-	if (fd_table[fd].path == NULL) {
+	tab = fd_table[fd];
+	tab->path = strdup(path);
+	if (tab->path == NULL) {
 		log_error("create_fd: %s, no memory", path);
 		return (-1);
 	}
 	buf_size = chunk_size > chfs_buf_size ? chunk_size : chfs_buf_size;
-	fd_table[fd].buf_size = buf_size;
-	fd_table[fd].buf = malloc(buf_size);
-	if (fd_table[fd].buf == NULL) {
-		free(fd_table[fd].path);
-		fd_table[fd].path = NULL;
+	tab->buf_size = buf_size;
+	tab->buf = malloc(buf_size);
+	if (tab->buf == NULL) {
+		free(tab->path);
+		tab->path = NULL;
 		log_error("create_fd: %s, no memory", path);
 		return (-1);
 	}
-	fd_table[fd].mode = MODE_MASK(mode);
-	fd_table[fd].cache_flags = FLAGS_FROM_MODE(mode);
-	fd_table[fd].chunk_size = chunk_size;
-	fd_table[fd].pos = 0;
-	fd_table[fd].buf_pos = 0;
-	fd_table[fd].buf_dirty = 0;
+	tab->mode = MODE_MASK(mode);
+	tab->cache_flags = FLAGS_FROM_MODE(mode);
+	tab->chunk_size = chunk_size;
+	tab->pos = 0;
+	tab->buf_pos = 0;
+	tab->buf_dirty = 0;
 	return (fd);
 }
 
@@ -494,7 +508,7 @@ check_fd_unlocked(int fd)
 		errno = EBADF;
 		return (-1);
 	}
-	if (fd_table[fd].path == NULL) {
+	if (fd_table[fd]->path == NULL) {
 		errno = EBADF;
 		return (-1);
 	}
@@ -502,22 +516,11 @@ check_fd_unlocked(int fd)
 }
 
 static int
-check_fd(int fd)
-{
-	int r;
-
-	ABT_mutex_lock(fd_mutex);
-	r = check_fd_unlocked(fd);
-	ABT_mutex_unlock(fd_mutex);
-	return (r);
-}
-
-static int
 clear_fd_unlocked(int fd)
 {
 	if (check_fd_unlocked(fd))
 		return (-1);
-	clear_fd_table(&fd_table[fd]);
+	clear_fd_table(fd_table[fd]);
 	return (0);
 }
 
@@ -532,12 +535,17 @@ clear_fd(int fd)
 	return (r);
 }
 
+/* the entry is valid until chfs_term() even if the table is expanded */
 static struct fd_table *
 get_fd_table(int fd)
 {
-	if (check_fd(fd))
-		return (NULL);
-	return (&fd_table[fd]);
+	struct fd_table *tab = NULL;
+
+	ABT_mutex_lock(fd_mutex);
+	if (check_fd_unlocked(fd) == 0)
+		tab = fd_table[fd];
+	ABT_mutex_unlock(fd_mutex);
+	return (tab);
 }
 
 static off_t
