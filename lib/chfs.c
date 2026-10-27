@@ -604,14 +604,17 @@ fd_flush_unlocked(int fd)
 	tab->buf_pos = tab->buf_dirty = 0;
 }
 
-static void
+static int
 fd_flush(int fd)
 {
 	struct fd_table *tab = get_fd_table(fd);
 
+	if (tab == NULL)
+		return (-1); /* EBADF */
 	ABT_mutex_lock(tab->mutex);
 	fd_flush_unlocked(fd);
 	ABT_mutex_unlock(tab->mutex);
+	return (0);
 }
 
 static int
@@ -670,8 +673,11 @@ fd_read(int fd, char *buf, size_t size, off_t offset)
 		return (0); /* EBADF */
 	if (S_ISDIR(tab->mode))
 		return (0);
-	if (tab->buf == NULL || size > tab->buf_size) {
-		/* large message, skip buffering */
+	if (tab->buf == NULL)
+		return (0);
+	if (size > tab->buf_size) {
+		/* large message, skip buffering after flushing dirty data */
+		fd_flush(fd);
 		return (0);
 	}
 	ABT_mutex_lock(tab->mutex);
@@ -1117,7 +1123,8 @@ path_index(const char *path, int index, size_t *size)
 int
 chfs_fsync(int fd)
 {
-	fd_flush(fd);
+	if (fd_flush(fd))
+		return (-1);
 	log_info("chfs_fsync: fd=%d", fd);
 	return (0);
 }
@@ -1125,7 +1132,8 @@ chfs_fsync(int fd)
 int
 chfs_close(int fd)
 {
-	fd_flush(fd);
+	if (fd_flush(fd))
+		return (-1);
 	log_info("chfs_close: fd=%d", fd);
 	return (clear_fd(fd));
 }
@@ -1684,6 +1692,7 @@ chfs_seek(int fd, off_t off, int whence)
 			pos = fd_pos_get(fd);
 		break;
 	case SEEK_END:
+		fd_flush(fd);
 		pos = fd_pos_get(fd);
 		if (chfs_stat_internal(tab->path, 0, &sb) == 0) {
 			if (pos < sb.st_size)
@@ -2000,6 +2009,7 @@ chfs_fstat(int fd, struct stat *st)
 
 	if (tab == NULL)
 		return (-1);
+	fd_flush(fd);
 	return (chfs_stat_internal(tab->path, 0, st));
 }
 
@@ -2102,6 +2112,8 @@ chfs_ftruncate(int fd, off_t len)
 		errno = EISDIR;
 		return (-1);
 	}
+	/* flush dirty data and invalidate the buffer before truncation */
+	fd_flush(fd);
 	return (chfs_truncate_internal(tab->path, len));
 }
 
@@ -2313,15 +2325,19 @@ chfs_linux_getdents64(int fd, char dirp[], size_t count)
 	}
 	if (tab->pos + count > tab->buf_size)
 		count = tab->buf_size - tab->pos;
-	for (;;) {
+	while (size < count) {
 		d = (struct linux_dirent64 *) (&tab->buf[tab->pos] + size);
 		if (size + d->d_reclen > count)
 			break;
 		size += d->d_reclen;
-		if (size == count)
-			break;
 	}
-	memcpy(dirp, tab->buf, size);
+	if (size == 0 && count > 0) {
+		/* result buffer is too small */
+		ABT_mutex_unlock(tab->mutex);
+		errno = EINVAL;
+		return (-1);
+	}
+	memcpy(dirp, &tab->buf[tab->pos], size);
 	tab->pos += size;
 	ABT_mutex_unlock(tab->mutex);
 	log_info("%s: fd=%d size=%d", diag, fd, size);
