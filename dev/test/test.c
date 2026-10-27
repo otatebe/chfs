@@ -1,6 +1,9 @@
 #include <assert.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -236,6 +239,123 @@ test_readdir(char *d)
 	puts("done");
 }
 
+static void
+test_bad_fd(char *f)
+{
+	int fd;
+
+	printf("test_bad_fd: %s: ", f);
+	fflush(stdout);
+	fd = chfs_create(f, O_WRONLY, 0644);
+	assert(fd != -1);
+	_(chfs_close(fd));
+
+	errno = 0;
+	assert(chfs_close(fd) == -1 && errno == EBADF);
+	errno = 0;
+	assert(chfs_fsync(fd) == -1 && errno == EBADF);
+	errno = 0;
+	assert(chfs_close(-1) == -1 && errno == EBADF);
+
+	test_unlink(f);
+	puts("done");
+}
+
+/* buffered data should be visible before close */
+static void
+test_buffered_write(char *f, int chunk_size)
+{
+	int fd;
+	char buf[256];
+	struct stat sb;
+
+	printf("test_buffered_write: %s chunk %d: ", f, chunk_size);
+	fflush(stdout);
+	fd = chfs_create_chunk_size(f, O_RDWR, 0644, chunk_size);
+	assert(fd != -1);
+
+	/* large read after a buffered write */
+	assert(chfs_write(fd, "hello", 5) == 5);
+	assert(chfs_pread(fd, buf, sizeof buf, 0) == 5);
+	assert(memcmp(buf, "hello", 5) == 0);
+
+	/* fstat after a buffered write */
+	assert(chfs_write(fd, "world", 5) == 5);
+	_(chfs_fstat(fd, &sb));
+	assert(sb.st_size == 10);
+
+	/* lseek(SEEK_END) after a buffered write */
+	assert(chfs_pwrite(fd, "!", 1, 10) == 1);
+	assert(chfs_seek(fd, 0, SEEK_END) == 11);
+
+	/* ftruncate after a buffered write */
+	assert(chfs_pwrite(fd, "abc", 3, 11) == 3);
+	_(chfs_ftruncate(fd, 0));
+	_(chfs_close(fd));
+	_(chfs_stat(f, &sb));
+	assert(sb.st_size == 0);
+
+	test_unlink(f);
+	puts("done");
+}
+
+struct linux_dirent64 {
+	uint64_t	d_ino;
+	int64_t		d_off;
+	unsigned short	d_reclen;
+	unsigned char	d_type;
+	char		d_name[];
+};
+
+#define GETDENTS_NFILES	100
+
+/* the directory listing is larger than the getdents buffer */
+static void
+test_getdents(char *d)
+{
+	char b[256], seen[GETDENTS_NFILES];
+	struct linux_dirent64 *e;
+	int fd, i, n, pos, nfiles = 0;
+
+	printf("test_getdents: %s: ", d);
+	fflush(stdout);
+	test_mkdir(d);
+	for (i = 0; i < GETDENTS_NFILES; ++i) {
+		sprintf(b, "%s/f%d", d, i);
+		fd = chfs_create(b, O_WRONLY, 0644);
+		assert(fd != -1);
+		_(chfs_close(fd));
+	}
+	memset(seen, 0, sizeof seen);
+
+	fd = chfs_open(d, O_RDONLY | O_DIRECTORY);
+	assert(fd != -1);
+	errno = 0;
+	assert(chfs_linux_getdents64(fd, b, 8) == -1 && errno == EINVAL);
+	while ((n = chfs_linux_getdents64(fd, b, sizeof b)) > 0) {
+		for (pos = 0; pos < n; pos += e->d_reclen) {
+			e = (struct linux_dirent64 *)&b[pos];
+			if (e->d_name[0] == '.')
+				continue;
+			assert(e->d_name[0] == 'f');
+			i = atoi(&e->d_name[1]);
+			assert(i >= 0 && i < GETDENTS_NFILES && !seen[i]);
+			seen[i] = 1;
+			++nfiles;
+		}
+	}
+	assert(n == 0);
+	assert(nfiles == GETDENTS_NFILES);
+	_(chfs_close(fd));
+
+	for (i = 0; i < GETDENTS_NFILES; ++i) {
+		sprintf(b, "%s/f%d", d, i);
+		test_unlink(b);
+	}
+	test_rmdir(d);
+	puts("done");
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -272,6 +392,9 @@ main(int argc, char *argv[])
 	test_ftruncate("a", 64, 256);
 	test_symlink("b", "a");
 	test_readdir("a");
+	test_bad_fd("a");
+	test_buffered_write("a", 64);
+	test_getdents("a");
 
 	_(chfs_term());
 }
