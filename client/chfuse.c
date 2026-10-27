@@ -141,6 +141,19 @@ chfuse_fsync(const char *path, int isdatasync, struct fuse_file_info *fi)
 	return (ret);
 }
 
+/* called by close(2).  The return value of release is not reported */
+static int
+chfuse_flush(const char *path, struct fuse_file_info *fi)
+{
+	int ret;
+
+	printf("flush: %s\n", path);
+	ret = chfs_fsync(fi->fh);
+	if (ret == -1)
+		return (-errno);
+	return (ret);
+}
+
 static int
 chfuse_unlink(const char *path)
 {
@@ -247,6 +260,7 @@ static const struct fuse_operations chfs_op = {
 	.write		= chfuse_write,
 	.read		= chfuse_read,
 	.fsync		= chfuse_fsync,
+	.flush		= chfuse_flush,
 	.unlink		= chfuse_unlink,
 	.mkdir		= chfuse_mkdir,
 	.rmdir		= chfuse_rmdir,
