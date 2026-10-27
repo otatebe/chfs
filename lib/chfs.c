@@ -1373,7 +1373,7 @@ chfs_pwrite_internal_async(int fd, const char *buf, size_t size, off_t offset)
 	void *path, *p;
 	int index, local_pos, pos, chunk_size, nchunks, i, err, save_errno = 0;
 	uint32_t emode;
-	size_t psize, ss = 0;
+	size_t psize, ss = 0, off, s;
 	struct {
 		size_t s;
 		fs_request_t r;
@@ -1440,8 +1440,10 @@ chfs_pwrite_internal_async(int fd, const char *buf, size_t size, off_t offset)
 		return (-1);
 	}
 
-	ss = 0;
-	for (i = 0; i < nchunks; ++i) {
+	/* ss is the written size, off is the position of the i-th chunk */
+	ss = off = 0;
+	for (i = 0; i < nchunks; off += s, ++i) {
+		s = req[i].s;
 		ret = chfs_async_rpc_inode_write_wait(&req[i].s, &err,
 			&req[i].r);
 		if (ret != HG_SUCCESS ||
@@ -1450,14 +1452,14 @@ chfs_pwrite_internal_async(int fd, const char *buf, size_t size, off_t offset)
 			if (save_errno == 0)
 				save_errno = errno;
 		} else if (err == KV_ERR_NO_SPACE) {
-			err = backend_write_key(tab->path, tab->mode, buf + ss,
-				req[i].s, offset + ss);
+			err = backend_write_key(tab->path, tab->mode, buf + off,
+				s, offset + off);
 			if (save_errno == 0) {
 				chfs_set_errno(ret, err, diag);
 				save_errno = errno;
 			}
 			if (err == KV_SUCCESS || err == KV_ERR_PARTIAL_WRITE)
-				ss += req[i].s;
+				ss += s;
 		} else
 			ss += req[i].s;
 	}
