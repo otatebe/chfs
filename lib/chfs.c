@@ -1374,7 +1374,8 @@ chfs_pwrite_internal_async(int fd, const char *buf, size_t size, off_t offset)
 	int index, local_pos, pos, chunk_size, nchunks, i, err, save_errno = 0;
 	int contiguous;
 	uint32_t emode;
-	size_t psize, ss = 0, off, s;
+	size_t psize, ss = 0, off, s, w;
+	ssize_t r;
 	struct {
 		size_t s;
 		fs_request_t r;
@@ -1467,10 +1468,23 @@ chfs_pwrite_internal_async(int fd, const char *buf, size_t size, off_t offset)
 			if (contiguous &&
 				(err == KV_SUCCESS || err == KV_ERR_PARTIAL_WRITE))
 				ss += s;
-		} else if (contiguous) {
-			ss += req[i].s;
-			if (req[i].s < s)
-				contiguous = 0;
+		} else {
+			w = req[i].s;
+			if (w < s) {
+				/* write the rest as chfs_pwrite_internal_sync() */
+				r = chfs_pwrite_internal_sync(fd, buf + off + w,
+					s - w, offset + off + w);
+				if (r < 0) {
+					if (save_errno == 0)
+						save_errno = errno;
+				} else
+					w += r;
+			}
+			if (contiguous) {
+				ss += w;
+				if (w < s)
+					contiguous = 0;
+			}
 		}
 	}
 	free(req);
