@@ -299,6 +299,45 @@ test_buffered_write(char *f, int chunk_size)
 	puts("done");
 }
 
+#define MANY_FDS	250	/* the initial fd table size is 100 */
+
+/* open many files to expand the fd table */
+static void
+test_many_fds(char *d)
+{
+	char b[64], c[16];
+	int fds[MANY_FDS], i, n;
+
+	printf("test_many_fds: %s %d: ", d, MANY_FDS);
+	fflush(stdout);
+	test_mkdir(d);
+	for (i = 0; i < MANY_FDS; ++i) {
+		sprintf(b, "%s/f%d", d, i);
+		fds[i] = chfs_create(b, O_RDWR, 0644);
+		assert(fds[i] != -1);
+		n = sprintf(c, "%d", i);
+		assert(chfs_write(fds[i], c, n) == n);
+	}
+	/* buffered data of the first fd is still accessible */
+	assert(chfs_pread(fds[0], c, sizeof c, 0) == 1 && c[0] == '0');
+	for (i = 0; i < MANY_FDS; ++i)
+		_(chfs_close(fds[i]));
+
+	for (i = 0; i < MANY_FDS; ++i) {
+		sprintf(b, "%s/f%d", d, i);
+		fds[i] = chfs_open(b, O_RDONLY);
+		assert(fds[i] != -1);
+		n = chfs_pread(fds[i], c, sizeof c - 1, 0);
+		assert(n > 0);
+		c[n] = '\0';
+		assert(atoi(c) == i);
+		_(chfs_close(fds[i]));
+		test_unlink(b);
+	}
+	test_rmdir(d);
+	puts("done");
+}
+
 struct linux_dirent64 {
 	uint64_t	d_ino;
 	int64_t		d_off;
@@ -395,6 +434,7 @@ main(int argc, char *argv[])
 	test_bad_fd("a");
 	test_buffered_write("a", 64);
 	test_getdents("a");
+	test_many_fds("a");
 
 	_(chfs_term());
 }
