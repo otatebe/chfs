@@ -44,6 +44,7 @@ static struct fd_table {
 	int buf_size;
 	off_t buf_off, buf_pos;
 	int buf_dirty;
+	int buf_err;	/* deferred write-back error reported by fsync/close */
 	ABT_mutex mutex;
 } **fd_table;	/* entries are not moved when the table is expanded */
 
@@ -478,6 +479,7 @@ create_fd_unlocked(const char *path, uint32_t mode, int chunk_size)
 	tab->pos = 0;
 	tab->buf_pos = 0;
 	tab->buf_dirty = 0;
+	tab->buf_err = 0;
 	return (fd);
 }
 
@@ -602,16 +604,46 @@ fd_pos_fetch_and_add(int fd, off_t size)
 static ssize_t
 chfs_pwrite_internal(int fd, const void *buf, size_t size, off_t offset);
 
-static void
+/*
+ * writes back dirty data and invalidates the buffer.  When it fails, the
+ * data is discarded and the error is kept in buf_err to be reported later.
+ */
+static int
 fd_flush_unlocked(int fd)
 {
 	struct fd_table *tab = get_fd_table(fd);
+	ssize_t s;
+	int r = 0;
 
-	if (tab->buf_pos > 0 && tab->buf_dirty == 1)
-		chfs_pwrite_internal(fd, tab->buf, tab->buf_pos, tab->buf_off);
+	if (tab->buf_pos > 0 && tab->buf_dirty == 1) {
+		s = chfs_pwrite_internal(fd, tab->buf, tab->buf_pos,
+			tab->buf_off);
+		if (s != tab->buf_pos) {
+			if (s >= 0)
+				errno = EIO;
+			if (tab->buf_err == 0)
+				tab->buf_err = errno;
+			r = -1;
+		}
+	}
 	tab->buf_pos = tab->buf_dirty = 0;
+	return (r);
 }
 
+/* returns -1 with errno if the error is reported */
+static int
+fd_report_error_unlocked(struct fd_table *tab)
+{
+	int err = tab->buf_err;
+
+	if (err == 0)
+		return (0);
+	tab->buf_err = 0;
+	errno = err;
+	return (-1);
+}
+
+/* the write-back error is not reported, but kept */
 static int
 fd_flush(int fd)
 {
@@ -625,6 +657,23 @@ fd_flush(int fd)
 	return (0);
 }
 
+/* the write-back error is reported, for fsync and close */
+static int
+fd_sync(int fd)
+{
+	struct fd_table *tab = get_fd_table(fd);
+	int r;
+
+	if (tab == NULL)
+		return (-1); /* EBADF */
+	ABT_mutex_lock(tab->mutex);
+	fd_flush_unlocked(fd);
+	r = fd_report_error_unlocked(tab);
+	ABT_mutex_unlock(tab->mutex);
+	return (r);
+}
+
+/* returns the buffered size, 0 if not buffered, or -1 if an error occurs */
 static int
 fd_write(int fd, const char *buf, size_t size, off_t offset)
 {
@@ -658,13 +707,18 @@ fd_write(int fd, const char *buf, size_t size, off_t offset)
 					tab->buf_pos = buf_off + s;
 				ss += s;
 			}
-			if (tab->buf_pos == tab->buf_size)
-				fd_flush_unlocked(fd);
-		} else
-			fd_flush_unlocked(fd);
+			if (tab->buf_pos == tab->buf_size &&
+				fd_flush_unlocked(fd))
+				goto err;
+		} else if (fd_flush_unlocked(fd))
+			goto err;
 	}
 	ABT_mutex_unlock(tab->mutex);
 	return (ss);
+ err:
+	fd_report_error_unlocked(tab);
+	ABT_mutex_unlock(tab->mutex);
+	return (-1);
 }
 
 static ssize_t
@@ -1131,19 +1185,26 @@ path_index(const char *path, int index, size_t *size)
 int
 chfs_fsync(int fd)
 {
-	if (fd_flush(fd))
-		return (-1);
-	log_info("chfs_fsync: fd=%d", fd);
-	return (0);
+	int r = fd_sync(fd);
+
+	log_info("chfs_fsync: fd=%d%s", fd, r ? " (error)" : "");
+	return (r);
 }
 
 int
 chfs_close(int fd)
 {
-	if (fd_flush(fd))
-		return (-1);
-	log_info("chfs_close: fd=%d", fd);
-	return (clear_fd(fd));
+	int r, save_errno;
+
+	r = fd_sync(fd);
+	save_errno = errno;
+	log_info("chfs_close: fd=%d%s", fd, r ? " (error)" : "");
+	/* the fd is closed even if the write-back fails */
+	if (clear_fd(fd))
+		return (-1); /* EBADF */
+	if (r)
+		errno = save_errno;
+	return (r);
 }
 
 static char *
@@ -1424,7 +1485,7 @@ chfs_pwrite(int fd, const void *buf, size_t size, off_t offset)
 	ssize_t s;
 
 	s = fd_write(fd, buf, size, offset);
-	if (s > 0)
+	if (s != 0)
 		return (s);
 	return (chfs_pwrite_internal(fd, buf, size, offset));
 }
