@@ -1372,6 +1372,7 @@ chfs_pwrite_internal_async(int fd, const char *buf, size_t size, off_t offset)
 	struct fd_table *tab = get_fd_table(fd);
 	void *path, *p;
 	int index, local_pos, pos, chunk_size, nchunks, i, err, save_errno = 0;
+	int contiguous;
 	uint32_t emode;
 	size_t psize, ss = 0, off, s;
 	struct {
@@ -1440,8 +1441,13 @@ chfs_pwrite_internal_async(int fd, const char *buf, size_t size, off_t offset)
 		return (-1);
 	}
 
-	/* ss is the written size, off is the position of the i-th chunk */
+	/*
+	 * ss is the written size, off is the position of the i-th chunk.
+	 * ss is not increased after a short write since the written data
+	 * should be contiguous.
+	 */
 	ss = off = 0;
+	contiguous = 1;
 	for (i = 0; i < nchunks; off += s, ++i) {
 		s = req[i].s;
 		ret = chfs_async_rpc_inode_write_wait(&req[i].s, &err,
@@ -1458,10 +1464,14 @@ chfs_pwrite_internal_async(int fd, const char *buf, size_t size, off_t offset)
 				chfs_set_errno(ret, err, diag);
 				save_errno = errno;
 			}
-			if (err == KV_SUCCESS || err == KV_ERR_PARTIAL_WRITE)
+			if (contiguous &&
+				(err == KV_SUCCESS || err == KV_ERR_PARTIAL_WRITE))
 				ss += s;
-		} else
+		} else if (contiguous) {
 			ss += req[i].s;
+			if (req[i].s < s)
+				contiguous = 0;
+		}
 	}
 	free(req);
 	if (save_errno) {
