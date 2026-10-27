@@ -56,6 +56,9 @@ sh ./test-rdbench-viz.sh
 ls -l $BACKEND/rdbench*
 rm -rf $BACKEND/rdbench*
 
+# write-back errors
+sh ./test-flush-error.sh
+
 # chfsctl status
 [ X$MDIR = X ] && OPT= || OPT="-m $MDIR"
 chfsctl -h hosts $OPT status

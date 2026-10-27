@@ -28,6 +28,7 @@ pkgconfig/chfs.pc
 /build
 
 dev/test/test
+dev/test/flush_error
 
 ## spack
 removed_la_files.txt
