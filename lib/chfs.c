@@ -813,19 +813,27 @@ chfs_async_rpc_inode_write(void *key, size_t key_size, const void *buf,
 	hg_return_t ret;
 	static const char diag[] = "async_rpc_inode_write";
 
+	/* a local error such as a registration failure is not a server error */
+	if (size > chfs_rdma_thresh) {
+		ret = fs_rpc_bulk_create(buf, size, HG_BULK_READ_ONLY, &rp->b);
+		if (ret != HG_SUCCESS)
+			return (ret);
+	}
 	while (1) {
 		target = ring_list_lookup(key, key_size);
 		if (target == NULL) {
 			log_error("%s: no server", diag);
+			if (size > chfs_rdma_thresh)
+				fs_rpc_bulk_free(rp->b);
 			return (HG_PROTOCOL_ERROR);
 		}
 		if (size <= chfs_rdma_thresh)
 			ret = fs_async_rpc_inode_write(target, key, key_size,
 				buf, size, offset, mode, chunk_size, rp);
 		else
-			ret = fs_async_rpc_inode_write_rdma(target, key,
-				key_size, chfs_client, buf, size, offset, mode,
-				chunk_size, rp);
+			ret = fs_async_rpc_inode_write_rdma_bulk(target, key,
+				key_size, chfs_client, rp->b, size, offset,
+				mode, chunk_size, rp);
 		if (ret == HG_SUCCESS)
 			break;
 
@@ -872,18 +880,26 @@ chfs_async_rpc_inode_read(void *key, size_t key_size, void *buf, size_t size,
 	hg_return_t ret;
 	static const char diag[] = "rpc_async_inode_read";
 
+	/* a local error such as a registration failure is not a server error */
+	if (size > chfs_rdma_thresh) {
+		ret = fs_rpc_bulk_create(buf, size, HG_BULK_WRITE_ONLY, &rp->b);
+		if (ret != HG_SUCCESS)
+			return (ret);
+	}
 	while (1) {
 		target = ring_list_lookup(key, key_size);
 		if (target == NULL) {
 			log_error("%s: no server", diag);
+			if (size > chfs_rdma_thresh)
+				fs_rpc_bulk_free(rp->b);
 			return (HG_PROTOCOL_ERROR);
 		}
 		if (size <= chfs_rdma_thresh)
 			ret = fs_async_rpc_inode_read(target, key, key_size,
 				size, offset, chunk_size, rp);
 		else
-			ret = fs_async_rpc_inode_read_rdma(target, key,
-				key_size, chfs_client, buf, size, offset,
+			ret = fs_async_rpc_inode_read_rdma_bulk(target, key,
+				key_size, chfs_client, rp->b, size, offset,
 				chunk_size, rp);
 		if (ret == HG_SUCCESS)
 			break;
