@@ -355,27 +355,49 @@ fs_rpc_inode_write_rdma_bulk(const char *server, void *key, size_t key_size,
 }
 
 hg_return_t
+fs_rpc_bulk_create(const void *buf, hg_size_t size, hg_uint8_t flags,
+	hg_bulk_t *bp)
+{
+	hg_return_t ret;
+	void *b = (void *)buf;
+	static const char diag[] = "fs_rpc_bulk_create";
+
+	ret = margo_bulk_create(env.mid, 1, &b, &size, flags, bp);
+	if (ret != HG_SUCCESS)
+		log_error("%s: %s", diag, HG_Error_to_string(ret));
+	return (ret);
+}
+
+void
+fs_rpc_bulk_free(hg_bulk_t b)
+{
+	hg_return_t ret;
+	static const char diag[] = "fs_rpc_bulk_free";
+
+	ret = margo_bulk_free(b);
+	if (ret != HG_SUCCESS)
+		log_error("%s: %s", diag, HG_Error_to_string(ret));
+}
+
+hg_return_t
 fs_async_rpc_inode_write_rdma(const char *server, void *key, size_t key_size,
 	char *client, const void *buf, hg_size_t size, size_t offset,
 	mode_t mode, size_t chunk_size, fs_request_t *rp)
 {
 	hg_return_t ret;
-	void *b = (void *)buf;
-	static const char diag[] = "fs_async_rpc_inode_write_rdma";
 
 	if (size == 0) {
 		rp->h = NULL;
 		return (HG_SUCCESS);
 	}
-	ret = margo_bulk_create(env.mid, 1, &b, &size, HG_BULK_READ_ONLY,
-		&rp->b);
-	if (ret != HG_SUCCESS) {
-		log_error("%s (bulk_create): %s", diag,
-			HG_Error_to_string(ret));
+	ret = fs_rpc_bulk_create(buf, size, HG_BULK_READ_ONLY, &rp->b);
+	if (ret != HG_SUCCESS)
 		return (ret);
-	}
-	return (fs_async_rpc_inode_write_rdma_bulk(server, key, key_size,
-			client, rp->b, size, offset, mode, chunk_size, rp));
+	ret = fs_async_rpc_inode_write_rdma_bulk(server, key, key_size,
+		client, rp->b, size, offset, mode, chunk_size, rp);
+	if (ret != HG_SUCCESS)
+		fs_rpc_bulk_free(rp->b);
+	return (ret);
 }
 
 hg_return_t
@@ -500,21 +522,19 @@ fs_async_rpc_inode_read_rdma(const char *server, void *key, size_t key_size,
 	size_t chunk_size, fs_request_t *rp)
 {
 	hg_return_t ret;
-	static const char diag[] = "fs_async_rpc_inode_read_rdma";
 
 	if (size == 0) {
 		rp->h = NULL;
 		return (HG_SUCCESS);
 	}
-	ret = margo_bulk_create(env.mid, 1, &buf, &size, HG_BULK_WRITE_ONLY,
-		&rp->b);
-	if (ret != HG_SUCCESS) {
-		log_error("%s (bulk_create): %s", diag,
-			HG_Error_to_string(ret));
+	ret = fs_rpc_bulk_create(buf, size, HG_BULK_WRITE_ONLY, &rp->b);
+	if (ret != HG_SUCCESS)
 		return (ret);
-	}
-	return (fs_async_rpc_inode_read_rdma_bulk(server, key, key_size, client,
-			rp->b, size, offset, chunk_size, rp));
+	ret = fs_async_rpc_inode_read_rdma_bulk(server, key, key_size, client,
+		rp->b, size, offset, chunk_size, rp);
+	if (ret != HG_SUCCESS)
+		fs_rpc_bulk_free(rp->b);
+	return (ret);
 }
 
 hg_return_t

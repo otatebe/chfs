@@ -2,6 +2,13 @@ struct stat;
 struct fs_stat;
 
 hg_return_t
+fs_rpc_bulk_create(const void *buf, hg_size_t size, hg_uint8_t flags,
+	hg_bulk_t *bp);
+
+void
+fs_rpc_bulk_free(hg_bulk_t b);
+
+hg_return_t
 fs_rpc_inode_create(const char *server, void *key, size_t key_size,
 	uint32_t uid, uint32_t gid, uint32_t mode, size_t chunk_size,
 	const void *buf, size_t size, int *errp);
