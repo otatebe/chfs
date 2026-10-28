@@ -12,8 +12,11 @@ hg_proc_kv_byte_t(hg_proc_t proc, void *data)
 	ret = hg_proc_hg_size_t(proc, &k->s);
 	if (ret != HG_SUCCESS)
 		return (ret);
-	if (hg_proc_get_op(proc) == HG_DECODE)
+	if (hg_proc_get_op(proc) == HG_DECODE) {
 		k->v = malloc(k->s);
+		if (k->v == NULL && k->s > 0)
+			return (HG_NOMEM);
+	}
 	ret = hg_proc_memcpy(proc, k->v, k->s);
 	if (ret != HG_SUCCESS)
 		return (ret);
