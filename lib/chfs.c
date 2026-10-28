@@ -2538,7 +2538,7 @@ chfs_set_stagein_buf_size(int buf_size)
 static int
 stagein_reg(const char *path, mode_t mode)
 {
-	int s, d, r, rr, st = -1;
+	int s, d, r, rr, st = -1, save_errno;
 	char *buf;
 	static const char diag[] = "chfs_stagein";
 
@@ -2565,7 +2565,12 @@ stagein_reg(const char *path, mode_t mode)
 	if (r == 0)
 		st = 0;
 
-	chfs_close(d);
+	/* write-back errors of the buffered data are reported at close */
+	save_errno = errno;
+	if (chfs_close(d) && st == 0)
+		st = -1;
+	else
+		errno = save_errno;
 close_s:
 	close(s);
 free_buf:

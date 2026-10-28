@@ -21,7 +21,7 @@ int
 main(int argc, char *argv[])
 {
 	char *file, *progname;
-	int r, opt, rank = 0, size = 1;
+	int r, opt, rank = 0, size = 1, status = EXIT_SUCCESS;
 
 #ifdef HAVE_MPI
 	MPI_Init(&argc, &argv);
@@ -62,8 +62,10 @@ main(int argc, char *argv[])
 		file = argv[0];
 		log_debug("%s %s", progname, file);
 		r = chfs_stagein(file);
-		if (r < 0)
+		if (r < 0) {
 			perror(file);
+			status = EXIT_FAILURE;
+		}
 		argc -= size;
 		argv += size;
 	}
@@ -71,5 +73,5 @@ main(int argc, char *argv[])
 #ifdef HAVE_MPI
 	MPI_Finalize();
 #endif
-	exit(r);
+	exit(status);
 }
