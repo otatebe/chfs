@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 #include <margo.h>
 #include "config.h"
 #include "ring_types.h"
@@ -112,6 +113,21 @@ ring_list_display_node(struct ring_node *node)
 	printf("%s %s ", node->address, node->name);
 	display_hash(node->hash);
 	printf("\n");
+}
+
+/*
+ * When Mercury auto_sm is enabled, the address is
+ * "uid://...#na+sm://...#protocol://address".  Return the last one.
+ */
+const char *
+ring_list_net_address(const char *address)
+{
+	const char *a;
+
+	if (address == NULL)
+		return (NULL);
+	a = strrchr(address, '#');
+	return (a ? a + 1 : address);
 }
 
 void
@@ -253,7 +269,8 @@ get_local_server_unlocked()
 		return (NULL);
 
 	for (i = 0; i < ring_list.n; ++i) {
-		strdiff(ring_list_client, ring_list.nodes[i].address,
+		strdiff(ring_list_net_address(ring_list_client),
+			ring_list_net_address(ring_list.nodes[i].address),
 			&len, NULL);
 		if (max_len < len) {
 			max_num = 1;

@@ -3,6 +3,7 @@ struct node_list;
 void ring_list_init(char *self, char *name);
 void ring_list_term(void);
 int ring_list_size(void);
+const char *ring_list_net_address(const char *address);
 void ring_list_set_client(char *client);
 void ring_list_display(int n);
 void ring_list_csv(int n);

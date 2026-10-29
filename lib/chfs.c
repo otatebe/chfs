@@ -145,6 +145,7 @@ margo_protocol(const char *server)
 	int s = 0;
 	char *proto;
 
+	server = ring_list_net_address(server);
 	while (server[s] && server[s] != ':')
 		++s;
 	if (server[s] != ':')
@@ -155,6 +156,19 @@ margo_protocol(const char *server)
 	strncpy(proto, server, s);
 	proto[s] = '\0';
 	return (proto);
+}
+
+static margo_instance_id
+client_margo_init(const char *server, const char *proto)
+{
+	struct margo_init_info info = { 0 };
+
+	/* enable auto_sm when the server enables it */
+	if (ring_list_net_address(server) == server)
+		return (margo_init(proto, MARGO_CLIENT_MODE, 1, 0));
+	info.json_config =
+		"{\"use_progress_thread\":true,\"mercury\":{\"auto_sm\":true}}";
+	return (margo_init_ext(proto, MARGO_CLIENT_MODE, &info));
 }
 
 static time_t node_list_cache_time;
@@ -318,7 +332,7 @@ chfs_init(const char *server)
 	if (server == NULL)
 		log_fatal("chfs_init: no protocol");
 
-	mid = margo_init(proto, MARGO_CLIENT_MODE, 1, 0);
+	mid = client_margo_init(server, proto);
 	free(proto);
 	if (mid == MARGO_INSTANCE_NULL)
 		log_fatal("margo_init failed, abort");
@@ -389,7 +403,7 @@ chfs_init_margo()
 	if (server == NULL)
 		log_fatal("%s: no protocol", diag);
 
-	mid = margo_init(proto, MARGO_CLIENT_MODE, 1, 0);
+	mid = client_margo_init(server, proto);
 	free(proto);
 	if (mid == MARGO_INSTANCE_NULL)
 		log_fatal("%s: margo_init failed, abort", diag);
