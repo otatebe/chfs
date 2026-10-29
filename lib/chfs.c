@@ -2456,6 +2456,10 @@ chfs_unlink_chunk_all(char *p, int index)
 	static const char diag[] = "chfs_unlink_chunk_all";
 
 	chfs_ring_list_copy(&nlist);
+	if (nlist.n == 0) {
+		log_notice("%s: no server", diag);
+		goto list_free;
+	}
 	req = malloc(sizeof(*req) * nlist.n);
 	if (req == NULL) {
 		log_error("%s (malloc): no memory for %ld bytes", diag,
@@ -2507,6 +2511,10 @@ chfs_sync()
 	static const char diag[] = "chfs_sync";
 
 	chfs_ring_list_copy(&nlist);
+	if (nlist.n == 0) {
+		log_notice("%s: no server", diag);
+		goto ring_list_free;
+	}
 	req = malloc(sizeof(*req) * nlist.n);
 	if (req == NULL) {
 		log_error("%s (malloc): no memory for %ld bytes", diag,
