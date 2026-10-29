@@ -169,13 +169,15 @@ skip_space(char *s)
 }
 
 static char *
-address_name_dup(char *address, char *name)
+address_name_dup(const char *address, char *name)
 {
 	int addrlen, namelen;
 	char *r;
 
 	if (address == NULL)
 		return (NULL);
+	/* the shared-memory address changes every time */
+	address = ring_list_net_address(address);
 	addrlen = strlen(address);
 	if (name != NULL)
 		namelen = strlen(name);
@@ -221,7 +223,7 @@ write_pid(char *file)
 void
 usage(char *prog_name)
 {
-	fprintf(stderr, "Usage: %s [-d] [-f] [-c db_dir] [-s db_size] "
+	fprintf(stderr, "Usage: %s [-a] [-d] [-f] [-c db_dir] [-s db_size] "
 		"[-b backend_dir]\n\t[-B subdir] [-F num_flush_threads] "
 		"[-U flush_interval]\n\t[-p protocol] [-h host[:port]/device] "
 		"[-n vname] [-N virtual_name]\n\t[-P pid_file] [-l log_file] "
@@ -246,7 +248,7 @@ main(int argc, char *argv[])
 	char *addr_name = NULL, *backend_dir = NULL, *subdir = NULL;
 	int opt, foreground = 0, rpc_timeout_msec = 30000, nthreads = 4;
 	int heartbeat_interval = 60, log_priority = -1, niothreads = 2;
-	int nflushthreads = 1;
+	int nflushthreads = 1, auto_sm = 0;
 	char *prog_name, *pid_file = NULL;
 	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&hb_mutex_mem);
 	ABT_cond stop_cond = ABT_COND_MEMORY_GET_HANDLE(&hb_stop_cond_mem);
@@ -254,8 +256,11 @@ main(int argc, char *argv[])
 	prog_name = basename(argv[0]);
 
 	while ((opt = getopt(argc, argv,
-			"b:B:c:dfF:h:H:I:l:L:n:N:p:P:s:S:t:T:U:Z")) != -1) {
+			"ab:B:c:dfF:h:H:I:l:L:n:N:p:P:s:S:t:T:U:Z")) != -1) {
 		switch (opt) {
+		case 'a':
+			auto_sm = 1;
+			break;
 		case 'b':
 			backend_dir = optarg;
 			break;
@@ -376,7 +381,17 @@ main(int argc, char *argv[])
 		}
 	}
 	log_info("information string %s", info_string);
-	mid = margo_init(info_string, MARGO_SERVER_MODE, 1, nthreads);
+	if (auto_sm) {
+		char json[128];
+		struct margo_init_info info = { 0 };
+
+		snprintf(json, sizeof json, "{\"use_progress_thread\":true,"
+			"\"rpc_thread_count\":%d,\"mercury\":{\"auto_sm\":true}}",
+			nthreads);
+		info.json_config = json;
+		mid = margo_init_ext(info_string, MARGO_SERVER_MODE, &info);
+	} else
+		mid = margo_init(info_string, MARGO_SERVER_MODE, 1, nthreads);
 	if (mid == MARGO_INSTANCE_NULL)
 		log_fatal("margo_init failed, abort");
 

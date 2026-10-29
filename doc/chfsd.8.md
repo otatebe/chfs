@@ -27,6 +27,9 @@ chfsd - CHFS server
 -p protocol
 : specifies a protocol like sm, sockets, tcp, and verbs.  Default is sockets.
 
+-a
+: uses shared memory for communication within a node in addition to the protocol specified by the -p option (Mercury auto_sm).  Clients detect it from the server address and use it automatically.  The server and clients on the same node need to be executed by the same user, and cross-memory attach needs to be permitted for both of them, for example, by setting kernel.yama.ptrace_scope to 0.  Otherwise, transfers larger than several KiB within a node fail.  With chfsctl, specify it by -O -a.
+
 -h host
 : specify hostname, IP address or interface name and the port number.  Before the port number, ':' is required.
 
