@@ -8,7 +8,17 @@ chfs_set_errno(hg_return_t ret, int err, const char *diag)
 {
 	if (ret != HG_SUCCESS) {
 		log_notice("%s: %s", diag, HG_Error_to_string(ret));
-		errno = ENOTCONN;
+		switch (ret) {
+		case HG_NOMEM:
+			errno = ENOMEM;
+			break;
+		case HG_FAULT: /* local error such as memory registration */
+			errno = EIO;
+			break;
+		default:
+			errno = ENOTCONN;
+			break;
+		}
 		return;
 	}
 	switch (err) {
@@ -23,10 +33,13 @@ chfs_set_errno(hg_return_t ret, int err, const char *diag)
 		break;
 	case KV_ERR_SERVER_DOWN:
 	case KV_ERR_LOOKUP:
-	case KV_ERR_BULK_CREATE:
 	case KV_ERR_BULK_TRANSFER:
 		log_notice("%s: %s", diag, kv_err_string(err));
 		errno = ENOTCONN;
+		break;
+	case KV_ERR_BULK_CREATE:
+		log_notice("%s: %s", diag, kv_err_string(err));
+		errno = EIO;
 		break;
 	case KV_ERR_NO_MEMORY:
 		errno = ENOMEM;
