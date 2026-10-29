@@ -37,6 +37,20 @@ create_rpc_handle(const char *server, hg_id_t rpc_id, hg_handle_t *h,
 	return (ret);
 }
 
+/* the handle is destroyed on error since the caller does not wait for it */
+static hg_return_t
+iforward_rpc(fs_request_t *rp, void *in)
+{
+	hg_return_t ret;
+
+	ret = margo_iforward_timed(rp->h, in, fs_rpc_timeout_msec, &rp->r);
+	if (ret != HG_SUCCESS) {
+		margo_destroy(rp->h);
+		rp->h = NULL;
+	}
+	return (ret);
+}
+
 hg_return_t
 fs_rpc_inode_create(const char *server, void *key, size_t key_size,
 	uint32_t uid, uint32_t gid, uint32_t mode, size_t chunk_size,
@@ -141,7 +155,7 @@ fs_async_rpc_inode_write(const char *server, void *key, size_t key_size,
 	in.offset = offset;
 	in.mode = mode;
 	in.chunk_size = chunk_size;
-	return (margo_iforward_timed(rp->h, &in, fs_rpc_timeout_msec, &rp->r));
+	return (iforward_rpc(rp, &in));
 }
 
 hg_return_t
@@ -216,7 +230,7 @@ fs_async_rpc_inode_read(const char *server, void *key, size_t key_size,
 	in.size = size;
 	in.offset = offset;
 	in.chunk_size = chunk_size;
-	return (margo_iforward_timed(rp->h, &in, fs_rpc_timeout_msec, &rp->r));
+	return (iforward_rpc(rp, &in));
 }
 
 hg_return_t
@@ -299,7 +313,7 @@ fs_async_rpc_inode_write_rdma_bulk(const char *server, void *key,
 	in.value_size = size;
 	in.mode = mode;
 	in.chunk_size = chunk_size;
-	return (margo_iforward_timed(rp->h, &in, fs_rpc_timeout_msec, &rp->r));
+	return (iforward_rpc(rp, &in));
 }
 
 hg_return_t
@@ -461,7 +475,7 @@ fs_async_rpc_inode_read_rdma_bulk(const char *server, void *key,
 	in.value = buf;
 	in.value_size = size;
 	in.chunk_size = chunk_size;
-	return (margo_iforward_timed(rp->h, &in, fs_rpc_timeout_msec, &rp->r));
+	return (iforward_rpc(rp, &in));
 }
 
 hg_return_t
@@ -723,7 +737,7 @@ fs_async_rpc_inode_unlink_chunk_all_request(const char *server,
 
 	in.path = path;
 	in.index = index;
-	return (margo_iforward_timed(rp->h, &in, fs_rpc_timeout_msec, &rp->r));
+	return (iforward_rpc(rp, &in));
 }
 
 hg_return_t
@@ -830,7 +844,7 @@ fs_async_rpc_inode_sync_request(const char *server, fs_request_t *rp)
 	if (ret != HG_SUCCESS)
 		return (ret);
 
-	return (margo_iforward_timed(rp->h, NULL, fs_rpc_timeout_msec, &rp->r));
+	return (iforward_rpc(rp, NULL));
 }
 
 hg_return_t
