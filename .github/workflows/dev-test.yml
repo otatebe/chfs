@@ -1,0 +1,72 @@
+name: dev test
+
+on:
+  push:
+    branches: [cache]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    defaults:
+      run:
+        working-directory: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up the user
+        run: |
+          echo "USER=$(id -un)" >> $GITHUB_ENV
+          echo "UID_NUM=$(id -u)" >> $GITHUB_ENV
+          # login shells in containers do not read .bashrc
+          echo "CENV=export LC_ALL=C PATH=\$HOME/local/bin:\$PATH LD_LIBRARY_PATH=\$HOME/local/lib PKG_CONFIG_PATH=\$HOME/local/lib/pkgconfig" >> $GITHUB_ENV
+
+      - name: Load the FUSE module
+        run: |
+          sudo modprobe fuse
+          ls -l /dev/fuse
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build the docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: dev/Dockerfile
+          build-args: |
+            USERNAME=${{ env.USER }}
+            UID=${{ env.UID_NUM }}
+          tags: chfs
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Start containers
+        run: docker compose up -d --no-build
+
+      - name: Install CHFS, MPI, IOR and others
+        run: |
+          docker exec -u $USER -w /home/$USER/chfs/dev chfs-c1 \
+            bash -c "$CENV; sh install.sh"
+
+      - name: Execute test.sh
+        run: |
+          docker exec -u $USER -w /home/$USER/chfs/dev chfs-c1 \
+            bash -c "$CENV; sh test.sh"
+
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-log
+          path: dev/log
+          if-no-files-found: ignore
+
+      - name: Stop containers
+        if: always()
+        run: docker compose down -v
