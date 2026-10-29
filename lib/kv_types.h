@@ -13,6 +13,9 @@ hg_proc_kv_byte_t(hg_proc_t proc, void *data)
 	if (ret != HG_SUCCESS)
 		return (ret);
 	if (hg_proc_get_op(proc) == HG_DECODE) {
+		/* a broken size should not be allocated */
+		if (k->s > hg_proc_get_size(proc))
+			return (HG_OVERFLOW);
 		k->v = malloc(k->s);
 		if (k->v == NULL && k->s > 0)
 			return (HG_NOMEM);
