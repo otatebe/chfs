@@ -13,7 +13,7 @@ RUN apt-get update \
     git fuse3 sudo vim curl wget \
     libfuse3-dev pandoc \
     gfortran zip bzip2 flex libibverbs-dev \
-    gdb numactl \
+    gdb numactl libcap2-bin \
     python3 python3-venv python3-pip \
     binutils-dev
 

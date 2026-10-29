@@ -59,6 +59,9 @@ rm -rf $BACKEND/rdbench*
 # write-back errors
 sh ./test-flush-error.sh
 
+# Mercury auto_sm
+sh ./test-auto-sm.sh
+
 # chfsctl status
 [ X$MDIR = X ] && OPT= || OPT="-m $MDIR"
 chfsctl -h hosts $OPT status
