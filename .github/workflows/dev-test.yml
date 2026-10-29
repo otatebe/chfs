@@ -55,12 +55,14 @@ jobs:
             bash -c "$CENV; sh install.sh"
 
       - name: Execute test.sh
+        timeout-minutes: 60
         run: |
           docker exec -u $USER -w /home/$USER/chfs/dev chfs-c1 \
             bash -c "$CENV; sh test.sh"
 
+      # chfsd logs of test-start.sh
       - name: Upload logs
-        if: failure()
+        if: failure() || cancelled()
         uses: actions/upload-artifact@v4
         with:
           name: dev-log
