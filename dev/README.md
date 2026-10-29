@@ -32,6 +32,10 @@
 
       c1$ sh test.sh
 
+  This also executes test-auto-sm.sh, which tests shared memory within a node (chfsd -a).  When kernel.yama.ptrace_scope is not 0, it executes chfsd with the CAP_SYS_PTRACE capability and CHFS_RDMA_THRESH=0, and the transfer of large inline replies is not tested.  To test it, set ptrace_scope to 0 on the host, which is the WSL distribution when using Docker on WSL2.
+
+      $ sudo sysctl kernel.yama.ptrace_scope=0
+
 - explore CHFS (in a container)
 
       c1$ eval $(chfsctl -h hosts -m /tmp/a -b $PWD/backend -L log start)
