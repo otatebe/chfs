@@ -112,7 +112,18 @@ leave:
 
 static int heartbeat_stop = 0;
 static ABT_mutex_memory hb_mutex_mem = ABT_MUTEX_INITIALIZER;
-static ABT_cond_memory hb_stop_cond_mem = ABT_COND_INITIALIZER;
+
+static int
+heartbeat_is_stopped(void)
+{
+	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&hb_mutex_mem);
+	int stop;
+
+	ABT_mutex_lock(mutex);
+	stop = heartbeat_stop;
+	ABT_mutex_unlock(mutex);
+	return (stop);
+}
 
 void *
 handle_sig(void *arg)
@@ -120,7 +131,6 @@ handle_sig(void *arg)
 	sigset_t *a = arg;
 	int ret, sig;
 	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&hb_mutex_mem);
-	ABT_cond stop_cond = ABT_COND_MEMORY_GET_HANDLE(&hb_stop_cond_mem);
 	static const char diag[] = "handle_sig";
 
 	ret = sigwait(a, &sig);
@@ -131,7 +141,6 @@ handle_sig(void *arg)
 
 	ABT_mutex_lock(mutex);
 	heartbeat_stop = 1;
-	ABT_cond_signal(stop_cond);
 	ABT_mutex_unlock(mutex);
 
 	profile_dump();
@@ -250,8 +259,6 @@ main(int argc, char *argv[])
 	int heartbeat_interval = 60, log_priority = -1, niothreads = 2;
 	int nflushthreads = 1, auto_sm = 0;
 	char *prog_name, *pid_file = NULL;
-	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&hb_mutex_mem);
-	ABT_cond stop_cond = ABT_COND_MEMORY_GET_HANDLE(&hb_stop_cond_mem);
 
 	prog_name = basename(argv[0]);
 
@@ -430,22 +437,20 @@ main(int argc, char *argv[])
 		ring_wait_coordinator_rpc();
 	}
 	while (heartbeat_interval > 0) {
-		struct timespec ts;
-		int ret = ABT_SUCCESS, stop;
+		int i;
 
 		if (ring_list_is_coordinator(addr_str)) {
 			log_debug("coordinator");
 			ring_heartbeat();
 		} else if (ring_heartbeat_is_timeout())
 			ring_start_election();
-		clock_gettime(CLOCK_REALTIME, &ts);
-		ts.tv_sec += heartbeat_interval;
-		ABT_mutex_lock(mutex);
-		while (!heartbeat_stop && ret != ABT_ERR_COND_TIMEDOUT)
-			ret = ABT_cond_timedwait(stop_cond, mutex, &ts);
-		stop = heartbeat_stop;
-		ABT_mutex_unlock(mutex);
-		if (stop)
+		/* ABT_cond_timedwait() busy-waits, which consumes a CPU core */
+		for (i = 0; i < heartbeat_interval; ++i) {
+			if (heartbeat_is_stopped())
+				break;
+			margo_thread_sleep(mid, 1000);
+		}
+		if (heartbeat_is_stopped())
 			break;
 	}
 	margo_wait_for_finalize(mid);
