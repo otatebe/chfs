@@ -1,0 +1,36 @@
+name: checkpatch
+
+on:
+  push:
+    branches: [cache]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checkpatch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # checkpatch.pl modified for the coding style of Gfarm and CHFS
+      - name: Run checkpatch.pl
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then
+            RANGE="$PR_BASE...$PR_HEAD"
+          else
+            case "$BEFORE" in
+            *[!0]*) RANGE="$BEFORE..$AFTER" ;;
+            *) echo "no previous commit, skip"; exit 0 ;;
+            esac
+          fi
+          git diff $RANGE -- . ':!dev/checkpatch.pl' | perl dev/checkpatch.pl -
