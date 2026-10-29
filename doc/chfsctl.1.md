@@ -64,7 +64,15 @@ chfsctl - manage CHFS servers
 : exports the specified environment variable.  This option can be specified multiple times.
 
 -O chfsd_options
-: specifies options for chfsd.
+: specifies options for chfsd.  Multiple options should be specified in a single argument such as -O "-L debug -T 8".  When this option is specified multiple times, only the last one is effective.  The following chfsd options are not specified by chfsctl and are often used.  See chfsd(8) for details.
+
+        -a                    uses shared memory within a node (Mercury auto_sm)
+        -L log_priority       maximum log priority to report.  Default is notice.
+        -H heartbeat_interval interval of heartbeat in seconds.  Default is 60.
+        -T nthreads           number of threads.  Default is 4.
+        -t RPC_timeout_msec   timeout for RPC in milliseconds.  Default is 30000.
+        -U flush_interval     flush interval in seconds.  Default is 1.
+        -I niothreads         number of I/O threads for ABT-IO.  Default is 2.
 
 -o fuse_options
 : specifies comma-separated mount options for chfuse such as allow_root and allow_other.  This option can be specified multiple times.
