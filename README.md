@@ -82,6 +82,28 @@ chfsctl outputs the settings of the CHFS_SERVER, CHFS_BACKEND_PATH, and CHFS_SUB
 
 For details, see [manual page of chfsctl](doc/chfsctl.1.md).
 
+### Use shared memory within a node
+
+By default, communication between a client and a server on the same node also uses the protocol specified by the -p option.  When the -a option is specified to chfsd, shared memory is used within a node (Mercury auto_sm).  Clients detect it from the server address and use it automatically.
+
+```console
+% eval `chfsctl [-h hostfile] [-p verbs] -O -a [-m /mount/point] start`
+```
+
+chfsd and clients on the same node need to be executed by the same user.  Data transfers within a node use cross-memory attach (process_vm_readv and process_vm_writev), which needs to be permitted for both chfsd and clients.  Otherwise, transfers larger than several KiB within a node fail.  Many distributions including Ubuntu set kernel.yama.ptrace_scope to 1, which does not permit it.  Set it to 0 on every node as follows.  Note that this allows a process to access the memory of other processes of the same user.
+
+```console
+# sysctl kernel.yama.ptrace_scope=0
+```
+
+To keep the setting after reboot, add a file that is read after /etc/sysctl.d/10-ptrace.conf.
+
+```console
+# echo kernel.yama.ptrace_scope=0 > /etc/sysctl.d/60-ptrace.conf
+```
+
+Containers share the kernel setting of the host, so set it on the host.
+
 ### Mount the CHFS
 
 CHFS is mounted by the -m option of the chfsctl command.  To mount it on other hosts, use the chfuse command.
