@@ -49,10 +49,18 @@ jobs:
       - name: Start containers
         run: docker compose up -d --no-build
 
+      # Open MPI takes most of the install time.  It is built with
+      # ROMIO for CHFS, which depends on lib/chfs.h
+      - name: Cache Open MPI
+        uses: actions/cache@v4
+        with:
+          path: dev/ompi-install.tar
+          key: ompi-${{ hashFiles('dev/Dockerfile', 'dev/install-ompi.sh', 'dev/ompi/ad_chfs-5.0.patch', 'lib/chfs.h') }}
+
       - name: Install CHFS, MPI, IOR and others
         run: |
           docker exec -u $USER -w /home/$USER/chfs/dev chfs-c1 \
-            bash -c "$CENV; sh install.sh"
+            bash -c "$CENV; OMPI_ARCHIVE=\$PWD/ompi-install.tar sh install.sh"
 
       - name: Execute test.sh
         timeout-minutes: 60
