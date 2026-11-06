@@ -27,7 +27,10 @@ st=0
 start_auto_sm() {
 	chfsctl -h hosts $OPT stop 2> /dev/null || :
 	chfsctl -h hosts clean
-	eval $(chfsctl -h hosts $OPT $WRAPPER -b $CHFS_BACKEND -O "-a" start)
+	# -U 10 as test-start.sh.  Unlinked files that have been flushed
+	# remain in the backend, which fails the regression test
+	eval $(chfsctl -h hosts $OPT $WRAPPER -b $CHFS_BACKEND \
+		-O "-a -U 10" start)
 	chlist
 }
 
