@@ -19,9 +19,16 @@ if [ X$MDIR != X ]; then
 	python3 test/close_error.py $MDIR/flush-error-fuse $READY $GO &
 	pid=$!
 	while [ ! -f $READY ] && kill -0 $pid 2> /dev/null; do sleep 0.1; done
+	# close(2) also fails with ENOTCONN when chfuse dies.  Check that
+	# chfuse reports the error and is still running
+	fuse_pid=$(pgrep -x chfuse) || fuse_pid=
 	for h in $(cat hosts); do ssh $h pkill -9 -x chfsd || :; done
 	touch $GO
 	wait $pid || st=1
+	if ! kill -0 $fuse_pid 2> /dev/null; then
+		echo chfuse died
+		st=1
+	fi
 	rm -f $READY $GO
 	chfsctl -h hosts $OPT kill > /dev/null 2>&1 || :
 	chfsctl -h hosts clean
