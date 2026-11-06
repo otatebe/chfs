@@ -2,19 +2,10 @@
 
 set -eu
 
-OPT=
-while [ $# -gt 0 ]
-do
-	case $1 in
-	pmemkv) OPT="$OPT --with-pmemkv" ;;
-	*) OPT="$OPT $1" ;;
-	esac
-	shift
-done
-
-sh ./install-chfs.sh $OPT
+# arguments are passed to install-chfs.sh
+sh ./install-chfs.sh "$@"
 sh ./install-ompi.sh
-sh ./install-chfs.sh $OPT
+sh ./install-chfs.sh "$@"
 sh ./install-zpoline.sh
 sh ./install-ior.sh
 sh ./install-rdbench.sh
