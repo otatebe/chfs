@@ -110,19 +110,19 @@ leave:
 	fs_server_term();
 }
 
-static int heartbeat_stop = 0;
-static ABT_mutex_memory hb_mutex_mem = ABT_MUTEX_INITIALIZER;
+static int shutdown_requested = 0;
+static ABT_mutex_memory shutdown_mutex_mem = ABT_MUTEX_INITIALIZER;
 
 static int
-heartbeat_is_stopped(void)
+is_shutdown_requested(void)
 {
-	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&hb_mutex_mem);
-	int stop;
+	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&shutdown_mutex_mem);
+	int requested;
 
 	ABT_mutex_lock(mutex);
-	stop = heartbeat_stop;
+	requested = shutdown_requested;
 	ABT_mutex_unlock(mutex);
-	return (stop);
+	return (requested);
 }
 
 void *
@@ -130,7 +130,7 @@ handle_sig(void *arg)
 {
 	sigset_t *a = arg;
 	int ret, sig;
-	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&hb_mutex_mem);
+	ABT_mutex mutex = ABT_MUTEX_MEMORY_GET_HANDLE(&shutdown_mutex_mem);
 	static const char diag[] = "handle_sig";
 
 	ret = sigwait(a, &sig);
@@ -139,13 +139,10 @@ handle_sig(void *arg)
 	else
 		log_notice("%s: signal %d caught", diag, sig);
 
+	/* the main thread leaves the ring and finalizes margo */
 	ABT_mutex_lock(mutex);
-	heartbeat_stop = 1;
+	shutdown_requested = 1;
 	ABT_mutex_unlock(mutex);
-
-	profile_dump();
-
-	leave();
 
 	return (NULL);
 }
@@ -446,14 +443,18 @@ main(int argc, char *argv[])
 			ring_start_election();
 		/* ABT_cond_timedwait() busy-waits, which consumes a CPU core */
 		for (i = 0; i < heartbeat_interval; ++i) {
-			if (heartbeat_is_stopped())
+			if (is_shutdown_requested())
 				break;
 			margo_thread_sleep(mid, 1000);
 		}
-		if (heartbeat_is_stopped())
+		if (is_shutdown_requested())
 			break;
 	}
-	margo_wait_for_finalize(mid);
+	while (!is_shutdown_requested())
+		margo_thread_sleep(mid, 1000);
+
+	profile_dump();
+	leave();
 
 	return (0);
 }
