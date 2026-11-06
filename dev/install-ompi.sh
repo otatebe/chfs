@@ -13,6 +13,14 @@ cd
 #./autogen.pl
 
 OMPI=openmpi-5.0.11
+
+# When OMPI_ARCHIVE is specified, the installed files are archived in it,
+# and installed from it next time without building
+if [ -n "${OMPI_ARCHIVE:-}" ] && [ -f "$OMPI_ARCHIVE" ]; then
+	tar xfp "$OMPI_ARCHIVE" -C $HOME/local
+	exit 0
+fi
+
 [ -d $OMPI ] || {
 	[ -f $OMPI.tar.bz2 ] || wget https://download.open-mpi.org/release/open-mpi/v5.0/$OMPI.tar.bz2
 	tar xfp $OMPI.tar.bz2
@@ -23,6 +31,19 @@ cd $OMPI
 
 [ -d build ] || mkdir build
 cd build
-../configure --enable-prte-prefix-by-default --with-io-romio-flags=--with-file-system=chfs+ufs+testfs --prefix $HOME/local > /dev/null
+# use bundled packages.  Otherwise, packages installed by the previous
+# installation are used as external packages, and configure fails
+../configure --enable-prte-prefix-by-default \
+	--with-io-romio-flags=--with-file-system=chfs+ufs+testfs \
+	--with-libevent=internal --with-hwloc=internal \
+	--with-pmix=internal --with-prrte=internal \
+	--prefix $HOME/local > /dev/null
 make -j $(nproc) > /dev/null
 make install > /dev/null
+
+if [ -n "${OMPI_ARCHIVE:-}" ]; then
+	STAGE=$(mktemp -d)
+	make install DESTDIR=$STAGE > /dev/null
+	tar cfp "$OMPI_ARCHIVE" -C $STAGE$HOME/local .
+	rm -rf $STAGE
+fi

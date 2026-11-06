@@ -150,3 +150,4 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+dev/ompi-install.tar

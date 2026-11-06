@@ -393,8 +393,8 @@ main(int argc, char *argv[])
 		struct margo_init_info info = { 0 };
 
 		snprintf(json, sizeof json, "{\"use_progress_thread\":true,"
-			"\"rpc_thread_count\":%d,\"mercury\":{\"auto_sm\":true}}",
-			nthreads);
+			"\"rpc_thread_count\":%d,"
+			"\"mercury\":{\"auto_sm\":true}}", nthreads);
 		info.json_config = json;
 		mid = margo_init_ext(info_string, MARGO_SERVER_MODE, &info);
 	} else
