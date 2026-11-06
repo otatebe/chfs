@@ -2,15 +2,31 @@
 
 set -eu
 
-OPT=
-while [ $# -gt 0 ]
+# pmemkv is an alias of --with-pmemkv.  Other arguments are passed to
+# configure as they are
+for a
 do
-	case $1 in
-	pmemkv) OPT="$OPT --with-pmemkv" ;;
-	*) OPT="$OPT $1" ;;
-	esac
 	shift
+	case $a in
+	pmemkv) set -- "$@" --with-pmemkv ;;
+	*) set -- "$@" "$a" ;;
+	esac
 done
+
+# SANITIZE=address builds CHFS with AddressSanitizer in build-address.
+# The option is added to CC and MPICC since libtool drops it from LDFLAGS
+BUILD=build
+if [ -n "${SANITIZE:-}" ]; then
+	SANFLAGS="-fsanitize=$SANITIZE -fno-omit-frame-pointer"
+	CC="${CC:-gcc} $SANFLAGS"
+	CFLAGS="${CFLAGS:--g -O1}"
+	export CC CFLAGS
+	if command -v ${MPICC:-mpicc} > /dev/null; then
+		MPICC="${MPICC:-mpicc} $SANFLAGS"
+		export MPICC
+	fi
+	BUILD=build-$SANITIZE
+fi
 
 echo Install CHFS
 cd ~/chfs
@@ -18,8 +34,8 @@ cd ~/chfs
 set -x
 autoreconf -i
 
-[ -d build ] || mkdir build
-cd build
-../configure --prefix $HOME/local $OPT > /dev/null
+[ -d $BUILD ] || mkdir $BUILD
+cd $BUILD
+../configure --prefix $HOME/local "$@" > /dev/null
 make -j $(nproc) > /dev/null
 make install > /dev/null

@@ -1,5 +1,6 @@
-CFLAGS=$(shell pkg-config --cflags chfs)
-LIBS=$(shell pkg-config --libs chfs)
+# SANFLAGS, e.g. -fsanitize=address, is for a sanitizer
+CFLAGS=$(shell pkg-config --cflags chfs) $(SANFLAGS)
+LIBS=$(shell pkg-config --libs chfs) $(SANFLAGS)
 
 all: test flush_error
 
