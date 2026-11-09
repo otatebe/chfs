@@ -26,6 +26,7 @@ doc/chstagein.1
 pkgconfig/chfs.pc
 *~
 /build
+/build-*
 
 dev/test/test
 dev/test/flush_error

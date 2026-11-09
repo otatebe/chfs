@@ -36,6 +36,13 @@
 
       $ sudo sysctl kernel.yama.ptrace_scope=0
 
+- execute a test with AddressSanitizer (in a container)
+
+      c1$ SANITIZE=address sh install-chfs.sh
+      c1$ sh test-asan.sh
+
+  This builds CHFS with AddressSanitizer in ~/chfs/build-address and installs it in ~/local.  test-asan.sh fails when AddressSanitizer reports an error, which is stored in log/asan.  MPI, IOR and zpoline are not tested.  To install CHFS without AddressSanitizer again, execute `sh install-chfs.sh`.
+
 - explore CHFS (in a container)
 
       c1$ eval $(chfsctl -h hosts -m /tmp/a -b $PWD/backend -L log start)

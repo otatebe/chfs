@@ -16,10 +16,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        backend: [posix, pmemkv]
+        include:
+          - name: posix
+            install: sh install.sh
+            test: sh test.sh
+          - name: pmemkv
+            install: sh install.sh pmemkv
+            test: sh test.sh
+          # MPI, IOR and others are not built with AddressSanitizer
+          - name: asan
+            install: SANITIZE=address sh install-chfs.sh
+            test: sh test-asan.sh
+    name: test (${{ matrix.name }})
     env:
-      # argument of install.sh
-      INSTALL_OPT: ${{ matrix.backend == 'pmemkv' && 'pmemkv' || '' }}
+      INSTALL: ${{ matrix.install }}
+      TEST: ${{ matrix.test }}
     defaults:
       run:
         working-directory: dev
@@ -59,28 +70,29 @@ jobs:
       # Open MPI takes most of the install time.  It is built with
       # ROMIO for CHFS, which depends on lib/chfs.h
       - name: Cache Open MPI
+        if: matrix.name != 'asan'
         uses: actions/cache@v4
         with:
           path: dev/ompi-install.tar
           key: ompi-${{ hashFiles('dev/Dockerfile', 'dev/install-ompi.sh', 'dev/ompi/ad_chfs-5.0.patch', 'lib/chfs.h') }}
 
-      - name: Install CHFS, MPI, IOR and others
+      - name: Install
         run: |
           docker exec -u $USER -w /home/$USER/chfs/dev chfs-c1 \
-            bash -c "$CENV; OMPI_ARCHIVE=\$PWD/ompi-install.tar sh install.sh $INSTALL_OPT"
+            bash -c "$CENV; export OMPI_ARCHIVE=\$PWD/ompi-install.tar; $INSTALL"
 
-      - name: Execute test.sh
+      - name: Test
         timeout-minutes: 60
         run: |
           docker exec -u $USER -w /home/$USER/chfs/dev chfs-c1 \
-            bash -c "$CENV; sh test.sh"
+            bash -c "$CENV; $TEST"
 
-      # chfsd logs of test-start.sh
+      # chfsd logs of test-start.sh and reports of AddressSanitizer
       - name: Upload logs
         if: failure() || cancelled()
         uses: actions/upload-artifact@v4
         with:
-          name: dev-log-${{ matrix.backend }}
+          name: dev-log-${{ matrix.name }}
           path: dev/log
           if-no-files-found: ignore
 
