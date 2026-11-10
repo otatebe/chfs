@@ -5,6 +5,11 @@
 # in fuse_main_real() when chfuse exits
 leak:fuse_fs_new
 
+# Mochi-margo (0.24.2) loses a cached handle when Mercury still refers to
+# it at margo_destroy(); the handle is freed later by Mercury without
+# returning it to the handle cache
+leak:__margo_handle_cache_init
+
 # Open MPI, when chstagein and chfind are built with MPI
 leak:libmpi.so
 leak:libopen-pal.so
