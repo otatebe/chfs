@@ -37,5 +37,8 @@ autoreconf -i
 [ -d $BUILD ] || mkdir $BUILD
 cd $BUILD
 ../configure --prefix $HOME/local "$@" > /dev/null
+# show the configuration since the output of configure is discarded
+grep -E '^(#define|/\* #undef) (USE_|HAVE_MPI|ENABLE_)' lib/config.h || :
+grep -E '^(CC|MPICC|LIBPMEMKV_LIBS|ABT_IO_LIBS) =' Makefile || :
 make -j $(nproc) > /dev/null
 make install > /dev/null
