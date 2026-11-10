@@ -13,8 +13,11 @@ REPORT=$PWD/log/asan
 DATA=/tmp/asan-data.$$
 rm -rf $REPORT
 mkdir -p $REPORT
-# memory leaks at exit are not checked
-export ASAN_OPTIONS="detect_leaks=0:log_path=$REPORT/asan"
+# errors are checked by the reports at the end.  exitcode=0 executes all
+# tests to collect the reports
+export ASAN_OPTIONS="detect_leaks=1:exitcode=0:log_path=$REPORT/asan"
+# leaks in libraries used by CHFS are suppressed
+export LSAN_OPTIONS="suppressions=$PWD/lsan.supp:print_suppressions=0"
 
 (cd test && make clean && make SANFLAGS="$SANFLAGS")
 

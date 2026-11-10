@@ -1,0 +1,11 @@
+# Suppressions of LeakSanitizer for test-asan.sh.  Only leaks in libraries
+# used by CHFS are suppressed.
+
+# libfuse3 (3.14) does not free the file system allocated by fuse_new()
+# in fuse_main_real() when chfuse exits
+leak:fuse_fs_new
+
+# Open MPI, when chstagein and chfind are built with MPI
+leak:libmpi.so
+leak:libopen-pal.so
+leak:libpmix.so
