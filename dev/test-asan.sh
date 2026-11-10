@@ -43,6 +43,9 @@ sh ./test-stop.sh
 # write-back errors
 sh ./test-flush-error.sh
 
+# no space in a server
+sh ./test-no-space.sh
+
 (cd test && make clean)
 rm -f $DATA $BACKEND/asan-*
 

@@ -30,6 +30,7 @@ pkgconfig/chfs.pc
 
 dev/test/test
 dev/test/flush_error
+dev/test/no_space
 
 ## spack
 removed_la_files.txt

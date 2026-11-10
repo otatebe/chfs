@@ -59,6 +59,9 @@ rm -rf $BACKEND/rdbench*
 # write-back errors
 sh ./test-flush-error.sh
 
+# no space in a server
+sh ./test-no-space.sh
+
 # Mercury auto_sm
 sh ./test-auto-sm.sh
 
