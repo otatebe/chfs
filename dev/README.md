@@ -41,7 +41,7 @@
       c1$ SANITIZE=address sh install-chfs.sh
       c1$ sh test-asan.sh
 
-  This builds CHFS with AddressSanitizer in ~/chfs/build-address and installs it in ~/local.  test-asan.sh fails when AddressSanitizer reports an error, which is stored in log/asan.  MPI, IOR and zpoline are not tested.  To install CHFS without AddressSanitizer again, execute `sh install-chfs.sh`.
+  This builds CHFS with AddressSanitizer in ~/chfs/build-address and installs it in ~/local.  test-asan.sh fails when AddressSanitizer reports an error including a memory leak, which is stored in log/asan.  Leaks in libraries such as libfuse3 are suppressed by lsan.supp.  MPI, IOR and zpoline are not tested.  To install CHFS without AddressSanitizer again, execute `sh install-chfs.sh`.
 
 - explore CHFS (in a container)
 
