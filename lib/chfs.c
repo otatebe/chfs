@@ -1465,7 +1465,8 @@ chfs_pwrite_internal_async(int fd, const char *buf, size_t size, off_t offset)
 				save_errno = errno;
 			}
 			if (contiguous &&
-				(err == KV_SUCCESS || err == KV_ERR_PARTIAL_WRITE))
+				(err == KV_SUCCESS ||
+				err == KV_ERR_PARTIAL_WRITE))
 				ss += s;
 		} else if (contiguous) {
 			ss += req[i].s;
