@@ -2,10 +2,11 @@
 #
 # Writes data to a file in the CHFS mount point, creates ready_file, and
 # waits for go_file, which is created after all CHFS servers are stopped.
-# Then checks that close(2) reports the write-back error.
+# Then checks that close(2) reports the write-back error as EIO.
 #
 # No child process is created while the file is open, since closing the
 # file descriptor in a child process also flushes the data.
+import errno
 import os
 import sys
 import time
@@ -25,6 +26,9 @@ try:
     os.close(fd)
 except OSError as e:
     print(f"close returns -1: {os.strerror(e.errno)}")
+    if e.errno != errno.EIO:
+        print("FAIL")
+        sys.exit(1)
     print("OK")
     sys.exit(0)
 print("close returns 0")

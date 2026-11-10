@@ -620,7 +620,8 @@ chfs_pwrite_internal(int fd, const void *buf, size_t size, off_t offset);
 
 /*
  * writes back dirty data and invalidates the buffer.  When it fails, the
- * data is discarded and the error is kept in buf_err to be reported later.
+ * data is discarded and EIO is kept in buf_err to be reported later as other
+ * file systems.  The cause is logged when the RPC fails.
  */
 static int
 fd_flush_unlocked(int fd)
@@ -633,10 +634,8 @@ fd_flush_unlocked(int fd)
 		s = chfs_pwrite_internal(fd, tab->buf, tab->buf_pos,
 			tab->buf_off);
 		if (s != tab->buf_pos) {
-			if (s >= 0)
-				errno = EIO;
 			if (tab->buf_err == 0)
-				tab->buf_err = errno;
+				tab->buf_err = EIO;
 			r = -1;
 		}
 	}

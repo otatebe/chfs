@@ -13,7 +13,7 @@
  * usage: flush_error command
  *
  * Writes buffered data, executes command that stops all CHFS servers,
- * and checks that the write-back errors are reported.
+ * and checks that the write-back errors are reported as EIO.
  */
 
 #define CHUNK_SIZE	4096
@@ -59,7 +59,7 @@ main(int argc, char *argv[])
 	r = (expr); \
 	err = errno; \
 	printf("%-18s returns %d: %s\n", label, r, strerror(err)); \
-	if ((r == -1) != (expect_fail)) \
+	if ((r == -1) != (expect_fail) || (r == -1 && err != EIO)) \
 		fail = 1; \
 } while (0)
 
