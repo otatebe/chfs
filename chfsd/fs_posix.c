@@ -291,9 +291,13 @@ fs_open(const char *path, int flags, mode_t mode, size_t *chunk_size,
 		if ((mode & S_IWUSR) == 0)
 			chmod(path, mode | S_IWUSR);
 		r = set_metadata(path, *chunk_size, *cache_flags);
-		if (r < 0)
+		if (r < 0) {
 			close(fd);
-		else if (set_metadata_p)
+			/* do not leave a chunk without metadata */
+			unlink(path);
+			return (r);
+		}
+		if (set_metadata_p)
 			*set_metadata_p = 1;
 		if ((mode & S_IWUSR) == 0)
 			chmod(path, mode);
@@ -453,6 +457,35 @@ fs_inode_utimensat(char *key, size_t key_size, struct timespec times[2])
 	return (fs_err(r, diag));
 }
 
+/*
+ * removes the chunk when there is no space, since the chunk hides the data
+ * that the client writes to the backend instead.  Dirty data of an existing
+ * chunk is flushed before the removal.
+ */
+static int
+remove_chunk_no_space(char *key, size_t key_size, const char *p, int created)
+{
+	int r;
+	static const char diag[] = "remove_chunk_no_space";
+
+	if (!created) {
+		r = fs_inode_flush(key, key_size);
+		if (r != KV_SUCCESS) {
+			log_error("%s: %s: cannot flush: %s", diag, p,
+				kv_err_string(r));
+			return (r);
+		}
+	}
+	if (unlink(p) == -1) {
+		r = fs_err(-errno, diag);
+		log_error("%s: %s: cannot remove: %s", diag, p,
+			kv_err_string(r));
+		return (r);
+	}
+	log_notice("%s: %s: removed", diag, p);
+	return (KV_SUCCESS);
+}
+
 int
 fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 	off_t offset, uint32_t emode, size_t chunk_size)
@@ -491,6 +524,19 @@ fs_inode_write(char *key, size_t key_size, const void *buf, size_t *size,
 		if (!(flags & CHFS_FS_CACHE))
 			fs_inode_flush_enq(key, key_size);
 		close(fd);
+
+		/*
+		 * when there is a backend, the client writes the data to the
+		 * backend.  Otherwise, only an empty chunk created here is
+		 * removed since there is no other place to keep the data.
+		 */
+		if ((path_backend_root() != NULL &&
+			(r == -ENOSPC || (r >= 0 && r < ss))) ||
+			(does_create && r == -ENOSPC)) {
+			if (remove_chunk_no_space(key, key_size, p,
+				does_create) == KV_SUCCESS)
+				r = -ENOSPC;
+		}
 	}
 	if (r >= 0)
 		*size = r;
